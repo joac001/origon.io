@@ -1,12 +1,9 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/characters/character-a.tscn" id="2_char"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
-radius = 0.4
-height = 1.8
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_1"]
 radius = 0.4
 height = 1.8
 
@@ -16,9 +13,7 @@ script = ExtResource("1_script")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="ShadowBody" type="MeshInstance3D" parent="."]
-mesh = SubResource("CapsuleMesh_1")
-cast_shadow = 3
+[node name="Body" parent="." instance=ExtResource("2_char")]
 
 [node name="Head" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
