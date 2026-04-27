@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/building/roof-flat-corner-inner.glb" id="1_glb"]
+
+[sub_resource type="BoxShape3D" id="CollisionShape"]
+size = Vector3(2.200, 0.500, 2.200)
+
+[node name="RoofFlatCornerInner" type="StaticBody3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_glb")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.250, 0)
+shape = SubResource("CollisionShape")

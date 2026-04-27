@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/city/building-a.glb" id="1_glb"]
+
+[sub_resource type="BoxShape3D" id="CollisionShape"]
+size = Vector3(0.884, 1.293, 0.940)
+
+[node name="BuildingA" type="StaticBody3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_glb")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.646, 0)
+shape = SubResource("CollisionShape")

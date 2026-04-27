@@ -1,0 +1,767 @@
+{
+  "barricade-doorway-a": {
+    "path": "scenes\\props\\barricade-doorway-a.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.07500000298023224,
+      1.460181325674057,
+      1.255796730518341
+    ]
+  },
+  "barricade-doorway-b": {
+    "path": "scenes\\props\\barricade-doorway-b.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.07500000298023224,
+      1.5834610760211945,
+      1.2555456161499023
+    ]
+  },
+  "barricade-doorway-c": {
+    "path": "scenes\\props\\barricade-doorway-c.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.10000000149011612,
+      1.7471979856491089,
+      1.2555456161499023
+    ]
+  },
+  "barricade-window-a": {
+    "path": "scenes\\props\\barricade-window-a.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.07500000298023224,
+      0.9601813182234764,
+      1.255796730518341
+    ]
+  },
+  "barricade-window-b": {
+    "path": "scenes\\props\\barricade-window-b.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.07500000298023224,
+      1.083461057394743,
+      1.2555456161499023
+    ]
+  },
+  "barricade-window-c": {
+    "path": "scenes\\props\\barricade-window-c.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.10000000149011612,
+      1.3559346050024033,
+      1.2555456161499023
+    ]
+  },
+  "border-corner-diagonal": {
+    "path": "scenes\\props\\border-corner-diagonal.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.30000001192092896,
+      2.200000047683716
+    ]
+  },
+  "border-corner-round": {
+    "path": "scenes\\props\\border-corner-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.30000001345770255,
+      2.200000047683716
+    ]
+  },
+  "border-corner-small": {
+    "path": "scenes\\props\\border-corner-small.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2000000476837158,
+      0.30000001192092896,
+      1.2000000476837158
+    ]
+  },
+  "border-corner": {
+    "path": "scenes\\props\\border-corner.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.30000001192092896,
+      2.200000047683716
+    ]
+  },
+  "border-high-corner-diagonal": {
+    "path": "scenes\\props\\border-high-corner-diagonal.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.5,
+      2.200000047683716
+    ]
+  },
+  "border-high-corner-round": {
+    "path": "scenes\\props\\border-high-corner-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.5000000015367736,
+      2.200000047683716
+    ]
+  },
+  "border-high-corner-small": {
+    "path": "scenes\\props\\border-high-corner-small.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2000000476837158,
+      0.5,
+      1.2000000476837158
+    ]
+  },
+  "border-high-corner": {
+    "path": "scenes\\props\\border-high-corner.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.5,
+      2.200000047683716
+    ]
+  },
+  "border-high": {
+    "path": "scenes\\props\\border-high.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.19999998807907104,
+      0.5,
+      2.0
+    ]
+  },
+  "border": {
+    "path": "scenes\\props\\border.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.19999998807907104,
+      0.30000001192092896,
+      2.0
+    ]
+  },
+  "column-thin": {
+    "path": "scenes\\props\\column-thin.tscn",
+    "type": "CylinderShape3D",
+    "size": [
+      0.4000000059604645,
+      2.4000000953674316,
+      0.4000000059604645
+    ]
+  },
+  "column-wide": {
+    "path": "scenes\\props\\column-wide.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.699999988079071,
+      2.4000000953674316,
+      0.699999988079071
+    ]
+  },
+  "column": {
+    "path": "scenes\\props\\column.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.5,
+      2.4000000953674316,
+      0.5
+    ]
+  },
+  "detail-pipe": {
+    "path": "scenes\\props\\detail-pipe.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.4341599643230438,
+      0.42767998576164246,
+      0.4341599643230438
+    ]
+  },
+  "door-rotate-round-a": {
+    "path": "scenes\\props\\door-rotate-round-a.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-round-b": {
+    "path": "scenes\\props\\door-rotate-round-b.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-round-c": {
+    "path": "scenes\\props\\door-rotate-round-c.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-round-d": {
+    "path": "scenes\\props\\door-rotate-round-d.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-square-a": {
+    "path": "scenes\\props\\door-rotate-square-a.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-square-b": {
+    "path": "scenes\\props\\door-rotate-square-b.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-square-c": {
+    "path": "scenes\\props\\door-rotate-square-c.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "door-rotate-square-d": {
+    "path": "scenes\\props\\door-rotate-square-d.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.25,
+      2.1249999050050974,
+      1.024999976158142
+    ]
+  },
+  "floor-corner-diagonal": {
+    "path": "scenes\\props\\floor-corner-diagonal.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      0.10000000149011612,
+      2.0
+    ]
+  },
+  "floor-corner-round": {
+    "path": "scenes\\props\\floor-corner-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      0.10000000149011612,
+      2.0
+    ]
+  },
+  "floor-half": {
+    "path": "scenes\\props\\floor-half.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.0,
+      0.10000000149011612,
+      2.0
+    ]
+  },
+  "floor-quarter": {
+    "path": "scenes\\props\\floor-quarter.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.0,
+      0.10000000149011612,
+      1.0
+    ]
+  },
+  "floor": {
+    "path": "scenes\\props\\floor.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      0.10000000149011612,
+      2.0
+    ]
+  },
+  "gutter-vertical-bottom": {
+    "path": "scenes\\props\\gutter-vertical-bottom.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      0.30000001192092896,
+      0.30000001192092896
+    ]
+  },
+  "gutter-vertical-short": {
+    "path": "scenes\\props\\gutter-vertical-short.tscn",
+    "type": "CylinderShape3D",
+    "size": [
+      0.308239221572876,
+      1.0,
+      0.308239221572876
+    ]
+  },
+  "gutter-vertical-top": {
+    "path": "scenes\\props\\gutter-vertical-top.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      0.30000001192092896,
+      0.30000001192092896
+    ]
+  },
+  "gutter-vertical-wall": {
+    "path": "scenes\\props\\gutter-vertical-wall.tscn",
+    "type": "CylinderShape3D",
+    "size": [
+      0.308239221572876,
+      2.4000000953674316,
+      0.308239221572876
+    ]
+  },
+  "gutter-vertical": {
+    "path": "scenes\\props\\gutter-vertical.tscn",
+    "type": "CylinderShape3D",
+    "size": [
+      0.308239221572876,
+      2.0,
+      0.308239221572876
+    ]
+  },
+  "plating-detailed-wide": {
+    "path": "scenes\\props\\plating-detailed-wide.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.1250000298023224,
+      1.0,
+      2.0
+    ]
+  },
+  "plating-detailed": {
+    "path": "scenes\\props\\plating-detailed.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.1250000298023224,
+      1.0,
+      1.0000000000000029
+    ]
+  },
+  "plating-wide": {
+    "path": "scenes\\props\\plating-wide.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.10000002384185791,
+      1.0,
+      2.0
+    ]
+  },
+  "plating": {
+    "path": "scenes\\props\\plating.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.10000002384185791,
+      1.0,
+      1.0000000000000029
+    ]
+  },
+  "roof-flat-center": {
+    "path": "scenes\\props\\roof-flat-center.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      0.10000000149011612,
+      2.0
+    ]
+  },
+  "roof-flat-corner-inner": {
+    "path": "scenes\\props\\roof-flat-corner-inner.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.1999999284744263,
+      0.5,
+      2.1999999284744263
+    ]
+  },
+  "roof-flat-corner": {
+    "path": "scenes\\props\\roof-flat-corner.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.200000047683716,
+      0.4000000059604672,
+      2.200000047683716
+    ]
+  },
+  "roof-flat-patch-large": {
+    "path": "scenes\\props\\roof-flat-patch-large.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.600000023841858,
+      0.05000000074505806,
+      1.600000023841858
+    ]
+  },
+  "roof-flat-patch": {
+    "path": "scenes\\props\\roof-flat-patch.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.100000023841858,
+      0.05000000074505806,
+      1.100000023841858
+    ]
+  },
+  "roof-flat-side": {
+    "path": "scenes\\props\\roof-flat-side.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.1999999284744263,
+      0.4000000059604645,
+      2.0
+    ]
+  },
+  "roof-flat-square": {
+    "path": "scenes\\props\\roof-flat-square.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.3945152759552,
+      0.4000000059604645,
+      2.3945152759552
+    ]
+  },
+  "stairs-center-short": {
+    "path": "scenes\\props\\stairs-center-short.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      1.3000000715255735,
+      2.0
+    ]
+  },
+  "stairs-center": {
+    "path": "scenes\\props\\stairs-center.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      2.4999999999999996,
+      4.0
+    ]
+  },
+  "stairs-closed-short": {
+    "path": "scenes\\props\\stairs-closed-short.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      1.3000000715255735,
+      2.000000014901161
+    ]
+  },
+  "stairs-closed": {
+    "path": "scenes\\props\\stairs-closed.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      2.4999999999999996,
+      4.0
+    ]
+  },
+  "stairs-open-short": {
+    "path": "scenes\\props\\stairs-open-short.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      1.3000000715255737,
+      2.0
+    ]
+  },
+  "stairs-open": {
+    "path": "scenes\\props\\stairs-open.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      2.5,
+      4.0
+    ]
+  },
+  "stairs-sides-short": {
+    "path": "scenes\\props\\stairs-sides-short.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      1.3499999046325684,
+      4.0
+    ]
+  },
+  "stairs-sides": {
+    "path": "scenes\\props\\stairs-sides.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.2999999523162842,
+      2.549999952316284,
+      6.0
+    ]
+  },
+  "wall-corner-column-bottom": {
+    "path": "scenes\\props\\wall-corner-column-bottom.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.125,
+      2.4000000953674316,
+      2.125
+    ]
+  },
+  "wall-corner-column-small-bottom": {
+    "path": "scenes\\props\\wall-corner-column-small-bottom.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.1249999999999978,
+      2.4000000953674316,
+      1.1250000000000087
+    ]
+  },
+  "wall-corner-column-small": {
+    "path": "scenes\\props\\wall-corner-column-small.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.074999928474424,
+      2.4000000953674316,
+      1.0777423381805507
+    ]
+  },
+  "wall-corner-column": {
+    "path": "scenes\\props\\wall-corner-column.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0749999284744263,
+      2.4000000953674316,
+      2.0749999284744263
+    ]
+  },
+  "wall-corner-diagonal": {
+    "path": "scenes\\props\\wall-corner-diagonal.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-corner-round": {
+    "path": "scenes\\props\\wall-corner-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-corner": {
+    "path": "scenes\\props\\wall-corner.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      2.0,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-doorway-round": {
+    "path": "scenes\\props\\wall-doorway-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-doorway-square": {
+    "path": "scenes\\props\\wall-doorway-square.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000016689300537,
+      2.4000000953674387,
+      2.000000238418579
+    ]
+  },
+  "wall-doorway-wide-round": {
+    "path": "scenes\\props\\wall-doorway-wide-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      4.0
+    ]
+  },
+  "wall-doorway-wide-square": {
+    "path": "scenes\\props\\wall-doorway-wide-square.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000040531158447,
+      2.4000000953674383,
+      4.000000476837158
+    ]
+  },
+  "wall-half": {
+    "path": "scenes\\props\\wall-half.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.1000000387430191,
+      2.4000000953674316,
+      1.0
+    ]
+  },
+  "wall-low": {
+    "path": "scenes\\props\\wall-low.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.10000002011656761,
+      1.2000000476837158,
+      2.0
+    ]
+  },
+  "wall-window-round-detailed": {
+    "path": "scenes\\props\\wall-window-round-detailed.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-window-round": {
+    "path": "scenes\\props\\wall-window-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-window-square-detailed": {
+    "path": "scenes\\props\\wall-window-square-detailed.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-window-square": {
+    "path": "scenes\\props\\wall-window-square.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "wall-window-wide-round-detailed": {
+    "path": "scenes\\props\\wall-window-wide-round-detailed.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.19999999552965164,
+      2.4000000953674316,
+      4.0
+    ]
+  },
+  "wall-window-wide-round": {
+    "path": "scenes\\props\\wall-window-wide-round.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.19999999552965164,
+      2.4000000953674316,
+      4.0
+    ]
+  },
+  "wall-window-wide-square-detailed": {
+    "path": "scenes\\props\\wall-window-wide-square-detailed.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      4.0
+    ]
+  },
+  "wall-window-wide-square": {
+    "path": "scenes\\props\\wall-window-wide-square.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.20000000298023224,
+      2.4000000953674316,
+      4.0
+    ]
+  },
+  "wall": {
+    "path": "scenes\\props\\wall.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.1000000387430191,
+      2.4000000953674316,
+      2.0
+    ]
+  },
+  "police": {
+    "path": "scenes\\props\\police.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.5,
+      1.4000000357627869,
+      2.899999976158142
+    ]
+  },
+  "sedan": {
+    "path": "scenes\\props\\sedan.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.5,
+      1.449999988079071,
+      2.549999952316284
+    ]
+  },
+  "suv": {
+    "path": "scenes\\props\\suv.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      1.5,
+      1.4000000357627869,
+      2.549999713897705
+    ]
+  },
+  "building-a": {
+    "path": "scenes\\props\\building-a.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.8835878968238831,
+      1.2929999828338623,
+      0.9399999976158142
+    ]
+  },
+  "building-b": {
+    "path": "scenes\\props\\building-b.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.9700000882148743,
+      1.2929999828338623,
+      0.9399999976158142
+    ]
+  },
+  "building-c": {
+    "path": "scenes\\props\\building-c.tscn",
+    "type": "BoxShape3D",
+    "size": [
+      0.8835878968238831,
+      0.8930000066757202,
+      1.0900000929832458
+    ]
+  }
+}

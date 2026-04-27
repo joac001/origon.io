@@ -26,10 +26,23 @@ scenes/
     test_map.tscn     # Mapa de prueba 30x30: piso, paredes, segundo piso, escaleras, autos, columnas, cover walls
   player/
     player.tscn       # CharacterBody3D + CapsuleCollision + ShadowBody + Head + Camera3D
-  props/              # Props modulares reutilizables (instanciar en cualquier mapa)
-    stairs.tscn       # Escalera stairs-open.glb con ramp CollisionShape3D calibrada
-    car_sedan.tscn    # Sedan con colisión compuesta: chassis (hood/trunk) + cabin (roof)
-    car_suv.tscn      # SUV con colisión compuesta: chassis + cabin más ancho
+  props/              # Props modulares reutilizables (89 escenas auto-generadas de GLBs)
+                      # BUILDING KIT (78 props):
+                      #   - Columnas: column.tscn, column-thin.tscn, column-wide.tscn
+                      #   - Paredes: wall.tscn, wall-low.tscn, wall-corner.tscn, wall-corner-diagonal.tscn, wall-corner-round.tscn, wall-half.tscn
+                      #   - Paredes con ventanas: wall-window-*.tscn (4 tipos)
+                      #   - Paredes con puertas: wall-doorway-*.tscn (4 tipos)
+                      #   - Puertas rotativas: door-rotate-*.tscn (8 tipos: square/round a/b/c/d)
+                      #   - Escaleras: stairs-open.tscn, stairs-closed.tscn, stairs-center.tscn, stairs-sides.tscn (+ short variants)
+                      #   - Techos: roof-flat-*.tscn (7 tipos)
+                      #   - Barricadas: barricade-*.tscn (6 tipos)
+                      #   - Bordes: border.tscn, border-corner.tscn, border-high.tscn (+ variants)
+                      #   - Pisos: floor.tscn, floor-corner-*.tscn, floor-half.tscn, floor-quarter.tscn
+                      #   - Detalles: detail-pipe.tscn, plating.tscn, gutter-vertical.tscn
+                      # CARS (3 props):
+                      #   - car-sedan.tscn, car-suv.tscn, car-police.tscn (colisiones compuestas)
+                      # CITY (3 props):
+                      #   - building-a.tscn, building-b.tscn, building-c.tscn (decoración de fondo)
 
 scripts/
   player/
@@ -40,20 +53,17 @@ resources/            # .tres — recursos de armas, clases, etc. (a crear)
 
 assets/
   models/
-    building/         # Kenney Building Kit (79 GLBs) — piezas modulares de edificio
-                      # En uso: column.glb, wall-low.glb, stairs-open.glb
-                      # Disponibles para futuros mapas: wall.glb, wall-corner.glb, wall-doorway-*.glb,
-                      #   stairs-*.glb, floor.glb, roof-*.glb, barricade-*.glb, door-*.glb, etc.
+    building/         # Kenney Building Kit (79 GLBs) — TODOS están modularizados en scenes/props/
                       # Textures/colormap.png — textura compartida del kit
     characters/       # Kenney Blocky Characters (18 GLBs, character-a.glb a character-r.glb)
                       # Para uso futuro como skins de jugador
                       # Textures/texture-a.png a texture-r.png (una por personaje)
-    cars/             # Kenney Car Kit: sedan.glb, suv.glb, police.glb
-                      # En uso: sedan.glb (car_sedan.tscn), suv.glb (car_suv.tscn)
-                      # Disponible: police.glb (prop scene pendiente)
+    cars/             # Kenney Car Kit (3 GLBs) — TODOS modularizados en scenes/props/
+                      # sedan.glb → car-sedan.tscn, suv.glb → car-suv.tscn, police.glb → car-police.tscn
+                      # Todas con colisiones compuestas: chassis (hood/trunk) + cabin (roof)
                       # Textures/colormap.png
-    city/             # Kenney City Kit Commercial: building-a/b/c.glb
-                      # Para uso futuro como decoración de fondo en mapas
+    city/             # Kenney City Kit Commercial (3 GLBs) — modularizados en scenes/props/
+                      # building-a/b/c.glb → building-a/b/c.tscn (decoración de fondo en mapas)
                       # Textures/colormap.png
 ```
 
@@ -75,6 +85,21 @@ Otros archivos en raíz:
 - No implementar features no listados en `especificaciones_funcionales.md` sin consultar
 - Los modos TDM y Gun Game tienen lógica de daño separada (ver RF-13, RF-63)
 - El cambio de clase solo ocurre en el countdown de respawn, no en cajas de munición (RF-43, RF-44)
+
+## Catálogo de Props Modularizados
+
+**89 escenas .tscn listos para usar** en cualquier mapa. Cada prop incluye:
+- Malla (mesh) del GLB correspondiente
+- CollisionShape3D calibrada automáticamente
+- StaticBody3D como raíz (pronto para ser instanciado)
+
+**Para agregar un prop a un mapa** (ej: columna):
+1. En el editor: clic derecho en el mapa → Instancia Scene
+2. Seleccionar `scenes/props/column.tscn`
+3. Posicionar y rotar el prop en el mapa
+4. Las colisiones se aplican automáticamente
+
+**Todos los props usan texturas del Kenney Kit** (colormap.png compartido por kit).
 
 ## Workflow con Claude
 

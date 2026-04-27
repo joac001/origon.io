@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/building/wall-low.glb" id="1_glb"]
+
+[sub_resource type="BoxShape3D" id="CollisionShape"]
+size = Vector3(0.100, 1.200, 2.000)
+
+[node name="WallLow" type="StaticBody3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_glb")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.600, 0)
+shape = SubResource("CollisionShape")

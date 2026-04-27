@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/characters/character-a.glb" id="1_glb"]
+
+[node name="CharacterA" type="Node3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_glb")]
