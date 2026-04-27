@@ -1,0 +1,723 @@
+{
+  "barricade-doorway-a": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "barricade-doorway-b": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "barricade-doorway-c": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "barricade-window-a": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "barricade-window-b": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "barricade-window-c": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-corner-diagonal": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-corner-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-corner-small": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-corner": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-high-corner-diagonal": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-high-corner-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-high-corner-small": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-high-corner": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border-high": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "border": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "column-thin": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "column-wide": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "column": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "detail-pipe": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-round-a": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-round-b": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-round-c": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-round-d": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "door-rotate-square-a": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-square-b": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-square-c": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "door-rotate-square-d": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "floor-corner-diagonal": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "floor-corner-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "floor-half": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "floor-quarter": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "floor": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "gutter-vertical-bottom": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "gutter-vertical-short": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "gutter-vertical-top": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "gutter-vertical-wall": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "gutter-vertical": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "plating-detailed-wide": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "plating-detailed": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "plating-wide": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "plating": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-center": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-corner-inner": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-corner": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-patch-large": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-patch": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-side": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "roof-flat-square": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-center-short": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-center": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-closed-short": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-closed": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-open-short": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-open": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-sides-short": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "stairs-sides": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner-column-bottom": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner-column-small-bottom": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner-column-small": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner-column": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner-diagonal": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-corner": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-doorway-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-doorway-square": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-doorway-wide-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-doorway-wide-square": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-half": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-low": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "wall-window-round-detailed": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-square-detailed": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-square": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-wide-round-detailed": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-wide-round": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-wide-square-detailed": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall-window-wide-square": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 2,
+    "has_materials": true
+  },
+  "wall": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "police": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "sedan": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "suv": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "building-a": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "building-b": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "building-c": {
+    "textures": [
+      "Textures/colormap.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-a": {
+    "textures": [
+      "Textures/texture-a.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-b": {
+    "textures": [
+      "Textures/texture-b.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-c": {
+    "textures": [
+      "Textures/texture-c.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-d": {
+    "textures": [
+      "Textures/texture-d.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-e": {
+    "textures": [
+      "Textures/texture-e.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-f": {
+    "textures": [
+      "Textures/texture-f.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-g": {
+    "textures": [
+      "Textures/texture-g.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-h": {
+    "textures": [
+      "Textures/texture-h.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-i": {
+    "textures": [
+      "Textures/texture-i.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-j": {
+    "textures": [
+      "Textures/texture-j.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-k": {
+    "textures": [
+      "Textures/texture-k.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-l": {
+    "textures": [
+      "Textures/texture-l.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-m": {
+    "textures": [
+      "Textures/texture-m.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-n": {
+    "textures": [
+      "Textures/texture-n.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-o": {
+    "textures": [
+      "Textures/texture-o.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-p": {
+    "textures": [
+      "Textures/texture-p.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-q": {
+    "textures": [
+      "Textures/texture-q.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  },
+  "character-r": {
+    "textures": [
+      "Textures/texture-r.png"
+    ],
+    "materials": 1,
+    "has_materials": true
+  }
+}
