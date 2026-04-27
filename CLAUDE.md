@@ -18,34 +18,48 @@ Los requisitos funcionales completos están en [`especificaciones_funcionales.md
 
 - `project.godot` — configuración del proyecto
 - `especificaciones_funcionales.md` — requisitos funcionales (fuente de verdad del diseño)
-- `test.tscn` — escena de prueba inicial (jugador cilindro básico)
-- `character_body_3d.gd` — script de movimiento básico del jugador (prototipo)
 
 Estructura actual de carpetas:
 ```
 scenes/
-  player/
-	player.tscn       # CharacterBody3D + CapsuleCollision + Head + Camera3D
   maps/
-	test_map.tscn     # Escena de prueba: piso, paredes, 2 cajas de cover, jugador
+    test_map.tscn     # Mapa de prueba 30x30: piso, paredes, segundo piso, escaleras, autos, columnas, cover walls
+  player/
+    player.tscn       # CharacterBody3D + CapsuleCollision + ShadowBody + Head + Camera3D
+  props/              # Props modulares reutilizables (instanciar en cualquier mapa)
+    stairs.tscn       # Escalera stairs-open.glb con ramp CollisionShape3D calibrada
+    car_sedan.tscn    # Sedan con colisión compuesta: chassis (hood/trunk) + cabin (roof)
+    car_suv.tscn      # SUV con colisión compuesta: chassis + cabin más ancho
+
 scripts/
   player/
-	player.gd         # Movimiento FPS: WASD + mouse look + salto
-autoloads/      # GameManager, NetworkManager, etc. (a crear)
-  weapons/
-  network/
-  game_modes/
-resources/      # .tres — recursos de armas, clases, etc. (a crear)
+    player.gd         # Movimiento FPS: WASD + mouse look + salto + sprint + air control
+
+autoloads/            # GameManager, NetworkManager, etc. (a crear)
+resources/            # .tres — recursos de armas, clases, etc. (a crear)
+
 assets/
   models/
-	building/   # Kenney Building Kit (79 GLBs) — piezas modulares de edificio
-	characters/ # Kenney Blocky Characters (18 GLBs, character-a.glb a character-r.glb)
-  textures/
-	characters/ # Texturas para characters (texture-a.png a texture-r.png)
+    building/         # Kenney Building Kit (79 GLBs) — piezas modulares de edificio
+                      # En uso: column.glb, wall-low.glb, stairs-open.glb
+                      # Disponibles para futuros mapas: wall.glb, wall-corner.glb, wall-doorway-*.glb,
+                      #   stairs-*.glb, floor.glb, roof-*.glb, barricade-*.glb, door-*.glb, etc.
+                      # Textures/colormap.png — textura compartida del kit
+    characters/       # Kenney Blocky Characters (18 GLBs, character-a.glb a character-r.glb)
+                      # Para uso futuro como skins de jugador
+                      # Textures/texture-a.png a texture-r.png (una por personaje)
+    cars/             # Kenney Car Kit: sedan.glb, suv.glb, police.glb
+                      # En uso: sedan.glb (car_sedan.tscn), suv.glb (car_suv.tscn)
+                      # Disponible: police.glb (prop scene pendiente)
+                      # Textures/colormap.png
+    city/             # Kenney City Kit Commercial: building-a/b/c.glb
+                      # Para uso futuro como decoración de fondo en mapas
+                      # Textures/colormap.png
 ```
 
-Archivos legacy en raíz (no borrar hasta confirmar que no se necesitan):
-- `test.tscn` / `character_body_3d.gd` — escena de prueba original
+Otros archivos en raíz:
+- `icon.svg` — ícono del proyecto Godot
+- `especificaciones_funcionales.md` — fuente de verdad del diseño (ver sección arriba)
 
 ## Convenciones de código
 
@@ -71,7 +85,8 @@ El usuario quiere tocar Godot lo mínimo posible. Claude se encarga de:
 - Modificar `project.godot` (autoloads, input maps, configuración)
 
 El usuario se encarga de:
-- Importar assets 3D (modelos, texturas, sonidos) desde el editor
 - Verificar visualmente el layout de escenas
 - Probar el juego corriendo desde el editor
 - Ajustar posiciones y transforms visuales cuando sea necesario
+
+Nota: Claude puede extraer assets de los ZIPs en `Asset library/` usando Python directamente (sin necesidad de que el usuario los importe manualmente). Los GLBs van en `assets/models/<kit>/` y las texturas en `assets/models/<kit>/Textures/`.
