@@ -23,48 +23,52 @@ Estructura actual de carpetas:
 ```
 scenes/
   maps/
-    test_map.tscn     # Mapa de prueba 30x30: piso, paredes, segundo piso, escaleras, autos, columnas, cover walls
+	test_map.tscn     # Mapa de prueba 30x30: piso, paredes, segundo piso, escaleras, autos, columnas, cover walls
   player/
-    player.tscn       # CharacterBody3D + CapsuleCollision + ShadowBody + Head + Camera3D
+	player.tscn       # CharacterBody3D + CapsuleCollision + ShadowBody + Head + Camera3D
   props/              # Props modulares reutilizables (89 escenas auto-generadas de GLBs)
-                      # BUILDING KIT (78 props):
-                      #   - Columnas: column.tscn, column-thin.tscn, column-wide.tscn
-                      #   - Paredes: wall.tscn, wall-low.tscn, wall-corner.tscn, wall-corner-diagonal.tscn, wall-corner-round.tscn, wall-half.tscn
-                      #   - Paredes con ventanas: wall-window-*.tscn (4 tipos)
-                      #   - Paredes con puertas: wall-doorway-*.tscn (4 tipos)
-                      #   - Puertas rotativas: door-rotate-*.tscn (8 tipos: square/round a/b/c/d)
-                      #   - Escaleras: stairs-open.tscn, stairs-closed.tscn, stairs-center.tscn, stairs-sides.tscn (+ short variants)
-                      #   - Techos: roof-flat-*.tscn (7 tipos)
-                      #   - Barricadas: barricade-*.tscn (6 tipos)
-                      #   - Bordes: border.tscn, border-corner.tscn, border-high.tscn (+ variants)
-                      #   - Pisos: floor.tscn, floor-corner-*.tscn, floor-half.tscn, floor-quarter.tscn
-                      #   - Detalles: detail-pipe.tscn, plating.tscn, gutter-vertical.tscn
-                      # CARS (3 props):
-                      #   - car-sedan.tscn, car-suv.tscn, car-police.tscn (colisiones compuestas)
-                      # CITY (3 props):
-                      #   - building-a.tscn, building-b.tscn, building-c.tscn (decoración de fondo)
+					  # BUILDING KIT (78 props):
+					  #   - Columnas: column.tscn, column-thin.tscn, column-wide.tscn
+					  #   - Paredes: wall.tscn, wall-low.tscn, wall-corner.tscn, wall-corner-diagonal.tscn, wall-corner-round.tscn, wall-half.tscn
+					  #   - Paredes con ventanas: wall-window-*.tscn (4 tipos)
+					  #   - Paredes con puertas: wall-doorway-*.tscn (4 tipos)
+					  #   - Puertas rotativas: door-rotate-*.tscn (8 tipos: square/round a/b/c/d)
+					  #   - Escaleras: stairs-open.tscn, stairs-closed.tscn, stairs-center.tscn, stairs-sides.tscn (+ short variants)
+					  #   - Techos: roof-flat-*.tscn (7 tipos)
+					  #   - Barricadas: barricade-*.tscn (6 tipos)
+					  #   - Bordes: border.tscn, border-corner.tscn, border-high.tscn (+ variants)
+					  #   - Pisos: floor.tscn, floor-corner-*.tscn, floor-half.tscn, floor-quarter.tscn
+					  #   - Detalles: detail-pipe.tscn, plating.tscn, gutter-vertical.tscn
+					  # CARS (3 props):
+					  #   - car-sedan.tscn, car-suv.tscn, car-police.tscn (colisiones compuestas)
+					  # CITY (3 props):
+					  #   - building-a.tscn, building-b.tscn, building-c.tscn (decoración de fondo)
 
 scripts/
   player/
-    player.gd         # Movimiento FPS: WASD + mouse look + salto + sprint + air control
+	player.gd         # Movimiento FPS: WASD + mouse look + salto + sprint + air control
+  tools/              # Scripts de validación y utilidades (Python)
+	check_dependencies.py    # Verifica que test_map.tscn tenga todas sus refs
+	check_prop_refs.py       # Verifica que props tengan GLBs válidos
+	check_textures.py        # Analiza qué texturas usa cada GLB
 
 autoloads/            # GameManager, NetworkManager, etc. (a crear)
 resources/            # .tres — recursos de armas, clases, etc. (a crear)
 
 assets/
   models/
-    building/         # Kenney Building Kit (79 GLBs) — TODOS están modularizados en scenes/props/
-                      # Textures/colormap.png — textura compartida del kit
-    characters/       # Kenney Blocky Characters (18 GLBs, character-a.glb a character-r.glb)
-                      # Para uso futuro como skins de jugador
-                      # Textures/texture-a.png a texture-r.png (una por personaje)
-    cars/             # Kenney Car Kit (3 GLBs) — TODOS modularizados en scenes/props/
-                      # sedan.glb → car-sedan.tscn, suv.glb → car-suv.tscn, police.glb → car-police.tscn
-                      # Todas con colisiones compuestas: chassis (hood/trunk) + cabin (roof)
-                      # Textures/colormap.png
-    city/             # Kenney City Kit Commercial (3 GLBs) — modularizados en scenes/props/
-                      # building-a/b/c.glb → building-a/b/c.tscn (decoración de fondo en mapas)
-                      # Textures/colormap.png
+	building/         # Kenney Building Kit (79 GLBs) — TODOS están modularizados en scenes/props/
+					  # Textures/colormap.png — textura compartida del kit
+	characters/       # Kenney Blocky Characters (18 GLBs, character-a.glb a character-r.glb)
+					  # Para uso futuro como skins de jugador
+					  # Textures/texture-a.png a texture-r.png (una por personaje)
+	cars/             # Kenney Car Kit (3 GLBs) — TODOS modularizados en scenes/props/
+					  # sedan.glb → car-sedan.tscn, suv.glb → car-suv.tscn, police.glb → car-police.tscn
+					  # Todas con colisiones compuestas: chassis (hood/trunk) + cabin (roof)
+					  # Textures/colormap.png
+	city/             # Kenney City Kit Commercial (3 GLBs) — modularizados en scenes/props/
+					  # building-a/b/c.glb → building-a/b/c.tscn (decoración de fondo en mapas)
+					  # Textures/colormap.png
 ```
 
 Otros archivos en raíz:
@@ -100,6 +104,23 @@ Otros archivos en raíz:
 4. Las colisiones se aplican automáticamente
 
 **Todos los props usan texturas del Kenney Kit** (colormap.png compartido por kit).
+
+## Scripts de Herramientas (Python)
+
+Los scripts de validación y utilidades se guardan en `scripts/tools/` y se ejecutan desde la raíz del proyecto:
+
+```bash
+# Validar que test_map.tscn tiene todas sus referencias
+python scripts/tools/check_dependencies.py
+
+# Validar que cada prop tiene GLBs válidos
+python scripts/tools/check_prop_refs.py
+
+# Analizar qué texturas usa cada GLB
+python scripts/tools/check_textures.py
+```
+
+**Convención**: Todos los scripts de herramientas (análisis, validación, generación) van en `scripts/tools/` con nombres descriptivos. No dejar scripts sueltos en la raíz del proyecto.
 
 ## Workflow con Claude
 

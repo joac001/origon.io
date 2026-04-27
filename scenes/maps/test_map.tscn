@@ -1,15 +1,15 @@
 [gd_scene format=3 uid="uid://bwrpvgqypdqwj"]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
-[ext_resource type="PackedScene" path="res://scenes/props/column.tscn" id="2_column"]
 [ext_resource type="PackedScene" path="res://scenes/props/column-thin.tscn" id="2b_column_thin"]
 [ext_resource type="PackedScene" path="res://scenes/props/column-wide.tscn" id="2c_column_wide"]
-[ext_resource type="PackedScene" path="res://scenes/props/wall-low.tscn" id="3_walllow"]
+[ext_resource type="PackedScene" path="res://scenes/props/column.tscn" id="2_column"]
 [ext_resource type="PackedScene" path="res://scenes/props/wall.tscn" id="3b_wall"]
 [ext_resource type="PackedScene" path="res://scenes/props/wall-corner.tscn" id="3c_wall_corner"]
 [ext_resource type="PackedScene" path="res://scenes/props/wall-half.tscn" id="3d_wall_half"]
-[ext_resource type="PackedScene" path="res://scenes/props/stairs.tscn" id="4_stairs_prop"]
+[ext_resource type="PackedScene" path="res://scenes/props/wall-low.tscn" id="3_walllow"]
 [ext_resource type="PackedScene" path="res://scenes/props/stairs-closed.tscn" id="4b_stairs_closed"]
+[ext_resource type="PackedScene" path="res://scenes/props/stairs.tscn" id="4_stairs_prop"]
 [ext_resource type="PackedScene" path="res://scenes/props/car_sedan.tscn" id="5_sedan_prop"]
 [ext_resource type="PackedScene" path="res://scenes/props/car_suv.tscn" id="6_suv_prop"]
 [ext_resource type="PackedScene" path="res://scenes/props/car_police.tscn" id="7_police_prop"]
@@ -157,39 +157,39 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.25, 0)
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 6, 0.2, 3)
 
 [node name="CarSUV" parent="." unique_id=1016 instance=ExtResource("6_suv_prop")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 10)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.280159, 0.2, 10)
 
-[node name="ColumnThin1" parent="." instance=ExtResource("2b_column_thin")]
+[node name="ColumnThin1" parent="." unique_id=1788485495 instance=ExtResource("2b_column_thin")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.25, -5)
 
-[node name="ColumnWide1" parent="." instance=ExtResource("2c_column_wide")]
+[node name="ColumnWide1" parent="." unique_id=1053193779 instance=ExtResource("2c_column_wide")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.25, -5)
 
-[node name="WallSection1" parent="." instance=ExtResource("3b_wall")]
+[node name="WallSection1" parent="." unique_id=453540502 instance=ExtResource("3b_wall")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0.25, 0)
 
-[node name="WallCorner1" parent="." instance=ExtResource("3c_wall_corner")]
+[node name="WallCorner1" parent="." unique_id=1995410642 instance=ExtResource("3c_wall_corner")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.25, 0)
 
-[node name="WallHalf1" parent="." instance=ExtResource("3d_wall_half")]
+[node name="WallHalf1" parent="." unique_id=776592008 instance=ExtResource("3d_wall_half")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 5)
 
-[node name="Door1" parent="." instance=ExtResource("8_door")]
+[node name="Door1" parent="." unique_id=66716978 instance=ExtResource("8_door")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 8)
 
-[node name="Barricade1" parent="." instance=ExtResource("9_barricade")]
+[node name="Barricade1" parent="." unique_id=1142048109 instance=ExtResource("9_barricade")]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 8, 0.25, 5)
 
-[node name="Roof1" parent="." instance=ExtResource("10_roof")]
+[node name="Roof1" parent="." unique_id=1703129768 instance=ExtResource("10_roof")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
 
-[node name="StairsClosedSouth" parent="." instance=ExtResource("4b_stairs_closed")]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0.25, 10)
+[node name="StairsClosedSouth" parent="." unique_id=791660005 instance=ExtResource("4b_stairs_closed")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -3.8072395, 0.25, 10)
 
-[node name="Police" parent="." instance=ExtResource("7_police_prop")]
+[node name="Police" parent="." unique_id=1671822008 instance=ExtResource("7_police_prop")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, 10)
 
-[node name="CityBuilding" parent="." instance=ExtResource("11_city_building")]
+[node name="CityBuilding" parent="." unique_id=861675088 instance=ExtResource("11_city_building")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, -15)
 
 [node name="Player" parent="." unique_id=896600524 instance=ExtResource("1_player")]
