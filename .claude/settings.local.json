@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Bash(python -c ' *)",
+      "Bash(rtk read *)",
+      "Bash(python3 -c ' *)",
+      "Bash(rtk git *)",
+      "Bash(git rev-parse *)",
+      "Bash(git reset *)"
+    ]
+  }
+}
