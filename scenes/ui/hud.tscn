@@ -24,8 +24,8 @@ min_value = 0.0
 max_value = 100.0
 value = 100.0
 show_percentage = true
-theme_overrides_colors/font_color = Color.WHITE
-theme_overrides_colors/font_outline_color = Color.BLACK
+theme_overrides_colors/font_color = Color(1, 1, 1, 1)
+theme_overrides_colors/font_outline_color = Color(0, 0, 0, 1)
 
 [node name="StaminaBar" type="ProgressBar" parent="VBoxContainer"]
 layout_mode = 2
@@ -35,7 +35,7 @@ custom_minimum_size = Vector2(200, 15)
 min_value = 0.0
 max_value = 100.0
 value = 100.0
-theme_overrides_colors/font_color = Color.YELLOW
+theme_overrides_colors/font_color = Color(1, 1, 0, 1)
 theme_overrides_colors/font_outline_color = Color.BLACK
 
 [node name="AmmoLabel" type="Label" parent="VBoxContainer"]
@@ -44,8 +44,8 @@ size_flags_horizontal = 1
 size_flags_vertical = 0
 text = "-- / --"
 theme_overrides_font_sizes/font_size = 24
-theme_overrides_colors/font_color = Color.WHITE
-theme_overrides_colors/font_outline_color = Color.BLACK
+theme_overrides_colors/font_color = Color(1, 1, 1, 1)
+theme_overrides_colors/font_outline_color = Color(0, 0, 0, 1)
 horizontal_alignment = 0
 
 [node name="CrouchIndicator" type="Label" parent="VBoxContainer"]
@@ -54,7 +54,7 @@ size_flags_horizontal = 1
 size_flags_vertical = 0
 text = ""
 theme_overrides_font_sizes/font_size = 16
-theme_overrides_colors/font_color = Color.CYAN
+theme_overrides_colors/font_color = Color(0, 1, 1, 1)
 theme_overrides_colors/font_outline_color = Color.BLACK
 horizontal_alignment = 0
 
@@ -67,9 +67,9 @@ mouse_filter = 2
 [node name="CrossHLine" type="Line2D" parent="VBoxContainer/Reticle"]
 points = PackedVector2Array(-20, 0, 20, 0)
 width = 2.0
-default_color = Color.WHITE
+default_color = Color(1, 1, 1, 1)
 
 [node name="CrossVLine" type="Line2D" parent="VBoxContainer/Reticle"]
 points = PackedVector2Array(0, -20, 0, 20)
 width = 2.0
-default_color = Color.WHITE
+default_color = Color(1, 1, 1, 1)
