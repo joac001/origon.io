@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/building/barricade-doorway-a.glb" id="1_glb"]
 
 [sub_resource type="BoxShape3D" id="CollisionShape"]
-size = Vector3(0.075, 1.460, 1.256)
+size = Vector3(0.0375, 0.73, 0.628)
 
 [node name="BarricadeDoorwayA" type="StaticBody3D"]
 
@@ -11,5 +11,5 @@ size = Vector3(0.075, 1.460, 1.256)
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.315, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1575, 0)
 shape = SubResource("CollisionShape")

@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/building/wall-window-round-detailed.glb" id="1_glb"]
 
 [sub_resource type="BoxShape3D" id="CollisionShape"]
-size = Vector3(0.200, 2.400, 2.000)
+size = Vector3(0.1, 1.2, 1)
 
 [node name="WallWindowRoundDetailed" type="StaticBody3D"]
 
@@ -11,5 +11,5 @@ size = Vector3(0.200, 2.400, 2.000)
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.200, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
 shape = SubResource("CollisionShape")

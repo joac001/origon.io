@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/building/detail-pipe.glb" id="1_glb"]
 
 [sub_resource type="BoxShape3D" id="CollisionShape"]
-size = Vector3(0.434, 0.428, 0.434)
+size = Vector3(0.217, 0.214, 0.217)
 
 [node name="DetailPipe" type="StaticBody3D"]
 
@@ -11,5 +11,5 @@ size = Vector3(0.434, 0.428, 0.434)
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.214, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.107, 0)
 shape = SubResource("CollisionShape")
