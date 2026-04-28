@@ -8,6 +8,7 @@ size = Vector3(0.200, 2.400, 4.000)
 [node name="WallWindowWideRound" type="StaticBody3D"]
 
 [node name="Mesh" parent="." instance=ExtResource("1_glb")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.200, 0)
