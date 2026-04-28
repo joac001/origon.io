@@ -36,7 +36,7 @@ min_value = 0.0
 max_value = 100.0
 value = 100.0
 theme_overrides_colors/font_color = Color(1, 1, 0, 1)
-theme_overrides_colors/font_outline_color = Color.BLACK
+theme_overrides_colors/font_outline_color = Color(0, 0, 0, 1)
 
 [node name="AmmoLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
@@ -55,7 +55,7 @@ size_flags_vertical = 0
 text = ""
 theme_overrides_font_sizes/font_size = 16
 theme_overrides_colors/font_color = Color(0, 1, 1, 1)
-theme_overrides_colors/font_outline_color = Color.BLACK
+theme_overrides_colors/font_outline_color = Color(0, 0, 0, 1)
 horizontal_alignment = 0
 
 [node name="Reticle" type="Control" parent="VBoxContainer"]
