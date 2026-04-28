@@ -31,17 +31,23 @@ var normal_height = 1.2
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	floor_snap_length = 0.5
-	_connect_hud()
+	# Defer so all nodes (including HUD) finish _ready() before connecting
+	call_deferred("_connect_hud")
 
 func _connect_hud() -> void:
 	var hud = get_tree().get_first_node_in_group("hud")
 	if hud == null:
+		push_warning("HUD not found in group 'hud'")
 		return
 	stamina_changed.connect(hud.update_stamina)
 	crouching_changed.connect(hud.update_crouch)
 	health_changed.connect(hud.update_health)
 	weapon_controller.ammo_changed.connect(hud.update_ammo)
 	weapon_controller.weapon_changed.connect(hud.update_weapon_name)
+	# Emit initial values so HUD shows correct state from start
+	health_changed.emit(current_health)
+	weapon_controller.ammo_changed.emit(weapon_controller.mag_ammo, weapon_controller.reserve_ammo)
+	weapon_controller.weapon_changed.emit(weapon_controller.current_weapon.weapon_name if weapon_controller.current_weapon else "")
 
 func take_damage(amount: int) -> void:
 	current_health = max(0, current_health - amount)
@@ -73,7 +79,7 @@ func _physics_process(delta: float) -> void:
 			collision_shape.position.y = 0.6
 		crouching_changed.emit(is_crouching)
 
-	var is_sprinting = Input.is_action_pressed("sprint") and not is_crouching
+	var is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and stamina > 0.0
 	var speed = CROUCH_SPEED if is_crouching else (SPRINT_SPEED if is_sprinting else WALK_SPEED)
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
