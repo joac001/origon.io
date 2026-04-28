@@ -33,9 +33,12 @@ def create_weapon_tres(name, display_name, weapon_type, dmg_tdm, dmg_gg, fire_ra
     is_melee = weapon_type == "MELEE"
     weapon_type_map = {'SECONDARY': 1, 'PRIMARY': 0, 'MELEE': 2}
     wtype_val = weapon_type_map[weapon_type]
-    return f"""[gd_resource type="WeaponResource" format=3]
+    return f"""[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/weapon_resource.gd" id="1_script"]
 
 [resource]
+script = ExtResource("1_script")
 weapon_name = "{display_name}"
 weapon_type = {wtype_val}
 damage_tdm = {dmg_tdm}

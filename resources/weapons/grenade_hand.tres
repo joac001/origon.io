@@ -1,6 +1,9 @@
-[gd_resource type="WeaponResource" format=3]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/weapon_resource.gd" id="1_script"]
 
 [resource]
+script = ExtResource("1_script")
 weapon_name = "Granada de Mano"
 weapon_type = 1
 damage_tdm = 45

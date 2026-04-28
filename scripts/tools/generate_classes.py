@@ -14,16 +14,19 @@ default_classes = [
 
 def create_class_tres(class_name, display_name, primary, secondary, melee):
     """Generate .tres resource for a class."""
-    return f"""[gd_resource type="ClassResource" format=3]
-[ext_resource type="Resource" uid="uid://primary_{primary}" path="res://resources/weapons/{primary}.tres" id="1_primary"]
-[ext_resource type="Resource" uid="uid://secondary_{secondary}" path="res://resources/weapons/{secondary}.tres" id="2_secondary"]
-[ext_resource type="Resource" uid="uid://melee_{melee}" path="res://resources/weapons/{melee}.tres" id="3_melee"]
+    return f"""[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/class_resource.gd" id="1_script"]
+[ext_resource type="Resource" path="res://resources/weapons/{primary}.tres" id="2_primary"]
+[ext_resource type="Resource" path="res://resources/weapons/{secondary}.tres" id="3_secondary"]
+[ext_resource type="Resource" path="res://resources/weapons/{melee}.tres" id="4_melee"]
 
 [resource]
+script = ExtResource("1_script")
 class_name_str = "{display_name}"
-primary_weapon = ExtResource("1_primary")
-secondary_weapon = ExtResource("2_secondary")
-melee_weapon = ExtResource("3_melee")
+primary_weapon = ExtResource("2_primary")
+secondary_weapon = ExtResource("3_secondary")
+melee_weapon = ExtResource("4_melee")
 """
 
 def main():
