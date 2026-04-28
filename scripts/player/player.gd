@@ -20,6 +20,7 @@ var current_health = 100
 var current_ammo = 30
 var reserve_ammo = 120
 var stamina = STAMINA_MAX
+var stamina_exhausted = false
 var is_crouching = false
 var crouch_height = 0.7
 var normal_height = 1.2
@@ -31,8 +32,14 @@ var normal_height = 1.2
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	floor_snap_length = 0.5
-	# Defer so all nodes (including HUD) finish _ready() before connecting
+	_set_body_layer($Body, 2)
 	call_deferred("_connect_hud")
+
+func _set_body_layer(node: Node, layer: int) -> void:
+	if node is VisualInstance3D:
+		node.visibility_layers = layer
+	for child in node.get_children():
+		_set_body_layer(child, layer)
 
 func _connect_hud() -> void:
 	var hud = get_tree().get_first_node_in_group("hud")
@@ -79,7 +86,12 @@ func _physics_process(delta: float) -> void:
 			collision_shape.position.y = 0.6
 		crouching_changed.emit(is_crouching)
 
-	var is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and stamina > 0.0
+	if stamina <= 0.0:
+		stamina_exhausted = true
+	elif stamina >= STAMINA_MAX * 0.3:
+		stamina_exhausted = false
+
+	var is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and not stamina_exhausted
 	var speed = CROUCH_SPEED if is_crouching else (SPRINT_SPEED if is_sprinting else WALK_SPEED)
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()

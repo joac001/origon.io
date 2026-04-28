@@ -23,6 +23,10 @@ var reload_timer: float = 0.0
 @onready var raycast: RayCast3D = $RayCast3D
 
 func _ready() -> void:
+	# Exclude the player body from hitscan so we never damage ourselves
+	var player = get_parent().get_parent()
+	raycast.add_exception(player)
+
 	var assault_rifle = load("res://resources/weapons/assault_rifle.tres")
 	var pistol = load("res://resources/weapons/pistol.tres")
 	var knife = load("res://resources/weapons/knife_combat.tres")
