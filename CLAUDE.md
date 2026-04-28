@@ -44,16 +44,30 @@ scenes/
 					  # CITY (3 props):
 					  #   - building-a.tscn, building-b.tscn, building-c.tscn (decoración de fondo)
 
+scenes/
+  ui/
+	hud.tscn          # HUD en-juego: health bar, stamina bar, ammo counter, crouch indicator, reticle (CanvasLayer)
+
 scripts/
   player/
-	player.gd         # Movimiento FPS: WASD + mouse look + salto + sprint + air control
+	player.gd         # Movimiento FPS: WASD + mouse look + salto + sprint + crouch + stamina + air control
+  ui/
+	hud.gd            # Lógica del HUD: update_health(), update_stamina(), update_ammo(), update_crouch()
+  resources/
+	weapon_resource.gd    # Clase Resource para armas (damage_tdm, damage_gungame, fire_rate, reload_time, etc.)
+	class_resource.gd     # Clase Resource para clases (nombre, primary/secondary/melee weapons)
+  autoloads/
+	game_manager.gd   # Singleton: estado de partida (GameState enum: MENU/LOADING/IN_GAME/PAUSED/GAME_OVER, GameMode enum: TDM/GUN_GAME)
   tools/              # Scripts de validación y utilidades (Python)
 	check_dependencies.py    # Verifica que test_map.tscn tenga todas sus refs
 	check_prop_refs.py       # Verifica que props tengan GLBs válidos
 	check_textures.py        # Analiza qué texturas usa cada GLB
+	generate_weapons.py      # Genera 20 WeaponResource .tres de Gun Game + TDM (ejecutar: python scripts/tools/generate_weapons.py)
+	generate_classes.py      # Genera 5 ClassResource .tres de loadouts default (ejecutar: python scripts/tools/generate_classes.py)
 
-autoloads/            # GameManager, NetworkManager, etc. (a crear)
-resources/            # .tres — recursos de armas, clases, etc. (a crear)
+resources/
+  weapons/            # 20 WeaponResource .tres (Gun Game progression: pistol → knife_final, con damage_tdm/damage_gungame)
+  classes/            # 5 ClassResource .tres de TDM default: class_assault, class_sniper, class_support, class_shotgunner, class_rusher
 
 assets/
   models/
@@ -104,6 +118,54 @@ Otros archivos en raíz:
 4. Las colisiones se aplican automáticamente
 
 **Todos los props usan texturas del Kenney Kit** (colormap.png compartido por kit).
+
+## Sistema de Datos (Resources)
+
+**WeaponResource** (`scripts/resources/weapon_resource.gd`):
+- Campos: `weapon_name`, `weapon_type` (enum PRIMARY/SECONDARY/MELEE), `damage_tdm`, `damage_gungame`, `fire_rate`, `reload_time`, `mag_capacity`, `ammo_reserve`, `recoil`, `spread`, `is_melee`
+- Uso: Cargar con `preload("res://resources/weapons/pistol.tres")` y acceder a `.damage_tdm` o `.damage_gungame`
+
+**ClassResource** (`scripts/resources/class_resource.gd`):
+- Campos: `class_name_str`, `primary_weapon` (WeaponResource), `secondary_weapon` (WeaponResource), `melee_weapon` (WeaponResource)
+- Uso: Cargar con `preload("res://resources/classes/class_assault.tres")` y acceder a `.primary_weapon.damage_tdm`
+
+**GameManager** (autoload `scripts/autoloads/game_manager.gd`):
+- Estados: enum GameState { MENU, LOADING, IN_GAME, PAUSED, GAME_OVER }
+- Modos: enum GameMode { TDM, GUN_GAME }
+- Señales: `game_state_changed(new_state)`, `game_mode_changed(new_mode)`
+- Accesible globalmente como `GameManager.current_state` o `GameManager.set_game_mode(GameMode.TDM)`
+
+## Sistema de Movimiento Expandido
+
+**Player.gd** ahora incluye:
+- **Crouch** (Ctrl): Alterna altura de colisión (1.2 → 0.7), velocidad 2.5, emite señal `crouching_changed(bool)`
+- **Stamina** (100 max): Se drena al sprintar (30/seg), se regenera al caminar (20/seg), emite señal `stamina_changed(float)`
+- Señales: `health_changed(int)`, `ammo_changed(int, int)`, `stamina_changed(float)`, `crouching_changed(bool)`
+
+## HUD Básico
+
+**scenes/ui/hud.tscn** (CanvasLayer):
+- Health bar (ProgressBar 0-100)
+- Stamina bar (ProgressBar 0-100, amarillo)
+- Ammo counter (Label "30 / 120")
+- Crouch indicator (Label "[CROUCH]" cuando está agachado)
+- Reticle (Cruz blanca centrada)
+
+Métodos en `hud.gd`:
+- `update_health(value: int)`
+- `update_stamina(value: float)`
+- `update_ammo(current: int, reserve: int)`
+- `update_crouch(is_crouching: bool)`
+
+**Integración**: HUD instanciado en `test_map.tscn`. Para conectar señales del Player, agregar en el script del Player o en el mapa:
+```gdscript
+var player = $Player
+var hud = $HUD
+player.health_changed.connect(hud.update_health)
+player.stamina_changed.connect(hud.update_stamina)
+player.ammo_changed.connect(hud.update_ammo)
+player.crouching_changed.connect(hud.update_crouch)
+```
 
 ## Scripts de Herramientas (Python)
 
