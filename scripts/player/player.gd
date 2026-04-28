@@ -35,11 +35,11 @@ func _ready() -> void:
 	_set_body_layer($Body, 2)
 	call_deferred("_connect_hud")
 
-func _set_body_layer(node: Node, layer_mask: int) -> void:
-	if node is VisualInstance3D:
-		node.layers = layer_mask
+func _set_body_layer(node: Node, _layer_mask: int) -> void:
+	if node is GeometryInstance3D:
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 	for child in node.get_children():
-		_set_body_layer(child, layer_mask)
+		_set_body_layer(child, _layer_mask)
 
 func _connect_hud() -> void:
 	var hud = get_tree().get_first_node_in_group("hud")

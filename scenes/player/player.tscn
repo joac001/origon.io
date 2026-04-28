@@ -23,7 +23,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2234042, 0)
 
 [node name="Camera3D" type="Camera3D" parent="Head" unique_id=2065268994]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.049999952, -0.21351862)
-cull_mask = 1048573
 
 [node name="WeaponController" type="Node3D" parent="Head" unique_id=1111111111]
 script = ExtResource("2_weapon_script")
