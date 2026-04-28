@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Escopeta Táctica"
+weapon_type = 0
+damage_tdm = 55
+damage_gungame = 85
+fire_rate = 0.7
+reload_time = 2.2
+mag_capacity = 10
+ammo_reserve = 30
+recoil = 1.9
+spread = 0.28
+is_melee = false

@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Sniper"
+weapon_type = 0
+damage_tdm = 70
+damage_gungame = 100
+fire_rate = 0.5
+reload_time = 3.0
+mag_capacity = 10
+ammo_reserve = 30
+recoil = 0.5
+spread = 0.02
+is_melee = false

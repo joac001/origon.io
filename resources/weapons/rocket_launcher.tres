@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Lanzacohetes"
+weapon_type = 0
+damage_tdm = 80
+damage_gungame = 100
+fire_rate = 2.0
+reload_time = 4.0
+mag_capacity = 4
+ammo_reserve = 12
+recoil = 0.3
+spread = 0.03
+is_melee = false

@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Escopeta"
+weapon_type = 0
+damage_tdm = 60
+damage_gungame = 90
+fire_rate = 0.8
+reload_time = 2.5
+mag_capacity = 8
+ammo_reserve = 24
+recoil = 2.0
+spread = 0.3
+is_melee = false

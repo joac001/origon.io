@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "SMG Compacta"
+weapon_type = 0
+damage_tdm = 14
+damage_gungame = 28
+fire_rate = 0.06
+reload_time = 1.0
+mag_capacity = 20
+ammo_reserve = 120
+recoil = 1.3
+spread = 0.18
+is_melee = false

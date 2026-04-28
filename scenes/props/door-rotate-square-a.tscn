@@ -1,14 +1,14 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cyowsk51gugew"]
 
-[ext_resource type="PackedScene" path="res://assets/models/building/door-rotate-square-a.glb" id="1_glb"]
+[ext_resource type="PackedScene" uid="uid://5uo37vpkcny1" path="res://assets/models/building/door-rotate-square-a.glb" id="1_glb"]
 
 [sub_resource type="BoxShape3D" id="CollisionShape"]
-size = Vector3(0.250, 2.125, 1.025)
+size = Vector3(0.25, 2.0967102, 0.92609864)
 
-[node name="DoorRotateSquareA" type="StaticBody3D"]
+[node name="DoorRotateSquareA" type="StaticBody3D" unique_id=371471535]
 
-[node name="Mesh" parent="." instance=ExtResource("1_glb")]
+[node name="Mesh" parent="." unique_id=1350416249 instance=ExtResource("1_glb")]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.037, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1046335149]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0553131, 0.465)
 shape = SubResource("CollisionShape")

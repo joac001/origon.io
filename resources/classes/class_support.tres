@@ -1,0 +1,10 @@
+[gd_resource type="ClassResource" format=3]
+[ext_resource type="Resource" uid="uid://primary_smg" path="res://resources/weapons/smg.tres" id="1_primary"]
+[ext_resource type="Resource" uid="uid://secondary_pistol" path="res://resources/weapons/pistol.tres" id="2_secondary"]
+[ext_resource type="Resource" uid="uid://melee_bat" path="res://resources/weapons/bat.tres" id="3_melee"]
+
+[resource]
+class_name_str = "Support"
+primary_weapon = ExtResource("1_primary")
+secondary_weapon = ExtResource("2_secondary")
+melee_weapon = ExtResource("3_melee")

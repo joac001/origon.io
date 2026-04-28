@@ -1,14 +1,14 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://d15wmcmx35bp0"]
 
-[ext_resource type="PackedScene" path="res://assets/models/building/stairs-closed.glb" id="1_glb"]
+[ext_resource type="PackedScene" uid="uid://cjqrm0n52s2pm" path="res://assets/models/building/stairs-closed.glb" id="1_glb"]
 
-[sub_resource type="BoxShape3D" id="CollisionShape"]
-size = Vector3(1.300, 2.500, 4.000)
+[sub_resource type="BoxShape3D" id="BoxShape3D_7l3cf"]
+size = Vector3(1.3, 0.3, 4.72)
 
-[node name="StairsClosed" type="StaticBody3D"]
+[node name="StairsClosed" type="StaticBody3D" unique_id=1528727174]
 
-[node name="Mesh" parent="." instance=ExtResource("1_glb")]
+[node name="Mesh" parent="." unique_id=883538651 instance=ExtResource("1_glb")]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.250, 0)
-shape = SubResource("CollisionShape")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1424476413]
+transform = Transform3D(1, 0, 0, 0, 0.848, 0.53, 0, -0.53, 0.848, 0, 1.0758872, 0.06204915)
+shape = SubResource("BoxShape3D_7l3cf")

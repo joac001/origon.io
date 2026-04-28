@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Pistola"
+weapon_type = 1
+damage_tdm = 15
+damage_gungame = 25
+fire_rate = 0.12
+reload_time = 1.5
+mag_capacity = 15
+ammo_reserve = 120
+recoil = 1.2
+spread = 0.15
+is_melee = false

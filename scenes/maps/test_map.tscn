@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://bwrpvgqypdqwj"]
 
 [ext_resource type="PackedScene" uid="uid://b510bsyo1iwpa" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://hud_scene" path="res://scenes/ui/hud.tscn" id="1_hud"]
 [ext_resource type="PackedScene" path="res://scenes/props/column-thin.tscn" id="2b_column_thin"]
 [ext_resource type="PackedScene" path="res://scenes/props/column-wide.tscn" id="2c_column_wide"]
 [ext_resource type="PackedScene" path="res://scenes/props/column.tscn" id="2_column"]
@@ -194,3 +195,5 @@ transform = Transform3D(3, 0, 0, 0, 3, 0, 0, 0, 3, 20, 0, -15)
 
 [node name="Player" parent="." unique_id=77591787 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 12)
+
+[node name="HUD" parent="." unique_id=1234567890 instance=ExtResource("1_hud")]

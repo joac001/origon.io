@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Carabina"
+weapon_type = 0
+damage_tdm = 28
+damage_gungame = 45
+fire_rate = 0.1
+reload_time = 2.0
+mag_capacity = 20
+ammo_reserve = 80
+recoil = 1.1
+spread = 0.08
+is_melee = false

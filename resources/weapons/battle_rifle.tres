@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Rifle de Batalla Pesado"
+weapon_type = 0
+damage_tdm = 35
+damage_gungame = 65
+fire_rate = 0.15
+reload_time = 2.5
+mag_capacity = 25
+ammo_reserve = 100
+recoil = 1.8
+spread = 0.1
+is_melee = false

@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Hacha"
+weapon_type = 2
+damage_tdm = 60
+damage_gungame = 60
+fire_rate = 0.0
+reload_time = 1.2
+mag_capacity = 1
+ammo_reserve = 1
+recoil = 0.0
+spread = 0.0
+is_melee = true

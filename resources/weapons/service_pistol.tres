@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Pistola de Servicio"
+weapon_type = 1
+damage_tdm = 18
+damage_gungame = 28
+fire_rate = 0.1
+reload_time = 1.8
+mag_capacity = 12
+ammo_reserve = 96
+recoil = 1.0
+spread = 0.12
+is_melee = false

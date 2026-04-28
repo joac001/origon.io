@@ -1,0 +1,14 @@
+[gd_resource type="WeaponResource" format=3]
+
+[resource]
+weapon_name = "Granada de Mano"
+weapon_type = 1
+damage_tdm = 45
+damage_gungame = 75
+fire_rate = 2.5
+reload_time = 3.5
+mag_capacity = 3
+ammo_reserve = 9
+recoil = 0.0
+spread = 0.05
+is_melee = false
