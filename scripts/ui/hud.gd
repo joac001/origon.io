@@ -8,6 +8,7 @@ extends CanvasLayer
 @onready var crouch_indicator: Label = $Root/BottomLeft/CrouchIndicator
 
 func _ready() -> void:
+	add_to_group("hud")
 	health_bar.max_value = 100
 	health_bar.value = 100
 	health_value.text = "100"

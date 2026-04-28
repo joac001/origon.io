@@ -30,6 +30,7 @@ corner_radius_bottom_left = 1
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_script")
+process_mode = 3
 
 [node name="Root" type="Control" parent="."]
 anchor_right = 1.0

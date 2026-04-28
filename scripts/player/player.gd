@@ -26,10 +26,26 @@ var normal_height = 1.2
 
 @onready var head: Node3D = $Head
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
+@onready var weapon_controller: WeaponController = $Head/WeaponController
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	floor_snap_length = 0.5
+	_connect_hud()
+
+func _connect_hud() -> void:
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud == null:
+		return
+	stamina_changed.connect(hud.update_stamina)
+	crouching_changed.connect(hud.update_crouch)
+	health_changed.connect(hud.update_health)
+	weapon_controller.ammo_changed.connect(hud.update_ammo)
+	weapon_controller.weapon_changed.connect(hud.update_weapon_name)
+
+func take_damage(amount: int) -> void:
+	current_health = max(0, current_health - amount)
+	health_changed.emit(current_health)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:

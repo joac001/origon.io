@@ -177,7 +177,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.25, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 5)
 
 [node name="Door1" parent="." unique_id=2139706860 instance=ExtResource("8_door")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 8)
+transform = Transform3D(2.13, 0, 0, 0, 2.13, 0, 0, 0, 2.13, -14.735887, 0.25332534, 8)
 
 [node name="Barricade1" parent="." unique_id=185385237 instance=ExtResource("9_barricade")]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 8, 0.25, 5)
