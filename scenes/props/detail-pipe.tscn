@@ -8,6 +8,7 @@ size = Vector3(0.434, 0.428, 0.434)
 [node name="DetailPipe" type="StaticBody3D"]
 
 [node name="Mesh" parent="." instance=ExtResource("1_glb")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.214, 0)
