@@ -33,6 +33,8 @@ GameSettings GameSettings::load(const std::filesystem::path& path) {
         settings.masterVolume = std::clamp(j.value("master_volume", settings.masterVolume), 0.0f, 1.0f);
         settings.ambience = j.value("ambience", settings.ambience);
         settings.showStats = j.value("show_stats", settings.showStats);
+        settings.vegetationDensity = std::clamp(j.value("vegetation_density", settings.vegetationDensity), 0.2f, 1.0f);
+        settings.vegetationDistance = std::clamp(j.value("vegetation_distance", settings.vegetationDistance), 30.0f, 150.0f);
         settings.vsync = j.value("vsync", settings.vsync);
         settings.maxFps = std::max(0, j.value("max_fps", settings.maxFps));
         settings.fov = std::clamp(j.value("fov", settings.fov), 60.0f, 110.0f);
@@ -58,6 +60,8 @@ bool GameSettings::save(const std::filesystem::path& path) const {
         {"master_volume", masterVolume},
         {"ambience", ambience},
         {"show_stats", showStats},
+        {"vegetation_density", vegetationDensity},
+        {"vegetation_distance", vegetationDistance},
         {"vsync", vsync},
         {"max_fps", maxFps},
         {"fov", fov},

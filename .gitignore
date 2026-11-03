@@ -4,3 +4,5 @@ settings.json
 imgui.ini
 compile_commands.json
 screenshots/
+assets/textures/*/
+!assets/textures/foliage/

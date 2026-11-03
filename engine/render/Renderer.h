@@ -22,6 +22,14 @@ struct Material {
     float gridSize = 0.0f;
     // 0 standard, 1 terrain (procedural splat by slope, height and paint in uv.x).
     int shading = 0;
+    // Texture maps (0 = none): albedo (sRGB, alpha = coverage), normal (OpenGL), ARM (AO, rough, metal).
+    unsigned albedoMap = 0;
+    unsigned normalMap = 0;
+    unsigned armMap = 0;
+    bool alphaTest = false; // Cutout foliage: alpha test, two-sided, wind, translucency.
+    float windStrength = 0.0f;
+    float windHeight = 1.0f; // Height at which wind bending reaches full strength.
+    float uvScale = 1.0f;
 };
 
 struct DrawItem {
@@ -29,6 +37,9 @@ struct DrawItem {
     glm::mat4 model{1.0f};
     Material material;
     bool castShadow = true;
+    // Instanced draw: per-instance model matrices (model is ignored). Must stay valid until render().
+    const glm::mat4* instances = nullptr;
+    int instanceCount = 0;
 };
 
 struct PointLight {
@@ -113,7 +124,12 @@ private:
     void ensureShadowMaps();
     void destroyTargets();
     void computeCascades(const CameraView& camera, const Environment& environment);
-    void drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWorld);
+    void drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWorld, const std::vector<int>& offsets);
+    void drawDepth(const std::vector<DrawItem>& items, const glm::mat4& viewProj, bool shadowPass, float time);
+    void uploadInstances();
+    Shader& litVariant(const DrawItem& item);
+    void setLitFrameUniforms(Shader& shader, const CameraView& camera, const glm::mat4& viewProj, const Environment& environment,
+                             bool shadowsOn);
     void drawLines(const std::vector<LineVertex>& lines, const glm::mat4& viewProj);
     void renderSsao(const glm::mat4& proj);
     void renderBloom();
@@ -168,7 +184,17 @@ private:
     size_t m_lineCapacity = 0;
 
     Shader m_litShader;
+    Shader m_litInstanced;
+    Shader m_litFoliage;
     Shader m_depthShader;
+    Shader m_depthInstanced;
+    Shader m_depthFoliage;
+    unsigned m_instanceBuffer = 0;
+    size_t m_instanceCapacity = 0;
+    std::vector<glm::mat4> m_instanceStaging;
+    std::vector<int> m_itemInstanceOffsets;
+    std::vector<int> m_noOffsets;
+    float m_time = 0.0f;
     Shader m_skyShader;
     Shader m_compositeShader;
     Shader m_ssaoShader;

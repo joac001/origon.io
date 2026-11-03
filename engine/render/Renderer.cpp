@@ -78,7 +78,11 @@ void drawFullscreen(unsigned vao) {
 bool Renderer::init() {
     bool ok = true;
     ok &= m_litShader.loadFile("assets/shaders/lit.glsl");
+    ok &= m_litInstanced.loadFile("assets/shaders/lit.glsl", "#define INSTANCED\n");
+    ok &= m_litFoliage.loadFile("assets/shaders/lit.glsl", "#define INSTANCED\n#define FOLIAGE\n");
     ok &= m_depthShader.loadFile("assets/shaders/depth.glsl");
+    ok &= m_depthInstanced.loadFile("assets/shaders/depth.glsl", "#define INSTANCED\n");
+    ok &= m_depthFoliage.loadFile("assets/shaders/depth.glsl", "#define INSTANCED\n#define FOLIAGE\n");
     ok &= m_skyShader.loadFile("assets/shaders/sky.glsl");
     ok &= m_compositeShader.loadFile("assets/shaders/composite.glsl");
     ok &= m_ssaoShader.loadFile("assets/shaders/ssao.glsl");
@@ -311,19 +315,153 @@ void Renderer::computeCascades(const CameraView& camera, const Environment& envi
 
 // --- Passes ---------------------------------------------------------------------------------
 
-void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWorld) {
-    for (const DrawItem& item : items) {
+Shader& Renderer::litVariant(const DrawItem& item) {
+    if (item.instanceCount > 0) {
+        return item.material.alphaTest ? m_litFoliage : m_litInstanced;
+    }
+    return m_litShader;
+}
+
+void Renderer::uploadInstances() {
+    m_instanceStaging.clear();
+    m_itemInstanceOffsets.assign(m_items.size(), 0);
+    for (size_t i = 0; i < m_items.size(); ++i) {
+        const DrawItem& item = m_items[i];
+        if (item.instanceCount > 0 && item.instances) {
+            m_itemInstanceOffsets[i] = static_cast<int>(m_instanceStaging.size());
+            m_instanceStaging.insert(m_instanceStaging.end(), item.instances, item.instances + item.instanceCount);
+        }
+    }
+    if (m_instanceStaging.empty()) {
+        return;
+    }
+    const size_t bytes = m_instanceStaging.size() * sizeof(glm::mat4);
+    if (bytes > m_instanceCapacity) {
+        if (m_instanceBuffer) glDeleteBuffers(1, &m_instanceBuffer);
+        m_instanceCapacity = std::max(bytes, m_instanceCapacity * 2);
+        glCreateBuffers(1, &m_instanceBuffer);
+        glNamedBufferData(m_instanceBuffer, static_cast<GLsizeiptr>(m_instanceCapacity), nullptr, GL_DYNAMIC_DRAW);
+    }
+    glNamedBufferSubData(m_instanceBuffer, 0, static_cast<GLsizeiptr>(bytes), m_instanceStaging.data());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_instanceBuffer);
+}
+
+void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& viewProj, bool shadowPass, float time) {
+    Shader* current = nullptr;
+    for (size_t i = 0; i < items.size(); ++i) {
+        const DrawItem& item = items[i];
+        if (!item.mesh || (shadowPass && !item.castShadow)) {
+            continue;
+        }
+        Shader& shader = item.instanceCount > 0 ? (item.material.alphaTest ? m_depthFoliage : m_depthInstanced) : m_depthShader;
+        if (&shader != current) {
+            current = &shader;
+            shader.bind();
+            shader.set("uViewProj", viewProj);
+            shader.set("uTime", time);
+            shader.set("uAlbedoMap", 2);
+        }
+        const bool twoSided = item.material.alphaTest;
+        if (twoSided) glDisable(GL_CULL_FACE);
+        if (item.instanceCount > 0) {
+            shader.set("uInstanceOffset", m_itemInstanceOffsets[i]);
+            shader.set("uWindStrength", item.material.windStrength);
+            shader.set("uWindHeight", item.material.windHeight);
+            if (item.material.alphaTest) glBindTextureUnit(2, item.material.albedoMap);
+            item.mesh->drawInstanced(item.instanceCount);
+        } else {
+            shader.set("uModel", item.model);
+            item.mesh->draw();
+        }
+        if (twoSided) glEnable(GL_CULL_FACE);
+        m_stats.drawCalls++;
+    }
+}
+
+void Renderer::setLitFrameUniforms(Shader& shader, const CameraView& camera, const glm::mat4& viewProj,
+                                   const Environment& environment, bool shadowsOn) {
+    shader.set("uViewProj", viewProj);
+    shader.set("uView", camera.view);
+    shader.set("uCameraPos", camera.position);
+    shader.set("uTime", environment.time);
+    shader.set("uSunDirection", glm::normalize(environment.sunDirection));
+    shader.set("uSunColor", environment.sunColor * environment.sunIntensity);
+    shader.set("uSkyColor", environment.skyColor);
+    shader.set("uGroundColor", environment.groundColor);
+    shader.set("uAmbientIntensity", environment.ambientIntensity);
+    shader.set("uFogColor", environment.fogColor);
+    shader.set("uFogDensity", environment.fogDensity);
+    shader.set("uShadowsEnabled", shadowsOn ? 1 : 0);
+    shader.set("uCascadeCount", m_cascadeCount);
+    shader.set("uPcfRadius", shadowConfig(m_settings.shadowQuality).pcfRadius);
+    shader.set("uShadowTexel", shadowsOn ? 1.0f / static_cast<float>(m_shadowSize) : 0.0f);
+    for (int c = 0; c < m_cascadeCount; ++c) {
+        const std::string index = "[" + std::to_string(c) + "]";
+        shader.set(("uCascadeViewProj" + index).c_str(), m_cascadeViewProj[static_cast<size_t>(c)]);
+        shader.set(("uCascadeSplit" + index).c_str(), m_cascadeSplits[static_cast<size_t>(c)]);
+        shader.set(("uCascadeTexel" + index).c_str(), m_cascadeTexel[static_cast<size_t>(c)]);
+    }
+    shader.set("uShadowMap", 0);
+    shader.set("uAo", 1);
+    shader.set("uAlbedoMap", 2);
+    shader.set("uNormalMap", 3);
+    shader.set("uArmMap", 4);
+    shader.set("uAoEnabled", m_settings.ssao ? 1 : 0);
+    shader.set("uSceneSize", glm::vec2(m_sceneSize));
+    const int lightCount = static_cast<int>(m_lights.size());
+    shader.set("uLightCount", lightCount);
+    for (int i = 0; i < lightCount; ++i) {
+        const PointLight& light = m_lights[static_cast<size_t>(i)];
+        const std::string index = "[" + std::to_string(i) + "]";
+        shader.set(("uLightPosRadius" + index).c_str(), glm::vec4(light.position, light.radius));
+        shader.set(("uLightColor" + index).c_str(), light.color * light.intensity);
+    }
+}
+
+void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWorld, const std::vector<int>& offsets) {
+    Shader* current = nullptr;
+    const bool alphaToCoverage = m_targetSamples > 0;
+    for (size_t i = 0; i < items.size(); ++i) {
+        const DrawItem& item = items[i];
         if (!item.mesh) {
             continue;
         }
-        m_litShader.set("uModel", toWorld * item.model);
-        m_litShader.set("uAlbedo", item.material.albedo);
-        m_litShader.set("uRoughness", item.material.roughness);
-        m_litShader.set("uMetallic", item.material.metallic);
-        m_litShader.set("uEmissive", item.material.emissive);
-        m_litShader.set("uGridSize", item.material.gridSize);
-        m_litShader.set("uShading", item.material.shading);
-        item.mesh->draw();
+        Shader& shader = litVariant(item);
+        if (&shader != current) {
+            current = &shader;
+            shader.bind();
+        }
+        const Material& m = item.material;
+        shader.set("uAlbedo", m.albedo);
+        shader.set("uRoughness", m.roughness);
+        shader.set("uMetallic", m.metallic);
+        shader.set("uEmissive", m.emissive);
+        shader.set("uGridSize", m.gridSize);
+        shader.set("uShading", m.shading);
+        shader.set("uUvScale", m.uvScale);
+        shader.set("uHasAlbedoMap", m.albedoMap ? 1 : 0);
+        shader.set("uHasNormalMap", m.normalMap ? 1 : 0);
+        shader.set("uHasArmMap", m.armMap ? 1 : 0);
+        glBindTextureUnit(2, m.albedoMap);
+        glBindTextureUnit(3, m.normalMap);
+        glBindTextureUnit(4, m.armMap);
+        if (m.alphaTest) {
+            glDisable(GL_CULL_FACE);
+            if (alphaToCoverage) glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+        }
+        if (item.instanceCount > 0) {
+            shader.set("uInstanceOffset", i < offsets.size() ? offsets[i] : 0);
+            shader.set("uWindStrength", m.windStrength);
+            shader.set("uWindHeight", m.windHeight);
+            item.mesh->drawInstanced(item.instanceCount);
+        } else {
+            shader.set("uModel", toWorld * item.model);
+            item.mesh->draw();
+        }
+        if (m.alphaTest) {
+            glEnable(GL_CULL_FACE);
+            glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+        }
         m_stats.drawCalls++;
     }
 }
@@ -483,24 +621,18 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glCullFace(GL_BACK);
     glDisable(GL_BLEND);
 
+    uploadInstances();
+
     // --- Cascaded shadow maps ----------------------------------------------------------
     if (shadowsOn) {
         computeCascades(camera, environment);
         glViewport(0, 0, m_shadowSize, m_shadowSize);
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(1.5f, 2.0f);
-        m_depthShader.bind();
         for (int c = 0; c < m_cascadeCount; ++c) {
             glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFbos[static_cast<size_t>(c)]);
             glClear(GL_DEPTH_BUFFER_BIT);
-            m_depthShader.set("uViewProj", m_cascadeViewProj[static_cast<size_t>(c)]);
-            for (const DrawItem& item : m_items) {
-                if (item.castShadow && item.mesh) {
-                    m_depthShader.set("uModel", item.model);
-                    item.mesh->draw();
-                    m_stats.drawCalls++;
-                }
-            }
+            drawDepth(m_items, m_cascadeViewProj[static_cast<size_t>(c)], true, environment.time);
         }
         glDisable(GL_POLYGON_OFFSET_FILL);
         m_stats.shadowCascades = m_cascadeCount;
@@ -512,15 +644,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glViewport(0, 0, m_sceneSize.x, m_sceneSize.y);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    m_depthShader.bind();
-    m_depthShader.set("uViewProj", viewProj);
-    for (const DrawItem& item : m_items) {
-        if (item.mesh) {
-            m_depthShader.set("uModel", item.model);
-            item.mesh->draw();
-            m_stats.drawCalls++;
-        }
-    }
+    drawDepth(m_items, viewProj, false, environment.time);
     if (m_targetSamples > 0) {
         glBlitNamedFramebuffer(m_msaaFbo, m_resolveFbo, 0, 0, m_sceneSize.x, m_sceneSize.y, 0, 0, m_sceneSize.x,
                                m_sceneSize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
@@ -551,44 +675,13 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glEnable(GL_CULL_FACE);
 
     // --- Opaque lit pass ------------------------------------------------------------------
-    m_litShader.bind();
-    m_litShader.set("uViewProj", viewProj);
-    m_litShader.set("uView", camera.view);
-    m_litShader.set("uCameraPos", camera.position);
-    m_litShader.set("uSunDirection", glm::normalize(environment.sunDirection));
-    m_litShader.set("uSunColor", environment.sunColor * environment.sunIntensity);
-    m_litShader.set("uSkyColor", environment.skyColor);
-    m_litShader.set("uGroundColor", environment.groundColor);
-    m_litShader.set("uAmbientIntensity", environment.ambientIntensity);
-    m_litShader.set("uFogColor", environment.fogColor);
-    m_litShader.set("uFogDensity", environment.fogDensity);
-    m_litShader.set("uShadowsEnabled", shadowsOn ? 1 : 0);
-    m_litShader.set("uCascadeCount", m_cascadeCount);
-    m_litShader.set("uPcfRadius", shadowConfig(m_settings.shadowQuality).pcfRadius);
-    m_litShader.set("uShadowTexel", shadowsOn ? 1.0f / static_cast<float>(m_shadowSize) : 0.0f);
-    for (int c = 0; c < m_cascadeCount; ++c) {
-        const std::string index = "[" + std::to_string(c) + "]";
-        m_litShader.set(("uCascadeViewProj" + index).c_str(), m_cascadeViewProj[static_cast<size_t>(c)]);
-        m_litShader.set(("uCascadeSplit" + index).c_str(), m_cascadeSplits[static_cast<size_t>(c)]);
-        m_litShader.set(("uCascadeTexel" + index).c_str(), m_cascadeTexel[static_cast<size_t>(c)]);
-    }
-    m_litShader.set("uShadowMap", 0);
-    m_litShader.set("uAo", 1);
-    m_litShader.set("uAoEnabled", m_settings.ssao ? 1 : 0);
-    m_litShader.set("uSceneSize", glm::vec2(m_sceneSize));
+    setLitFrameUniforms(m_litShader, camera, viewProj, environment, shadowsOn);
+    setLitFrameUniforms(m_litInstanced, camera, viewProj, environment, shadowsOn);
+    setLitFrameUniforms(m_litFoliage, camera, viewProj, environment, shadowsOn);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
 
-    const int lightCount = static_cast<int>(m_lights.size());
-    m_litShader.set("uLightCount", lightCount);
-    for (int i = 0; i < lightCount; ++i) {
-        const PointLight& light = m_lights[static_cast<size_t>(i)];
-        const std::string index = "[" + std::to_string(i) + "]";
-        m_litShader.set(("uLightPosRadius" + index).c_str(), glm::vec4(light.position, light.radius));
-        m_litShader.set(("uLightColor" + index).c_str(), light.color * light.intensity);
-    }
-
-    drawLit(m_items, glm::mat4(1.0f));
+    drawLit(m_items, glm::mat4(1.0f), m_itemInstanceOffsets);
     renderWater(camera, viewProj, environment, sceneFbo);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
@@ -604,7 +697,8 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         m_litShader.bind();
         m_litShader.set("uViewProj", projection(vmCamera) * camera.view);
         m_litShader.set("uAoEnabled", 0);
-        drawLit(m_viewModelItems, glm::inverse(camera.view));
+        drawLit(m_viewModelItems, glm::inverse(camera.view), m_noOffsets);
+        m_litShader.set("uAoEnabled", m_settings.ssao ? 1 : 0);
     }
 
     glDisable(GL_DEPTH_TEST);

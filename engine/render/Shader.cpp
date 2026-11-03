@@ -65,11 +65,43 @@ Shader& Shader::operator=(Shader&& other) noexcept {
     return *this;
 }
 
+namespace {
+
+// Expands lines of the form: #include "relative/path.glsl" (relative to assets/shaders).
+std::string expandIncludes(const std::string& source) {
+    std::string out;
+    size_t start = 0;
+    while (start < source.size()) {
+        size_t end = source.find('\n', start);
+        if (end == std::string::npos) end = source.size();
+        const std::string line = source.substr(start, end - start);
+        const std::string tag = "#include \"";
+        if (line.rfind(tag, 0) == 0) {
+            const size_t close = line.find('"', tag.size());
+            const std::string name = line.substr(tag.size(), close - tag.size());
+            const auto included = fs::readText(fs::resolve(std::filesystem::path("assets/shaders") / name));
+            if (included) {
+                out += *included;
+            } else {
+                log::error("Shader include not found: {}", name);
+            }
+        } else {
+            out += line;
+        }
+        out += '\n';
+        start = end + 1;
+    }
+    return out;
+}
+
+} // namespace
+
 bool Shader::loadFile(const std::filesystem::path& path, const std::string& defines) {
-    const auto source = fs::readText(fs::resolve(path));
+    auto source = fs::readText(fs::resolve(path));
     if (!source) {
         return false;
     }
+    source = expandIncludes(*source);
     std::string vertexBody;
     std::string fragmentBody;
     if (!splitStages(*source, vertexBody, fragmentBody)) {

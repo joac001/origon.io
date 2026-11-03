@@ -15,6 +15,8 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
+#include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
@@ -154,6 +156,7 @@ struct PhysicsWorld::Impl {
     std::unique_ptr<JPH::PhysicsSystem> system;
     JPH::CharacterVsCharacterCollisionSimple characterCollision;
     std::vector<JPH::BodyID> bodies;
+    std::vector<JPH::RefConst<JPH::Shape>> shapes;
 };
 
 PhysicsWorld::PhysicsWorld() : m_impl(std::make_unique<Impl>()) {
@@ -213,6 +216,41 @@ BodyHandle PhysicsWorld::addDynamicBox(const glm::vec3& center, const glm::vec3&
     const JPH::BodyID id = m_impl->system->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::Activate);
     if (id.IsInvalid()) {
         log::error("Physics: body limit reached");
+        return kInvalidBody;
+    }
+    m_impl->bodies.push_back(id);
+    return id.GetIndexAndSequenceNumber();
+}
+
+ShapeHandle PhysicsWorld::createMeshShape(const std::vector<glm::vec3>& vertices, const std::vector<uint32_t>& indices) {
+    JPH::TriangleList triangles;
+    triangles.reserve(indices.size() / 3);
+    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+        const glm::vec3& a = vertices[indices[i]];
+        const glm::vec3& b = vertices[indices[i + 1]];
+        const glm::vec3& c = vertices[indices[i + 2]];
+        triangles.push_back(JPH::Triangle(JPH::Float3(a.x, a.y, a.z), JPH::Float3(b.x, b.y, b.z), JPH::Float3(c.x, c.y, c.z)));
+    }
+    JPH::MeshShapeSettings settings(triangles);
+    JPH::ShapeSettings::ShapeResult result = settings.Create();
+    if (result.HasError()) {
+        log::error("Physics: mesh shape creation failed: {}", result.GetError().c_str());
+        return -1;
+    }
+    m_impl->shapes.push_back(result.Get());
+    return static_cast<ShapeHandle>(m_impl->shapes.size()) - 1;
+}
+
+BodyHandle PhysicsWorld::addStaticShape(ShapeHandle shape, const glm::vec3& position, const glm::quat& rotation, float scale) {
+    if (shape < 0 || shape >= static_cast<ShapeHandle>(m_impl->shapes.size())) {
+        return kInvalidBody;
+    }
+    JPH::RefConst<JPH::Shape> base = m_impl->shapes[static_cast<size_t>(shape)];
+    JPH::RefConst<JPH::Shape> used = std::abs(scale - 1.0f) > 1e-3f ? JPH::RefConst<JPH::Shape>(new JPH::ScaledShape(base, JPH::Vec3::sReplicate(scale))) : base;
+    JPH::BodyCreationSettings settings(used, JPH::RVec3(toJolt(position)), toJolt(glm::normalize(rotation)), JPH::EMotionType::Static,
+                                       Layers::kStatic);
+    const JPH::BodyID id = m_impl->system->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+    if (id.IsInvalid()) {
         return kInvalidBody;
     }
     m_impl->bodies.push_back(id);

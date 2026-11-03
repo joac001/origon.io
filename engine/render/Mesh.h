@@ -26,6 +26,8 @@ public:
     Mesh& operator=(Mesh&& other) noexcept;
 
     void draw() const;
+    void drawInstanced(int count) const;
+    int indexCount() const { return m_indexCount; }
     bool valid() const { return m_vao != 0; }
 
     // Unit cube centered at the origin (size 1 on each axis).

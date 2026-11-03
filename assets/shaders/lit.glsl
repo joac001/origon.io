@@ -1,12 +1,7 @@
 // Forward PBR shading: GGX specular, Lambert diffuse, sun with cascaded PCF soft shadows,
 // point lights, hemispheric ambient with SSAO, exponential distance fog, graybox grid.
 #pragma stage vertex
-layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aNormal;
-layout(location = 2) in vec2 aUv;
-
-uniform mat4 uModel;
-uniform mat4 uViewProj;
+#include "include/vertex_common.glsl"
 
 out vec3 vWorldPos;
 out vec3 vNormal;
@@ -14,10 +9,12 @@ out vec2 vUv;
 invariant gl_Position;
 
 void main() {
-    vUv = aUv;
-    vec4 world = uModel * vec4(aPosition, 1.0);
+    mat4 model = modelMatrix();
+    vec4 world = model * vec4(aPosition, 1.0);
+    world.xyz = applyWind(world.xyz, aPosition, model);
     vWorldPos = world.xyz;
-    vNormal = normalize(transpose(inverse(mat3(uModel))) * aNormal);
+    vNormal = normalize(transpose(inverse(mat3(model))) * aNormal);
+    vUv = aUv;
     gl_Position = uViewProj * world;
 }
 
@@ -32,6 +29,13 @@ in vec2 vUv;
 out vec4 fragColor;
 
 uniform int uShading;
+uniform sampler2D uAlbedoMap;
+uniform sampler2D uNormalMap;
+uniform sampler2D uArmMap;
+uniform int uHasAlbedoMap;
+uniform int uHasNormalMap;
+uniform int uHasArmMap;
+uniform float uUvScale;
 
 uniform vec3 uCameraPos;
 uniform vec3 uAlbedo;
@@ -200,6 +204,20 @@ void terrainMaterial(inout vec3 n, out vec3 albedo, out float roughness) {
     n = normalize(n + vec3(-hx, 0.0, -hz) * mix(0.6, 1.4, rockMask));
 }
 
+// Normal mapping without precomputed tangents (cotangent frame from screen derivatives).
+mat3 cotangentFrame(vec3 n, vec3 p, vec2 uv) {
+    vec3 dp1 = dFdx(p);
+    vec3 dp2 = dFdy(p);
+    vec2 duv1 = dFdx(uv);
+    vec2 duv2 = dFdy(uv);
+    vec3 dp2perp = cross(dp2, n);
+    vec3 dp1perp = cross(n, dp1);
+    vec3 t = dp2perp * duv1.x + dp1perp * duv2.x;
+    vec3 b = dp2perp * duv1.y + dp1perp * duv2.y;
+    float invmax = inversesqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+    return mat3(t * invmax, b * invmax, n);
+}
+
 float gridLines(vec3 worldPos, vec3 n, float size) {
     vec3 weights = abs(n);
     weights /= (weights.x + weights.y + weights.z);
@@ -221,8 +239,34 @@ void main() {
     vec3 v = normalize(uCameraPos - vWorldPos);
     vec3 albedo = uAlbedo;
     float roughness = clamp(uRoughness, 0.05, 1.0);
+    float metallic = uMetallic;
+    float occlusion = 1.0;
+    float alpha = 1.0;
+    vec2 uv = vUv * uUvScale;
     if (uShading == 1) {
         terrainMaterial(n, albedo, roughness);
+    }
+    if (uHasAlbedoMap == 1) {
+        vec4 tex = texture(uAlbedoMap, uv);
+        albedo *= tex.rgb;
+        alpha = tex.a;
+    }
+#ifdef FOLIAGE
+    // Sharpened alpha for alpha-to-coverage; plain alpha test otherwise.
+    alpha = (alpha - 0.5) / max(fwidth(alpha), 1e-4) + 0.5;
+    if (alpha < 0.02) {
+        discard;
+    }
+#endif
+    if (uHasNormalMap == 1) {
+        vec3 mapped = texture(uNormalMap, uv).xyz * 2.0 - 1.0;
+        n = normalize(cotangentFrame(n, vWorldPos, uv) * mapped);
+    }
+    if (uHasArmMap == 1) {
+        vec3 arm = texture(uArmMap, uv).rgb;
+        occlusion = arm.r;
+        roughness = clamp(arm.g * uRoughness / 0.8, 0.05, 1.0);
+        metallic = arm.b;
     }
 
     if (uGridSize > 0.0) {
@@ -231,7 +275,7 @@ void main() {
         albedo *= 1.0 - 0.18 * minor - 0.22 * major;
     }
 
-    vec3 color = brdf(n, v, uSunDirection, albedo, roughness, uMetallic) * uSunColor * sunShadow(n);
+    vec3 color = brdf(n, v, uSunDirection, albedo, roughness, metallic) * uSunColor * sunShadow(n);
 
     for (int i = 0; i < uLightCount; ++i) {
         vec3 toLight = uLightPosRadius[i].xyz - vWorldPos;
@@ -241,17 +285,23 @@ void main() {
             continue;
         }
         float falloff = pow(clamp(1.0 - pow(dist / radius, 4.0), 0.0, 1.0), 2.0) / (dist * dist + 1.0);
-        color += brdf(n, v, toLight / dist, albedo, roughness, uMetallic) * uLightColor[i] * falloff;
+        color += brdf(n, v, toLight / dist, albedo, roughness, metallic) * uLightColor[i] * falloff;
     }
 
     float ao = uAoEnabled == 1 ? texture(uAo, gl_FragCoord.xy / uSceneSize).r : 1.0;
     vec3 ambient = mix(uGroundColor, uSkyColor, n.y * 0.5 + 0.5) * uAmbientIntensity;
     // Cheap ambient specular: sky reflection tinted by roughness.
-    vec3 f0 = mix(vec3(0.04), albedo, uMetallic);
+    vec3 f0 = mix(vec3(0.04), albedo, metallic);
     vec3 reflected = reflect(-v, n);
     vec3 envSpecular = mix(uGroundColor, uSkyColor, reflected.y * 0.5 + 0.5) * uAmbientIntensity *
                        fresnelSchlick(max(dot(n, v), 0.0), f0) * (1.0 - roughness * 0.8);
-    color += (ambient * albedo * (1.0 - uMetallic) + envSpecular) * ao;
+    color += (ambient * albedo * (1.0 - metallic) + envSpecular) * ao * occlusion;
+#ifdef FOLIAGE
+    // Light transmitted through leaves when looking toward the sun, plus soft wrap lighting.
+    float shadowTerm = sunShadow(normalize(vNormal));
+    float backLit = pow(max(dot(-v, uSunDirection), 0.0), 3.0);
+    color += albedo * uSunColor * (backLit * 0.5 + 0.12) * shadowTerm;
+#endif
     color += uEmissive;
 
     float dist = length(uCameraPos - vWorldPos);
@@ -260,5 +310,5 @@ void main() {
     vec3 fogColor = mix(uFogColor, uSkyColor, 0.25) * 1.3 + uSunColor * pow(sunAmount, 8.0) * 0.06;
     color = mix(color, fogColor, fog);
 
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(color, clamp(alpha, 0.0, 1.0));
 }

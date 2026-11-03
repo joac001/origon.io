@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace JPH {
 class CharacterVirtual;
@@ -15,6 +16,7 @@ class Shape;
 namespace origon {
 
 using BodyHandle = uint32_t;
+using ShapeHandle = int;
 constexpr BodyHandle kInvalidBody = 0xFFFFFFFFu;
 
 // Collision layers.
@@ -91,6 +93,9 @@ public:
                              float mass, BodyLayer layer = BodyLayer::Dynamic,
                              const glm::vec3& linearVelocity = glm::vec3(0.0f),
                              const glm::vec3& angularVelocity = glm::vec3(0.0f));
+    // Static triangle mesh shapes, created once (per model) and instanced many times.
+    ShapeHandle createMeshShape(const std::vector<glm::vec3>& vertices, const std::vector<uint32_t>& indices);
+    BodyHandle addStaticShape(ShapeHandle shape, const glm::vec3& position, const glm::quat& rotation, float scale);
     // Square heightfield: samples[z * sampleCount + x], first sample at origin, spacing cellSize.
     BodyHandle addHeightField(const glm::vec3& origin, float cellSize, int sampleCount, const float* samples);
     void removeBody(BodyHandle body);

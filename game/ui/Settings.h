@@ -18,6 +18,8 @@ struct GameSettings {
     float masterVolume = 0.8f;
     bool ambience = true;
     bool showStats = false;
+    float vegetationDensity = 1.0f;
+    float vegetationDistance = 90.0f;
 
     static GameSettings load(const std::filesystem::path& path);
     bool save(const std::filesystem::path& path) const;

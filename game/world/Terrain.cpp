@@ -94,6 +94,14 @@ float TerrainData::heightAt(float x, float z) const {
     return h00 + (h01 - h00) * fz + (h11 - h01) * fx;
 }
 
+float TerrainData::paintAt(float x, float z) const {
+    if (!valid() || paint.size() != heights.size()) return 0.0f;
+    const glm::vec2 o = origin();
+    const int ix = std::clamp(static_cast<int>(std::round((x - o.x) / cellSize())), 0, resolution - 1);
+    const int iz = std::clamp(static_cast<int>(std::round((z - o.y) / cellSize())), 0, resolution - 1);
+    return static_cast<float>(paint[static_cast<size_t>(iz * resolution + ix)]) / 255.0f;
+}
+
 glm::vec3 TerrainData::normalAt(float x, float z) const {
     const float e = cellSize();
     const float hl = heightAt(x - e, z), hr = heightAt(x + e, z);

@@ -62,6 +62,11 @@ void Mesh::draw() const {
     glDrawElements(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
+void Mesh::drawInstanced(int count) const {
+    glBindVertexArray(m_vao);
+    glDrawElementsInstanced(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, nullptr, count);
+}
+
 Mesh Mesh::makeCube() {
     struct Face {
         glm::vec3 normal;

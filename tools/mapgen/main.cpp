@@ -174,6 +174,47 @@ MapData makeForest() {
     map.lights.push_back({{camp.x, campY + 0.6f, camp.y + 0.5f}, {1.0f, 0.55f, 0.25f}, 8.0f, 9.0f});
     map.lights.push_back({{cabin.x - 2.0f, cabinY + 1.2f, cabin.y - 2.0f}, {1.0f, 0.7f, 0.4f}, 4.0f, 7.0f});
 
+    // Vegetation: giant redwoods, mixed conifers, maples near water, rocks, logs and understory.
+    auto layer = [&](const char* model, float density, float minScale, float maxScale, float maxSlope, bool collision, float wind,
+                     uint32_t seed) {
+        VegetationLayer v;
+        v.model = model;
+        v.density = density;
+        v.minScale = minScale;
+        v.maxScale = maxScale;
+        v.maxSlope = maxSlope;
+        v.collision = collision;
+        v.wind = wind;
+        v.seed = seed;
+        map.vegetation.push_back(v);
+        return &map.vegetation.back();
+    };
+    layer("redwood", 0.05f, 0.85f, 1.15f, 0.25f, true, 0.15f, 1)->clumping = 0.2f;
+    layer("pine_a", 0.45f, 0.75f, 1.25f, 0.35f, true, 0.3f, 2);
+    layer("pine_b", 0.45f, 0.75f, 1.2f, 0.35f, true, 0.3f, 3);
+    layer("fir_a", 0.35f, 0.8f, 1.3f, 0.4f, true, 0.35f, 4);
+    VegetationLayer* maple = layer("maple", 0.18f, 0.8f, 1.2f, 0.3f, true, 0.4f, 5);
+    maple->clumping = 0.7f;
+    VegetationLayer* rocks = layer("rock_a", 0.35f, 0.6f, 1.6f, 0.9f, true, 0.0f, 6);
+    rocks->alignToGround = true;
+    rocks->sink = 0.25f;
+    rocks->waterMargin = -2.0f;
+    VegetationLayer* pebbles = layer("rock_b", 0.6f, 0.4f, 1.2f, 0.9f, true, 0.0f, 7);
+    pebbles->alignToGround = true;
+    pebbles->sink = 0.2f;
+    pebbles->waterMargin = -2.0f;
+    VegetationLayer* boulders = layer("boulder", 0.04f, 0.8f, 1.3f, 0.6f, true, 0.0f, 8);
+    boulders->alignToGround = true;
+    boulders->sink = 0.6f;
+    layer("log", 0.04f, 0.8f, 1.2f, 0.25f, true, 0.0f, 9)->alignToGround = true;
+    layer("stump", 0.08f, 0.8f, 1.3f, 0.35f, true, 0.0f, 10)->sink = 0.1f;
+    layer("bush", 0.9f, 0.7f, 1.3f, 0.45f, false, 0.25f, 11)->clumping = 0.6f;
+    VegetationLayer* ferns = layer("fern", 5.0f, 0.7f, 1.3f, 0.5f, false, 0.35f, 12);
+    ferns->clumping = 0.7f;
+    VegetationLayer* grass = layer("grass", 22.0f, 0.7f, 1.3f, 0.45f, false, 0.5f, 13);
+    grass->groundCover = true;
+    grass->clumping = 0.5f;
+
     // Twelve spawns spread around the map (lifted onto the ground at load time).
     for (int i = 0; i < 12; ++i) {
         const float angle = glm::two_pi<float>() * static_cast<float>(i) / 12.0f + 0.2f;

@@ -39,6 +39,7 @@ struct TerrainData {
     float heightAt(float x, float z) const;
     glm::vec3 normalAt(float x, float z) const;
     float sample(int ix, int iz) const;
+    float paintAt(float x, float z) const; // 0..1, nearest sample.
 
     enum class Brush { Raise, Lower, Smooth, Flatten, Paint, Erase };
     // Applies a brush stroke. Returns true if anything changed.

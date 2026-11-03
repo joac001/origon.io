@@ -66,6 +66,12 @@ FetchContent_Declare(stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
     GIT_TAG d14d46f6b44456eb88beac58cba833a4135d4c89)
 
+# --- cgltf (glTF 2.0 loading for models from the Blender pipeline) ---------------------
+FetchContent_Declare(cgltf
+    GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
+    GIT_TAG v1.15
+    GIT_SHALLOW TRUE)
+
 # --- miniaudio (audio playback, 3D spatialization) ---------------------------------
 FetchContent_Declare(miniaudio
     GIT_REPOSITORY https://github.com/mackron/miniaudio.git
@@ -74,6 +80,10 @@ FetchContent_Declare(miniaudio
 
 FetchContent_MakeAvailable(glfw glad glm nlohmann_json JoltPhysics imgui)
 # Header-only style sources: fetched without running their own CMake scripts.
+FetchContent_GetProperties(cgltf)
+if(NOT cgltf_POPULATED)
+    FetchContent_Populate(cgltf)
+endif()
 FetchContent_GetProperties(stb)
 if(NOT stb_POPULATED)
     FetchContent_Populate(stb)
@@ -117,3 +127,6 @@ endif()
 
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+
+add_library(cgltf INTERFACE)
+target_include_directories(cgltf INTERFACE ${cgltf_SOURCE_DIR})

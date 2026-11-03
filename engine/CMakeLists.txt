@@ -8,13 +8,15 @@ add_library(origon_engine STATIC
     physics/PhysicsWorld.cpp
     audio/AudioSystem.cpp
     audio/Synth.cpp
-    render/Screenshot.cpp)
+    render/Screenshot.cpp
+    render/Texture.cpp
+    render/Model.cpp)
 
 target_include_directories(origon_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(origon_engine
     PUBLIC glfw glad_gl45 glm::glm Jolt nlohmann_json::nlohmann_json
-    PRIVATE miniaudio stb origon_warnings)
+    PRIVATE miniaudio stb cgltf origon_warnings)
 
 target_compile_definitions(origon_engine PUBLIC
     GLFW_INCLUDE_NONE

@@ -140,6 +140,25 @@ std::optional<MapData> MapData::load(const std::filesystem::path& path) {
             }
             terrain.ensureStorage();
         }
+        for (const json& v : root.value("vegetation", json::array())) {
+            VegetationLayer layer;
+            layer.model = v.value("model", std::string());
+            layer.density = v.value("density", layer.density);
+            layer.minScale = v.value("min_scale", layer.minScale);
+            layer.maxScale = v.value("max_scale", layer.maxScale);
+            layer.minSlope = v.value("min_slope", layer.minSlope);
+            layer.maxSlope = v.value("max_slope", layer.maxSlope);
+            layer.waterMargin = v.value("water_margin", layer.waterMargin);
+            layer.clumping = v.value("clumping", layer.clumping);
+            layer.avoidPaths = v.value("avoid_paths", layer.avoidPaths);
+            layer.sink = v.value("sink", layer.sink);
+            layer.wind = v.value("wind", layer.wind);
+            layer.collision = v.value("collision", layer.collision);
+            layer.alignToGround = v.value("align_to_ground", layer.alignToGround);
+            layer.groundCover = v.value("ground_cover", layer.groundCover);
+            layer.seed = v.value("seed", layer.seed);
+            if (!layer.model.empty()) map.vegetation.push_back(layer);
+        }
         for (const json& b : root.value("blocks", json::array())) {
             BlockData block;
             block.position = readVec3(b, "pos", block.position);
@@ -204,6 +223,15 @@ bool MapData::save(const std::filesystem::path& path) const {
             {"paint", base64Encode(terrain.paint)},
         };
     }
+    json vegetationArray = json::array();
+    for (const VegetationLayer& v : vegetation) {
+        vegetationArray.push_back({{"model", v.model}, {"density", v.density}, {"min_scale", v.minScale}, {"max_scale", v.maxScale},
+                                   {"min_slope", v.minSlope}, {"max_slope", v.maxSlope}, {"water_margin", v.waterMargin},
+                                   {"clumping", v.clumping}, {"avoid_paths", v.avoidPaths}, {"sink", v.sink}, {"wind", v.wind},
+                                   {"collision", v.collision}, {"align_to_ground", v.alignToGround},
+                                   {"ground_cover", v.groundCover}, {"seed", v.seed}});
+    }
+    if (!vegetation.empty()) root["vegetation"] = vegetationArray;
     json blockArray = json::array();
     for (const BlockData& b : blocks) {
         json block = {{"pos", writeVec3(b.position)},

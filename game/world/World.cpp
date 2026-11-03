@@ -55,6 +55,10 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
 
     m_blockBodies.clear();
     m_blockBodies.reserve(m_map.blocks.size());
+    m_vegetation.clear();
+    if (m_models && terrain.valid()) {
+        m_vegetation.build(m_map, *m_models, physics);
+    }
     for (const BlockData& block : m_map.blocks) {
         const BodyHandle body = block.dynamic
                                     ? physics.addDynamicBox(block.position, block.size * 0.5f, block.orientation(), block.mass)
@@ -101,6 +105,11 @@ void World::submit(Renderer& renderer, const PhysicsWorld& physics) const {
     for (const LightData& light : m_map.lights) {
         renderer.addLight({light.position, light.radius, toLinear(light.color), light.intensity});
     }
+}
+
+void World::submitVegetation(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera,
+                             const VegetationSettings& settings) const {
+    m_vegetation.submit(renderer, viewProj, camera, settings);
 }
 
 Environment World::environment() const {

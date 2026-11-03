@@ -63,6 +63,7 @@ App::App(const LaunchOptions& options) : m_options(options) {
         m_audio.setVolume(m_settings.masterVolume);
         m_audio.setAmbienceEnabled(m_settings.ambience);
     }
+    m_world.setModelLibrary(&m_models);
     m_sim = std::make_unique<Simulation>(m_physics, m_weapons);
     m_hud.setFonts(m_fontRegular, m_fontBold);
     m_mapFiles = listMaps();
@@ -266,6 +267,10 @@ int App::run() {
         }
         Environment environment = m_world.environment();
         environment.time = m_time;
+        VegetationSettings vegetation;
+        vegetation.density = m_settings.vegetationDensity;
+        vegetation.distance = m_settings.vegetationDistance;
+        m_world.submitVegetation(m_renderer, m_renderer.projection(camera) * camera.view, camera.position, vegetation);
         m_renderer.render(camera, environment);
 
         // --- UI -----------------------------------------------------------------------
@@ -560,13 +565,13 @@ void App::drawMenu() {
             RenderSettings& r = m_settings.render;
             ImGui::TextDisabled("Preajustes:");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Batata")) { r.shadowQuality = 1; r.msaaSamples = 0; r.renderScale = 0.7f; r.ssao = false; r.bloom = false; r.godRays = false; }
+            if (ImGui::SmallButton("Batata")) { r.shadowQuality = 1; r.msaaSamples = 0; r.renderScale = 0.7f; r.ssao = false; r.bloom = false; r.godRays = false; m_settings.vegetationDensity = 0.3f; m_settings.vegetationDistance = 40.0f; }
             ImGui::SameLine();
             if (ImGui::SmallButton("Media")) { r.shadowQuality = 2; r.msaaSamples = 2; r.renderScale = 0.9f; r.ssao = true; r.bloom = true; r.godRays = false; }
             ImGui::SameLine();
             if (ImGui::SmallButton("Alta")) { r.shadowQuality = 3; r.msaaSamples = 4; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true; }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Ultra")) { r.shadowQuality = 4; r.msaaSamples = 8; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true; }
+            if (ImGui::SmallButton("Ultra")) { r.shadowQuality = 4; r.msaaSamples = 8; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true; m_settings.vegetationDensity = 1.0f; m_settings.vegetationDistance = 150.0f; }
             ImGui::Separator();
             const char* shadowLabels[] = {"Desactivadas", "Bajas", "Medias", "Altas", "Ultra"};
             ImGui::Combo("Calidad de sombras", &r.shadowQuality, shadowLabels, 5);
@@ -586,6 +591,10 @@ void App::drawMenu() {
             ImGui::SliderInt("FPS máximos", &m_settings.maxFps, 0, 360, m_settings.maxFps == 0 ? "Sin límite" : "%d");
             ImGui::EndDisabled();
             ImGui::SliderFloat("Exposición", &r.exposure, 0.5f, 2.0f, "%.2f");
+            int density = static_cast<int>(std::round(m_settings.vegetationDensity * 100.0f));
+            if (ImGui::SliderInt("Densidad de hierba", &density, 20, 100, "%d%%")) m_settings.vegetationDensity = static_cast<float>(density) / 100.0f;
+            ImGui::SliderFloat("Distancia de hierba", &m_settings.vegetationDistance, 30.0f, 150.0f, "%.0f m");
+            ImGui::TextDisabled("Árboles, rocas, arbustos y helechos se ven igual en todas las calidades.");
             ImGui::Checkbox("Mostrar rendimiento (F3)", &m_settings.showStats);
             ImGui::Spacing();
             ImGui::TextDisabled("Los ajustes nunca cambian colisiones ni visibilidad del mapa.");

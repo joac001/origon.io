@@ -7,6 +7,8 @@
 #include "fx/Effects.h"
 #include "physics/PhysicsWorld.h"
 #include "render/Renderer.h"
+#include "render/Texture.h"
+#include "world/Vegetation.h"
 #include "sim/Simulation.h"
 #include "sim/Weapons.h"
 #include "ui/Hud.h"
@@ -72,6 +74,8 @@ private:
     std::unique_ptr<Window> m_window;
     Input m_input;
     Renderer m_renderer;
+    TextureCache m_textures;
+    ModelLibrary m_models{&m_textures};
     PhysicsWorld m_physics;
     WeaponDatabase m_weapons;
     std::unique_ptr<Simulation> m_sim;
