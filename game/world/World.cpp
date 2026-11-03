@@ -28,8 +28,10 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
         if (terrain.valid()) {
             std::vector<Vertex> vertices;
             std::vector<uint32_t> indices;
-            terrain.buildVertices(vertices, indices);
-            m_terrainMesh = Mesh(vertices, indices);
+            if (!m_headless) {
+                terrain.buildVertices(vertices, indices);
+                m_terrainMesh = Mesh(vertices, indices);
+            }
             const glm::vec2 o = terrain.origin();
             physics.addHeightField(glm::vec3(o.x, 0.0f, o.y), terrain.cellSize(), terrain.resolution, terrain.heights.data());
             // Spawns placed under the ground are lifted onto it.
@@ -38,7 +40,7 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
                 spawn.position.y = std::max(spawn.position.y, ground);
             }
         }
-        if (terrain.waterEnabled) {
+        if (terrain.waterEnabled && !m_headless) {
             const float half = terrain.size * 0.5f;
             const float y = terrain.waterLevel;
             const std::vector<Vertex> water = {{{-half, y, -half}, {0, 1, 0}, {0, 0}},

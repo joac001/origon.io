@@ -691,6 +691,19 @@ void Simulation::computeBotCommands(std::vector<PlayerCommand>& commands) {
             command.buttons |= kButtonSprint;
         }
 
+        // Obstacle avoidance (trees, rocks): steer toward the clearer side when moving forward
+        // without a target to aim at, or while rushing with the knife.
+        if (command.forward > 0.3f && (!target || weapon.isMelee())) {
+            const glm::vec3 chest = p.position + glm::vec3(0.0f, 0.9f, 0.0f);
+            auto blocked = [&](float offset) { return m_physics.rayCast(chest, flatForward(desiredYaw + offset), 2.4f, true).has_value(); };
+            if (blocked(0.0f)) {
+                const bool left = blocked(0.6f);
+                const bool right = blocked(-0.6f);
+                desiredYaw += !left ? 0.9f : (!right ? -0.9f : 1.8f);
+                if (target) command.right = !left ? -0.8f : 0.8f;
+            }
+        }
+
         // Stuck detection: jump and pick a new waypoint.
         bot.stuckTimer += dt;
         if (bot.stuckTimer > 1.0f) {

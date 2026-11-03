@@ -21,6 +21,8 @@ public:
     void setModelLibrary(ModelLibrary* library) { m_models = library; }
     void setTextureCache(TextureCache* textures) { m_textures = textures; }
     void setVegetationEnabled(bool enabled) { m_vegetationEnabled = enabled; }
+    // Headless: collision only, no GPU meshes (tests, dedicated server).
+    void setHeadless(bool headless) { m_headless = headless; }
     void submitVegetation(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera,
                           const VegetationSettings& settings) const;
     const VegetationField& vegetation() const { return m_vegetation; }
@@ -42,6 +44,7 @@ private:
     ModelLibrary* m_models = nullptr;
     TextureCache* m_textures = nullptr;
     bool m_vegetationEnabled = true;
+    bool m_headless = false;
     VegetationField m_vegetation;
     std::vector<BodyHandle> m_blockBodies; // One per block.
 };

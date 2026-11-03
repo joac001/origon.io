@@ -113,6 +113,45 @@ void testFullMatch(const WeaponDatabase& weapons) {
     check(positionsValid, "living players stay inside the map");
 }
 
+void testForestMatch(const WeaponDatabase& weapons) {
+    auto map = MapData::load(fs::resolve("maps/bosque.json"));
+    check(map.has_value(), "bosque map loads");
+    if (!map) {
+        return;
+    }
+    PhysicsWorld physics;
+    ModelLibrary library(nullptr); // Geometry only: collision meshes without GL.
+    World world;
+    world.setHeadless(true);
+    world.setModelLibrary(&library);
+    world.build(*map, physics);
+    check(world.vegetation().instanceCount() > 1000, "vegetation scattered headless");
+
+    Simulation sim(physics, weapons);
+    sim.startMatch(world.map(), 9);
+    sim.players()[0].isBot = true;
+    std::vector<PlayerCommand> commands;
+    int kills = 0;
+    int tick = 0;
+    const int maxTicks = static_cast<int>(weapons.rules().timeLimitSeconds * kTickRate) + 300;
+    for (; tick < maxTicks && sim.gunGame().phase() == GunGame::Phase::Playing; ++tick) {
+        sim.computeBotCommands(commands);
+        sim.tick(commands);
+        for (const GameEvent& e : sim.takeEvents()) {
+            if (e.type == GameEvent::Type::Kill) ++kills;
+        }
+    }
+    std::printf("       forest match: %.1f s, %d kills, %zu vegetation instances\n", static_cast<float>(tick) / kTickRate,
+                kills, world.vegetation().instanceCount());
+    check(sim.gunGame().phase() == GunGame::Phase::Finished, "forest match finishes");
+    check(kills > 20, "bots fight in the forest");
+    bool aboveGround = true;
+    for (const Player& p : sim.players()) {
+        if (p.alive && p.position.y < world.terrainHeight(p.position.x, p.position.z) - 1.0f) aboveGround = false;
+    }
+    check(aboveGround, "living players stay on the terrain");
+}
+
 } // namespace
 
 int main() {
@@ -121,6 +160,7 @@ int main() {
     check(weapons.tierCount() == 20, "ladder has 20 tiers");
     testRules(weapons);
     testFullMatch(weapons);
+    testForestMatch(weapons);
     std::printf("%s (%d failures)\n", g_failures == 0 ? "ALL PASSED" : "FAILED", g_failures);
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
