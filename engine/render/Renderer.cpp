@@ -606,6 +606,9 @@ void Renderer::renderWater(const CameraView& camera, const glm::mat4& viewProj, 
     m_waterShader.set("uFogDensity", environment.fogDensity);
     m_waterShader.set("uSceneSize", glm::vec2(m_sceneSize));
     m_waterShader.set("uNear", camera.nearPlane);
+    m_waterShader.set("uView", camera.view);
+    m_waterShader.set("uProj", projection(camera));
+    m_waterShader.set("uSsrEnabled", m_settings.ssr ? 1 : 0);
     m_waterShader.set("uFar", camera.farPlane);
     m_waterShader.set("uSceneColor", 0);
     m_waterShader.set("uSceneDepth", 1);

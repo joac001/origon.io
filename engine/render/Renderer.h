@@ -84,6 +84,7 @@ struct RenderSettings {
     bool ssao = true;
     bool bloom = true;
     bool godRays = true;
+    bool ssr = true; // Screen-space reflections on water.
     float bloomStrength = 0.06f;
 };
 

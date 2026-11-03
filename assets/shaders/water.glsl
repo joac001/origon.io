@@ -29,11 +29,43 @@ uniform sampler2D uSceneDepth;
 uniform vec2 uSceneSize;
 uniform float uNear;
 uniform float uFar;
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform int uSsrEnabled;
 
-float linearDepth(float d) {
+float linearDepthOf(float d);
+
+// Screen-space reflection: march the reflected ray in view space against the scene depth.
+vec4 traceReflection(vec3 worldPos, vec3 reflectDir) {
+    vec3 origin = (uView * vec4(worldPos, 1.0)).xyz;
+    vec3 dir = normalize((uView * vec4(reflectDir, 0.0)).xyz);
+    float stepLength = 0.35;
+    vec3 p = origin + dir * 0.2;
+    for (int i = 0; i < 40; ++i) {
+        p += dir * stepLength;
+        stepLength *= 1.09;
+        vec4 clip = uProj * vec4(p, 1.0);
+        if (clip.w <= 0.0) break;
+        vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+        float sceneDepth = linearDepthOf(texture(uSceneDepth, uv).r);
+        float rayDepth = -p.z;
+        float diff = rayDepth - sceneDepth;
+        if (diff > 0.0 && diff < stepLength * 1.5 + 0.3) {
+            vec2 edge = smoothstep(vec2(0.0), vec2(0.12), uv) * smoothstep(vec2(0.0), vec2(0.12), 1.0 - uv);
+            float fade = edge.x * edge.y * (1.0 - float(i) / 40.0);
+            return vec4(texture(uSceneColor, uv).rgb, fade);
+        }
+    }
+    return vec4(0.0);
+}
+
+float linearDepthOf(float d) {
     float z = d * 2.0 - 1.0;
     return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear));
 }
+
+float linearDepth(float d) { return linearDepthOf(d); }
 
 vec2 waveGradient(vec2 p, float t) {
     vec2 g = vec2(0.0);
@@ -73,8 +105,13 @@ void main() {
 
     vec3 r = reflect(-v, n);
     vec3 skyReflection = mix(uFogColor * 0.75, uSkyColor * vec3(0.5, 0.58, 0.75), pow(clamp(r.y, 0.0, 1.0), 0.4)) * 0.9;
-    float fresnel = 0.02 + 0.6 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
-    vec3 color = mix(transmitted, skyReflection, fresnel);
+    float fresnel = 0.03 + 0.7 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+    vec3 reflection = skyReflection;
+    if (uSsrEnabled == 1) {
+        vec4 ssr = traceReflection(vWorldPos, normalize(reflect(-v, normalize(n * vec3(0.4, 1.0, 0.4)))));
+        reflection = mix(skyReflection, ssr.rgb, ssr.a);
+    }
+    vec3 color = mix(transmitted, reflection, fresnel);
 
     vec3 h = normalize(v + uSunDirection);
     color += uSunColor * min(pow(max(dot(n, h), 0.0), 800.0) * 1.2, 2.0);

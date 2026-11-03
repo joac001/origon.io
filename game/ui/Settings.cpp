@@ -30,6 +30,7 @@ GameSettings GameSettings::load(const std::filesystem::path& path) {
         r.ssao = j.value("ssao", r.ssao);
         r.bloom = j.value("bloom", r.bloom);
         r.godRays = j.value("volumetric_light", r.godRays);
+        r.ssr = j.value("ssr", r.ssr);
         settings.masterVolume = std::clamp(j.value("master_volume", settings.masterVolume), 0.0f, 1.0f);
         settings.ambience = j.value("ambience", settings.ambience);
         settings.showStats = j.value("show_stats", settings.showStats);
@@ -57,6 +58,7 @@ bool GameSettings::save(const std::filesystem::path& path) const {
         {"ssao", render.ssao},
         {"bloom", render.bloom},
         {"volumetric_light", render.godRays},
+        {"ssr", render.ssr},
         {"master_volume", masterVolume},
         {"ambience", ambience},
         {"show_stats", showStats},
