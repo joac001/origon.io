@@ -57,7 +57,7 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
     m_blockBodies.clear();
     m_blockBodies.reserve(m_map.blocks.size());
     m_vegetation.clear();
-    if (m_models && terrain.valid()) {
+    if (m_models && terrain.valid() && m_vegetationEnabled) {
         m_vegetation.build(m_map, *m_models, physics);
     }
     for (const BlockData& block : m_map.blocks) {

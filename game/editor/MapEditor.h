@@ -46,6 +46,8 @@ public:
     void setFov(float fov) { m_fov = fov; }
     CameraView camera() const;
     bool consumePlayRequest();
+    // While sculpting, the App skips the (slow) vegetation scatter until the stroke ends.
+    bool isSculpting() const { return m_sculpting; }
 
 private:
     struct Prefab {
@@ -101,6 +103,7 @@ private:
     void drawGizmo();
     void drawValidation();
     void drawTerrainPanel();
+    void drawVegetationPanel();
     void updateSculpt(float dt, Input& input, const PhysicsWorld& physics);
     void refreshMapList();
     void setStatus(const std::string& text);
@@ -152,6 +155,8 @@ private:
     glm::vec3 m_brushCenter{0.0f};
     bool m_sculpting = false;
     float m_flattenHeight = 0.0f;
+
+    std::vector<std::string> m_vegetationModels;
 
     // History and clipboard.
     std::deque<MapData> m_undo;

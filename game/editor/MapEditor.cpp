@@ -793,6 +793,7 @@ void MapEditor::drawUi() {
     drawInspector();
     drawHierarchy();
     drawTerrainPanel();
+    drawVegetationPanel();
     drawStatusBar();
     if (m_showValidation) {
         drawValidation();
@@ -1212,6 +1213,7 @@ void MapEditor::updateSculpt(float dt, Input& input, const PhysicsWorld& physics
         m_flattenHeight = m_brushCenter.y;
     }
     if (!down) {
+        if (m_sculpting) markDirty(); // Rebuild with vegetation once the stroke ends.
         m_sculpting = false;
     }
     if (m_sculpting && m_brushValid) {
@@ -1281,6 +1283,118 @@ void MapEditor::drawTerrainPanel() {
         ImGui::SliderFloat("Radio", &m_brushRadius, 0.5f, 60.0f, "%.1f m");
         ImGui::SliderFloat("Fuerza", &m_brushStrength, 0.05f, 5.0f, "%.2f");
         ImGui::TextDisabled("Shift: invertir. Ctrl+rueda: radio.");
+    }
+    ImGui::End();
+}
+
+void MapEditor::drawVegetationPanel() {
+    if (!m_map.terrain.enabled) return;
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(660, io.DisplaySize.y - 300), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(360, 420), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
+    ImGui::Begin("Vegetación");
+    if (m_vegetationModels.empty()) {
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator(fs::resolve("assets/models/vegetation"), ec)) {
+            if (entry.path().extension() == ".glb") m_vegetationModels.push_back(entry.path().stem().string());
+        }
+        std::sort(m_vegetationModels.begin(), m_vegetationModels.end());
+    }
+    ImGui::TextDisabled("Capas dispersadas sobre el terreno. Igual para todos los jugadores.");
+    ImGui::TextDisabled("Solo el pasto bajo depende de la calidad gráfica.");
+    // Edits apply when a widget is released, so the scatter runs once.
+    auto apply = [&](bool changed) {
+        if (ImGui::IsItemActivated()) pushUndo();
+        if (changed && !ImGui::IsItemActive()) markDirty();
+        if (ImGui::IsItemDeactivatedAfterEdit()) markDirty();
+    };
+    int removeIndex = -1;
+    for (size_t i = 0; i < m_map.vegetation.size(); ++i) {
+        VegetationLayer& layer = m_map.vegetation[i];
+        ImGui::PushID(static_cast<int>(i));
+        const std::string header = std::format("{}  ({:.1f}/100 m²)###layer", layer.model, layer.density);
+        if (ImGui::CollapsingHeader(header.c_str())) {
+            if (ImGui::BeginCombo("Modelo", layer.model.c_str())) {
+                for (const std::string& model : m_vegetationModels) {
+                    if (ImGui::Selectable(model.c_str(), model == layer.model)) {
+                        pushUndo();
+                        layer.model = model;
+                        markDirty();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            apply(ImGui::DragFloat("Densidad", &layer.density, 0.05f, 0.01f, 300.0f, "%.2f / 100 m²"));
+            apply(ImGui::DragFloatRange2("Escala", &layer.minScale, &layer.maxScale, 0.01f, 0.1f, 5.0f));
+            apply(ImGui::DragFloatRange2("Pendiente", &layer.minSlope, &layer.maxSlope, 0.01f, 0.0f, 1.0f));
+            apply(ImGui::SliderFloat("Agrupamiento", &layer.clumping, 0.0f, 1.0f));
+            apply(ImGui::SliderFloat("Evitar caminos", &layer.avoidPaths, 0.0f, 1.0f));
+            apply(ImGui::SliderFloat("Margen del agua", &layer.waterMargin, -3.0f, 3.0f, "%.1f m"));
+            apply(ImGui::SliderFloat("Hundir", &layer.sink, 0.0f, 1.0f, "%.2f m"));
+            apply(ImGui::SliderFloat("Viento", &layer.wind, 0.0f, 1.0f));
+            int seed = static_cast<int>(layer.seed);
+            if (ImGui::InputInt("Semilla", &seed)) {
+                pushUndo();
+                layer.seed = static_cast<uint32_t>(std::max(seed, 0));
+                markDirty();
+            }
+            apply(ImGui::Checkbox("Colisión", &layer.collision));
+            ImGui::SameLine();
+            apply(ImGui::Checkbox("Alinear al suelo", &layer.alignToGround));
+            ImGui::SameLine();
+            apply(ImGui::Checkbox("Pasto bajo", &layer.groundCover));
+            if (ImGui::Button("Quitar capa")) removeIndex = static_cast<int>(i);
+        }
+        ImGui::PopID();
+    }
+    if (removeIndex >= 0) {
+        pushUndo();
+        m_map.vegetation.erase(m_map.vegetation.begin() + removeIndex);
+        markDirty();
+    }
+    if (ImGui::Button("Añadir capa") && !m_vegetationModels.empty()) {
+        pushUndo();
+        VegetationLayer layer;
+        layer.model = m_vegetationModels.front();
+        layer.seed = static_cast<uint32_t>(m_map.vegetation.size() + 1);
+        m_map.vegetation.push_back(layer);
+        markDirty();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Bosque templado (preajuste)")) {
+        pushUndo();
+        m_map.vegetation.clear();
+        auto add = [&](const char* model, float density, float minS, float maxS, float slope, bool collision, float wind, bool ground) {
+            VegetationLayer v;
+            v.model = model;
+            v.density = density;
+            v.minScale = minS;
+            v.maxScale = maxS;
+            v.maxSlope = slope;
+            v.collision = collision;
+            v.wind = wind;
+            v.groundCover = ground;
+            v.seed = static_cast<uint32_t>(m_map.vegetation.size() + 1);
+            if (std::string(model).rfind("rock", 0) == 0 || std::string(model) == "boulder" || std::string(model) == "log") {
+                v.alignToGround = true;
+                v.sink = 0.25f;
+            }
+            m_map.vegetation.push_back(v);
+        };
+        add("redwood", 0.05f, 0.85f, 1.15f, 0.25f, true, 0.15f, false);
+        add("pine_a", 0.45f, 0.75f, 1.25f, 0.35f, true, 0.3f, false);
+        add("pine_b", 0.45f, 0.75f, 1.2f, 0.35f, true, 0.3f, false);
+        add("fir_a", 0.35f, 0.8f, 1.3f, 0.4f, true, 0.35f, false);
+        add("maple", 0.18f, 0.8f, 1.2f, 0.3f, true, 0.4f, false);
+        add("rock_a", 0.35f, 0.6f, 1.6f, 0.9f, true, 0.0f, false);
+        add("rock_b", 0.6f, 0.4f, 1.2f, 0.9f, true, 0.0f, false);
+        add("boulder", 0.04f, 0.8f, 1.3f, 0.6f, true, 0.0f, false);
+        add("log", 0.04f, 0.8f, 1.2f, 0.25f, true, 0.0f, false);
+        add("bush", 0.9f, 0.7f, 1.3f, 0.45f, false, 0.25f, false);
+        add("fern", 12.0f, 0.7f, 1.3f, 0.5f, false, 0.35f, false);
+        add("grass", 140.0f, 0.6f, 1.1f, 0.45f, false, 0.5f, true);
+        markDirty();
     }
     ImGui::End();
 }

@@ -392,7 +392,9 @@ int App::run() {
         } else {
             m_editor.setFov(m_settings.fov);
             if (m_editor.update(dt, m_input, *m_window, m_physics, framebuffer)) {
+                m_world.setVegetationEnabled(!m_editor.isSculpting());
                 buildWorld(m_editor.map());
+                m_world.setVegetationEnabled(true);
             }
             if (m_editor.consumePlayRequest()) leaveEditor();
         }

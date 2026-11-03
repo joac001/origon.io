@@ -20,6 +20,7 @@ public:
     // Vegetation needs a model library (null: no vegetation, e.g. headless tests).
     void setModelLibrary(ModelLibrary* library) { m_models = library; }
     void setTextureCache(TextureCache* textures) { m_textures = textures; }
+    void setVegetationEnabled(bool enabled) { m_vegetationEnabled = enabled; }
     void submitVegetation(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera,
                           const VegetationSettings& settings) const;
     const VegetationField& vegetation() const { return m_vegetation; }
@@ -40,6 +41,7 @@ private:
     Mesh m_waterMesh;
     ModelLibrary* m_models = nullptr;
     TextureCache* m_textures = nullptr;
+    bool m_vegetationEnabled = true;
     VegetationField m_vegetation;
     std::vector<BodyHandle> m_blockBodies; // One per block.
 };
