@@ -26,7 +26,7 @@ float sunMask(vec2 uv) {
     }
     float sky = texture(uDepth, uv).r >= 1.0 ? 1.0 : 0.0;
     vec2 d = (uv - uSunUv) * vec2(uAspect, 1.0);
-    return sky * exp(-dot(d, d) * 6.0);
+    return sky * exp(-dot(d, d) * 40.0);
 }
 
 float hash(vec2 p) {

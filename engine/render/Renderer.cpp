@@ -578,7 +578,7 @@ void Renderer::renderGodRays(const CameraView& camera, const glm::mat4& viewProj
     m_godRaysShader.set("uSunUv", sunUv);
     m_godRaysShader.set("uAspect", static_cast<float>(m_sceneSize.x) / static_cast<float>(m_sceneSize.y));
     m_godRaysShader.set("uSunColor", environment.sunColor * environment.sunIntensity);
-    m_godRaysShader.set("uIntensity", std::pow(facing, 3.0f) * 0.35f);
+    m_godRaysShader.set("uIntensity", std::pow(facing, 4.0f) * 0.12f);
     glBindTextureUnit(0, m_resolveDepth);
     drawFullscreen(m_emptyVao);
     m_stats.drawCalls++;
