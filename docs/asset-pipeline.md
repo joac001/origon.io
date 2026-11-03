@@ -29,7 +29,19 @@ One pipeline for the whole project. No manual modeling.
 
 ## 3. Requirements
 
-- Blender 4.x or newer on PATH (not installed yet on the dev machine).
-- Python 3 for `tools/fetch_assets.py`.
+- Blender 4.5 LTS (portable build in `~/.local/share/origon-tools/` on the dev machine).
+- Python 3 for `tools/fetch_assets.py`, plus Pillow for `tools/textures/gen_foliage.py`.
 
-The graybox prototype needs neither: it uses procedural boxes defined in map JSON.
+## 4. Current generators
+
+| Script | Output |
+|---|---|
+| `tools/blender/gen_vegetation.py` | `assets/models/vegetation/*.glb`: pine_a, pine_b, fir_a, redwood, maple, rock_a, rock_b, boulder, fern, grass, bush, log, stump (LOD0-2, `_COL` collision) |
+| `tools/blender/gen_weapons.py` | `assets/models/weapons/*.glb`: the 19 ladder weapons and the knife |
+| `tools/textures/gen_foliage.py` | `assets/textures/foliage/*.png`: needles, fern, leaves, grass cards |
+| `tools/fetch_assets.py` | `assets/textures/<id>/{albedo,normal,arm}.jpg` from Poly Haven (CC0) |
+| `tools/mapgen` (`origon_mapgen`) | `maps/bosque.json` |
+
+Material naming contract (models do not embed images): `bark_<id>`, `rock_<id>` and `pbr_<id>`
+use `assets/textures/<id>/`; `foliage_<name>` uses `assets/textures/foliage/<name>.png` with
+alpha testing, two-sided lighting and wind; other materials use their glTF color factors.

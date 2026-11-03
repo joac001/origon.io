@@ -462,6 +462,8 @@ int App::run() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         if (!m_pendingScreenshot.empty()) {
             saveScreenshot(m_pendingScreenshot, framebuffer.x, framebuffer.y, m_shotFbo);
+            log::info("Perf: {:.2f} ms/frame ({:.0f} FPS), {} draw calls, {} vegetation instances", m_frameMs, m_fpsSmoothed,
+                      m_renderer.stats().drawCalls, m_world.vegetation().instanceCount());
             if (m_pendingScreenshot == m_options.screenshotPath) {
                 m_window->requestClose();
             }

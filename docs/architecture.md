@@ -44,8 +44,12 @@ docs/                   design and research
 - Fixed tick: 60 Hz. Rendering runs at any frame rate and interpolates between ticks.
 - Input is sampled into a `PlayerCommand` (move axes, view angles, buttons) once per tick.
 - The simulation reads only `PlayerCommand`s. It never reads GLFW directly.
-- In phase 2, clients send `PlayerCommand`s to the host over ENet. The host runs the same
-  simulation and sends snapshots back. Clients predict their own player and reconcile.
+- Clients send `PlayerCommand`s to the host over ENet (unreliable). The host runs the
+  simulation and sends 30 Hz snapshots (players, match state, dynamic props) plus reliable
+  gameplay events. Clients predict their own movement with the same movement code and snap
+  back when the error exceeds 1.2 m; remote players are interpolated between snapshots.
+- Known limits: no lag compensation for hitscan yet (the host judges hits at its own time),
+  and weapon fire feedback on clients waits for the server event.
 - Game rules (Gun Game) live only in the simulation. The UI reads simulation state.
 
 ## 4. Rendering plan
