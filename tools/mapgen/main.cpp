@@ -20,6 +20,8 @@ float creekZ(float x) { return 12.0f * std::sin(x * 0.045f) + 6.0f * std::sin(x 
 
 BlockData block(glm::vec3 position, glm::vec3 size, glm::vec3 color, glm::vec3 rotation = {}, float roughness = 0.85f) {
     BlockData b;
+    // Structures use scanned textures; the color is a tint.
+    b.texture = color.r > color.b + 0.05f ? "wood_planks_dirt" : "mossy_rock";
     b.position = position;
     b.size = size;
     b.color = color;
@@ -85,10 +87,10 @@ MapData makeForest() {
     EnvironmentData& e = map.environment;
     e.sunDirection = {-0.55f, 0.55f, 0.35f};
     e.sunColor = {1.0f, 0.87f, 0.68f};
-    e.sunIntensity = 3.4f;
-    e.skyColor = {0.5f, 0.62f, 0.78f};
-    e.groundColor = {0.2f, 0.22f, 0.14f};
-    e.ambientIntensity = 0.55f;
+    e.sunIntensity = 3.1f;
+    e.skyColor = {0.52f, 0.62f, 0.72f};
+    e.groundColor = {0.2f, 0.24f, 0.12f};
+    e.ambientIntensity = 0.42f;
     e.fogColor = {0.55f, 0.63f, 0.66f};
     e.fogDensity = 0.0055f;
 
@@ -209,20 +211,39 @@ MapData makeForest() {
     layer("log", 0.04f, 0.8f, 1.2f, 0.25f, true, 0.0f, 9)->alignToGround = true;
     layer("stump", 0.08f, 0.8f, 1.3f, 0.35f, true, 0.0f, 10)->sink = 0.1f;
     layer("bush", 0.9f, 0.7f, 1.3f, 0.45f, false, 0.25f, 11)->clumping = 0.6f;
-    VegetationLayer* ferns = layer("fern", 5.0f, 0.7f, 1.3f, 0.5f, false, 0.35f, 12);
+    VegetationLayer* ferns = layer("fern", 12.0f, 0.7f, 1.3f, 0.5f, false, 0.35f, 12);
     ferns->clumping = 0.7f;
-    VegetationLayer* grass = layer("grass", 22.0f, 0.7f, 1.3f, 0.45f, false, 0.5f, 13);
+    VegetationLayer* grass = layer("grass", 140.0f, 0.6f, 1.1f, 0.45f, false, 0.5f, 13);
     grass->groundCover = true;
     grass->clumping = 0.5f;
 
     // Twelve spawns spread around the map (lifted onto the ground at load time).
+    // Each spawn searches outward from its preferred spot for dry, flat ground away from structures.
     for (int i = 0; i < 12; ++i) {
         const float angle = glm::two_pi<float>() * static_cast<float>(i) / 12.0f + 0.2f;
-        const float radius = i % 2 ? 48.0f : 30.0f;
-        glm::vec3 p(std::cos(angle) * radius, 0.0f, std::sin(angle) * radius);
-        if (std::abs(p.z - creekZ(p.x)) < 8.0f) p.z += 12.0f;
-        p.y = t.heightAt(p.x, p.z) + 0.05f;
-        map.spawns.push_back({p, glm::degrees(std::atan2(p.x, p.z))});
+        const float radius = i % 2 ? 50.0f : 32.0f;
+        glm::vec3 best(std::cos(angle) * radius, 0.0f, std::sin(angle) * radius);
+        for (int attempt = 0; attempt < 64; ++attempt) {
+            const float a = angle + static_cast<float>(attempt) * 0.37f;
+            const float r = radius + static_cast<float>(attempt % 8) * 2.5f - 8.0f;
+            glm::vec3 p(std::cos(a) * r, 0.0f, std::sin(a) * r);
+            const float h = t.heightAt(p.x, p.z);
+            const bool dry = h > t.waterLevel + 0.8f && std::abs(p.z - creekZ(p.x)) > 9.0f;
+            const bool flat = t.normalAt(p.x, p.z).y > 0.92f;
+            bool clear = true;
+            for (const BlockData& b : map.blocks) {
+                if (glm::length(glm::vec2(b.position.x - p.x, b.position.z - p.z)) < glm::length(glm::vec2(b.size.x, b.size.z)) * 0.5f + 2.5f) {
+                    clear = false;
+                }
+            }
+            if (dry && flat && clear) {
+                best = p;
+                break;
+            }
+        }
+        best.y = t.heightAt(best.x, best.z) + 0.05f;
+        // Face the map center.
+        map.spawns.push_back({best, glm::degrees(std::atan2(best.x, best.z))});
     }
     return map;
 }

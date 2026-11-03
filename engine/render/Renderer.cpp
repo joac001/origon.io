@@ -406,6 +406,9 @@ void Renderer::setLitFrameUniforms(Shader& shader, const CameraView& camera, con
     shader.set("uAlbedoMap", 2);
     shader.set("uNormalMap", 3);
     shader.set("uArmMap", 4);
+    shader.set("uTerrainAlbedo", 5);
+    shader.set("uTerrainNormal", 6);
+    shader.set("uTerrainArm", 7);
     shader.set("uAoEnabled", m_settings.ssao ? 1 : 0);
     shader.set("uSceneSize", glm::vec2(m_sceneSize));
     const int lightCount = static_cast<int>(m_lights.size());
@@ -445,6 +448,13 @@ void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWo
         glBindTextureUnit(2, m.albedoMap);
         glBindTextureUnit(3, m.normalMap);
         glBindTextureUnit(4, m.armMap);
+        if (m.shading == 1) {
+            shader.set("uHasTerrainTextures", m.terrainAlbedo ? 1 : 0);
+            shader.set("uWaterLevel", m.waterLevel);
+            glBindTextureUnit(5, m.terrainAlbedo);
+            glBindTextureUnit(6, m.terrainNormal);
+            glBindTextureUnit(7, m.terrainArm);
+        }
         if (m.alphaTest) {
             glDisable(GL_CULL_FACE);
             if (alphaToCoverage) glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);

@@ -36,6 +36,11 @@ uniform int uHasAlbedoMap;
 uniform int uHasNormalMap;
 uniform int uHasArmMap;
 uniform float uUvScale;
+uniform sampler2DArray uTerrainAlbedo;
+uniform sampler2DArray uTerrainNormal;
+uniform sampler2DArray uTerrainArm;
+uniform int uHasTerrainTextures;
+uniform float uWaterLevel;
 
 uniform vec3 uCameraPos;
 uniform vec3 uAlbedo;
@@ -218,6 +223,75 @@ mat3 cotangentFrame(vec3 n, vec3 p, vec2 uv) {
     return mat3(t * invmax, b * invmax, n);
 }
 
+// Textured forest ground from CC0 scans. Layers: 0 grass, 1 needles, 2 leaves, 3 path, 4 rock, 5 creek bed.
+const float TERRAIN_TILE = 3.0;
+
+void sampleLayer(int layer, vec2 uv, float weight, inout vec3 albedo, inout vec3 tn, inout vec2 rough_ao) {
+    if (weight <= 0.001) return;
+    albedo += texture(uTerrainAlbedo, vec3(uv, layer)).rgb * weight;
+    tn += (texture(uTerrainNormal, vec3(uv, layer)).xyz * 2.0 - 1.0) * weight;
+    vec3 arm = texture(uTerrainArm, vec3(uv, layer)).rgb;
+    rough_ao += vec2(arm.g, arm.r) * weight;
+}
+
+void terrainTextured(inout vec3 n, out vec3 albedo, out float roughness, out float ao) {
+    vec3 geomN = n;
+    vec2 p = vWorldPos.xz;
+    float slope = 1.0 - geomN.y;
+    float large = fbm2(p * 0.035);
+    float medium = fbm2(p * 0.22);
+    float breakup = (noise2(p * 1.7) - 0.5) * 0.25;
+
+    float wGrass = smoothstep(0.5, 0.7, large + breakup);
+    float wLeaves = smoothstep(0.55, 0.72, fbm2(p * 0.06 + 13.0) + breakup) * (1.0 - wGrass * 0.7);
+    float wNeedles = max(1.0 - wGrass - wLeaves, 0.0);
+    float wPath = smoothstep(0.25, 0.6, vUv.x + breakup);
+    float wCreek = 1.0 - smoothstep(uWaterLevel + 0.25, uWaterLevel + 0.9, vWorldPos.y + breakup);
+    float wRock = smoothstep(0.3, 0.45, slope + (medium - 0.5) * 0.15);
+
+    // Planar layers projected from above.
+    vec2 uv = p / TERRAIN_TILE;
+    float other = (1.0 - wPath) * (1.0 - wCreek);
+    vec3 planarAlbedo = vec3(0.0);
+    vec3 tn = vec3(0.0);
+    vec2 roughAo = vec2(0.0);
+    vec3 before = planarAlbedo;
+    sampleLayer(0, uv, wGrass * other, planarAlbedo, tn, roughAo);
+    planarAlbedo = before + (planarAlbedo - before) * vec3(0.6, 0.75, 0.45); // Greener, darker grass.
+    sampleLayer(1, uv * 1.3, wNeedles * other, planarAlbedo, tn, roughAo);
+    sampleLayer(2, uv, wLeaves * other, planarAlbedo, tn, roughAo);
+    sampleLayer(3, uv * 0.8, wPath * (1.0 - wCreek), planarAlbedo, tn, roughAo);
+    sampleLayer(5, uv * 0.7, wCreek, planarAlbedo, tn, roughAo);
+    vec3 planarN = normalize(vec3(tn.x + geomN.x, abs(tn.z) * geomN.y, tn.y + geomN.z));
+
+    // Rock: triplanar so steep banks do not stretch.
+    vec3 blend = pow(abs(geomN), vec3(4.0));
+    blend /= (blend.x + blend.y + blend.z);
+    vec3 q = vWorldPos / 4.0;
+    vec3 rockAlbedo = texture(uTerrainAlbedo, vec3(q.zy, 4)).rgb * blend.x + texture(uTerrainAlbedo, vec3(q.xz, 4)).rgb * blend.y +
+                      texture(uTerrainAlbedo, vec3(q.xy, 4)).rgb * blend.z;
+    vec3 tnX = texture(uTerrainNormal, vec3(q.zy, 4)).xyz * 2.0 - 1.0;
+    vec3 tnY = texture(uTerrainNormal, vec3(q.xz, 4)).xyz * 2.0 - 1.0;
+    vec3 tnZ = texture(uTerrainNormal, vec3(q.xy, 4)).xyz * 2.0 - 1.0;
+    vec3 nx = vec3(abs(tnX.z) * geomN.x, tnX.y + geomN.y, tnX.x + geomN.z);
+    vec3 ny = vec3(tnY.x + geomN.x, abs(tnY.z) * geomN.y, tnY.y + geomN.z);
+    vec3 nz = vec3(tnZ.x + geomN.x, tnZ.y + geomN.y, abs(tnZ.z) * geomN.z);
+    vec3 rockN = normalize(nx * blend.x + ny * blend.y + nz * blend.z);
+    vec3 rockArm = texture(uTerrainArm, vec3(q.xz, 4)).rgb;
+
+    // Macro variation hides tiling.
+    float macro = (0.7 + 0.3 * fbm2(p * 0.02 + 5.0)) * 0.85;
+    albedo = mix(planarAlbedo, rockAlbedo, wRock) * macro;
+    albedo = mix(vec3(dot(albedo, vec3(0.3, 0.59, 0.11))), albedo, 0.8); // Slightly muted, like the reference.
+    n = normalize(mix(planarN, rockN, wRock));
+    roughness = mix(roughAo.x, rockArm.g, wRock);
+    ao = mix(roughAo.y, rockArm.r, wRock);
+    // Damp ground near the water is darker and glossier.
+    float wet = 1.0 - smoothstep(uWaterLevel, uWaterLevel + 0.5, vWorldPos.y);
+    albedo *= mix(1.0, 0.55, wet);
+    roughness = mix(roughness, 0.25, wet);
+}
+
 float gridLines(vec3 worldPos, vec3 n, float size) {
     vec3 weights = abs(n);
     weights /= (weights.x + weights.y + weights.z);
@@ -244,9 +318,29 @@ void main() {
     float alpha = 1.0;
     vec2 uv = vUv * uUvScale;
     if (uShading == 1) {
-        terrainMaterial(n, albedo, roughness);
+        if (uHasTerrainTextures == 1) {
+            terrainTextured(n, albedo, roughness, occlusion);
+        } else {
+            terrainMaterial(n, albedo, roughness);
+        }
     }
-    if (uHasAlbedoMap == 1) {
+    if (uShading == 3) {
+        // Triplanar textured block (map geometry): world-space mapping, 1.5 m tiles.
+        vec3 blend = pow(abs(n), vec3(4.0));
+        blend /= (blend.x + blend.y + blend.z);
+        vec3 q = vWorldPos / 1.5;
+        albedo *= texture(uAlbedoMap, q.zy).rgb * blend.x + texture(uAlbedoMap, q.xz).rgb * blend.y + texture(uAlbedoMap, q.xy).rgb * blend.z;
+        vec3 arm = texture(uArmMap, q.zy).rgb * blend.x + texture(uArmMap, q.xz).rgb * blend.y + texture(uArmMap, q.xy).rgb * blend.z;
+        occlusion = arm.r;
+        roughness = clamp(arm.g, 0.05, 1.0);
+        vec3 tnX = texture(uNormalMap, q.zy).xyz * 2.0 - 1.0;
+        vec3 tnY = texture(uNormalMap, q.xz).xyz * 2.0 - 1.0;
+        vec3 tnZ = texture(uNormalMap, q.xy).xyz * 2.0 - 1.0;
+        vec3 nx = vec3(abs(tnX.z) * n.x, tnX.y + n.y, tnX.x + n.z);
+        vec3 ny = vec3(tnY.x + n.x, abs(tnY.z) * n.y, tnY.y + n.z);
+        vec3 nz = vec3(tnZ.x + n.x, tnZ.y + n.y, abs(tnZ.z) * n.z);
+        n = normalize(nx * blend.x + ny * blend.y + nz * blend.z);
+    } else if (uHasAlbedoMap == 1) {
         vec4 tex = texture(uAlbedoMap, uv);
         albedo *= tex.rgb;
         alpha = tex.a;
@@ -258,11 +352,11 @@ void main() {
         discard;
     }
 #endif
-    if (uHasNormalMap == 1) {
+    if (uHasNormalMap == 1 && uShading != 3) {
         vec3 mapped = texture(uNormalMap, uv).xyz * 2.0 - 1.0;
         n = normalize(cotangentFrame(n, vWorldPos, uv) * mapped);
     }
-    if (uHasArmMap == 1) {
+    if (uHasArmMap == 1 && uShading != 3) {
         vec3 arm = texture(uArmMap, uv).rgb;
         occlusion = arm.r;
         roughness = clamp(arm.g * uRoughness / 0.8, 0.05, 1.0);
@@ -295,6 +389,9 @@ void main() {
     vec3 reflected = reflect(-v, n);
     vec3 envSpecular = mix(uGroundColor, uSkyColor, reflected.y * 0.5 + 0.5) * uAmbientIntensity *
                        fresnelSchlick(max(dot(n, v), 0.0), f0) * (1.0 - roughness * 0.8);
+#ifdef FOLIAGE
+    envSpecular *= 0.15;
+#endif
     color += (ambient * albedo * (1.0 - metallic) + envSpecular) * ao * occlusion;
 #ifdef FOLIAGE
     // Light transmitted through leaves when looking toward the sun, plus soft wrap lighting.
@@ -307,7 +404,7 @@ void main() {
     float dist = length(uCameraPos - vWorldPos);
     float fog = 1.0 - exp(-dist * uFogDensity);
     float sunAmount = max(dot(-v, uSunDirection), 0.0);
-    vec3 fogColor = mix(uFogColor, uSkyColor, 0.25) * 1.3 + uSunColor * pow(sunAmount, 8.0) * 0.06;
+    vec3 fogColor = mix(uFogColor, uSkyColor, 0.25) * 1.3 + uSunColor * pow(sunAmount, 8.0) * 0.025;
     color = mix(color, fogColor, fog);
 
     fragColor = vec4(color, clamp(alpha, 0.0, 1.0));

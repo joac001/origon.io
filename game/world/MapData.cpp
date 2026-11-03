@@ -169,6 +169,7 @@ std::optional<MapData> MapData::load(const std::filesystem::path& path) {
             block.metallic = b.value("metallic", block.metallic);
             block.dynamic = b.value("dynamic", block.dynamic);
             block.mass = b.value("mass", block.mass);
+            block.texture = b.value("texture", std::string());
             map.blocks.push_back(block);
         }
         for (const json& s : root.value("spawns", json::array())) {
@@ -240,6 +241,7 @@ bool MapData::save(const std::filesystem::path& path) const {
                       {"color", writeVec3(b.color)},
                       {"roughness", b.roughness},
                       {"metallic", b.metallic}};
+        if (!b.texture.empty()) block["texture"] = b.texture;
         if (b.dynamic) {
             block["dynamic"] = true;
             block["mass"] = b.mass;

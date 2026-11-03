@@ -23,6 +23,8 @@ struct BlockData {
     // Dynamic blocks are physics props: they fall, can be pushed and react to bullets.
     bool dynamic = false;
     float mass = 40.0f;
+    // Optional CC0 texture set (assets/textures/<id>), triplanar mapped. Empty: graybox grid.
+    std::string texture;
 
     glm::quat orientation() const;
 };

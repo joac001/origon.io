@@ -1,6 +1,7 @@
 #include "world/World.h"
 
 #include "physics/PhysicsWorld.h"
+#include "render/Texture.h"
 
 #include <glm/exponential.hpp>
 #include <glm/vec2.hpp>
@@ -84,6 +85,15 @@ void World::submit(Renderer& renderer, const PhysicsWorld& physics) const {
         item.material.roughness = block.roughness;
         item.material.metallic = block.metallic;
         item.material.gridSize = 1.0f;
+        if (!block.texture.empty() && m_textures) {
+            const std::filesystem::path folder = std::filesystem::path("assets/textures") / block.texture;
+            item.material.shading = 3;
+            item.material.gridSize = 0.0f;
+            item.material.albedoMap = m_textures->load(folder / "albedo.jpg", true).id;
+            item.material.normalMap = m_textures->load(folder / "normal.jpg", false).id;
+            item.material.armMap = m_textures->load(folder / "arm.jpg", false).id;
+            item.material.albedo = toLinear(block.color) * 2.0f; // Color acts as a tint around mid grey.
+        }
         renderer.submit(item);
     }
     if (m_terrainMesh.valid()) {
@@ -91,6 +101,21 @@ void World::submit(Renderer& renderer, const PhysicsWorld& physics) const {
         item.mesh = &m_terrainMesh;
         item.material.shading = 1;
         item.material.roughness = 0.95f;
+        item.material.waterLevel = m_map.terrain.waterEnabled ? m_map.terrain.waterLevel : -1000.0f;
+        if (m_textures) {
+            static const char* layers[] = {"aerial_grass_rock", "forest_ground_04", "forest_leaves_02", "brown_mud_leaves_01",
+                                           "rock_face_03", "rocks_ground_05"};
+            std::vector<std::filesystem::path> albedo, normal, arm;
+            for (const char* id : layers) {
+                const std::filesystem::path folder = std::filesystem::path("assets/textures") / id;
+                albedo.push_back(folder / "albedo.jpg");
+                normal.push_back(folder / "normal.jpg");
+                arm.push_back(folder / "arm.jpg");
+            }
+            item.material.terrainAlbedo = m_textures->loadArray(albedo, true).id;
+            item.material.terrainNormal = m_textures->loadArray(normal, false).id;
+            item.material.terrainArm = m_textures->loadArray(arm, false).id;
+        }
         renderer.submit(item);
     }
     if (m_waterMesh.valid()) {

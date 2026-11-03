@@ -33,7 +33,7 @@ void main() {
     // Sun disk plus forward-scattering glow (Mie-like), stronger near the horizon.
     float sunDot = max(dot(dir, uSunDirection), 0.0);
     float horizonBoost = 1.0 - clamp(height, 0.0, 1.0);
-    sky += uSunColor * (pow(sunDot, 1800.0) * 12.0 + pow(sunDot, 64.0) * 0.12 + pow(sunDot, 6.0) * 0.05 * horizonBoost);
+    sky += uSunColor * (pow(sunDot, 1800.0) * 12.0 + pow(sunDot, 64.0) * 0.1 + pow(sunDot, 8.0) * 0.015 * horizonBoost);
 
     fragColor = vec4(sky * 1.25, 1.0);
 }

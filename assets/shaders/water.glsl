@@ -72,15 +72,15 @@ void main() {
     vec3 transmitted = refracted * absorption + deepColor * (1.0 - absorption);
 
     vec3 r = reflect(-v, n);
-    vec3 skyReflection = mix(uFogColor * 1.1, uSkyColor * vec3(0.55, 0.62, 0.85), pow(clamp(r.y, 0.0, 1.0), 0.4)) * 1.25;
-    float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+    vec3 skyReflection = mix(uFogColor * 0.75, uSkyColor * vec3(0.5, 0.58, 0.75), pow(clamp(r.y, 0.0, 1.0), 0.4)) * 0.9;
+    float fresnel = 0.02 + 0.6 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
     vec3 color = mix(transmitted, skyReflection, fresnel);
 
     vec3 h = normalize(v + uSunDirection);
-    color += uSunColor * pow(max(dot(n, h), 0.0), 600.0) * 4.0;
+    color += uSunColor * min(pow(max(dot(n, h), 0.0), 800.0) * 1.2, 2.0);
 
     float foam = (1.0 - smoothstep(0.0, 0.25, thickness)) * (0.5 + 0.5 * sin(uTime * 2.0 + vWorldPos.x * 3.0 + vWorldPos.z * 2.0));
-    color = mix(color, vec3(0.6) * (uSkyColor + uSunColor * 0.2), foam * 0.35);
+    color = mix(color, vec3(0.5) * (uSkyColor + uSunColor * 0.15), foam * 0.18);
 
     float dist = length(uCameraPos - vWorldPos);
     float fog = 1.0 - exp(-dist * uFogDensity);

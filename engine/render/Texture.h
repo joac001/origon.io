@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace origon {
 
@@ -19,6 +20,8 @@ public:
     ~TextureCache();
     // srgb: color textures (albedo). Linear for normal and ARM maps. Returns id 0 on failure.
     const TextureInfo& load(const std::filesystem::path& path, bool srgb);
+    // 2D array texture from same-size images (one layer per path). Cached by the joined paths.
+    const TextureInfo& loadArray(const std::vector<std::filesystem::path>& paths, bool srgb);
     void clear();
 
 private:

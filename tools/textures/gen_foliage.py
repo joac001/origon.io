@@ -121,7 +121,7 @@ def grass(seed=4, size=(512, 512)):
         height = rng.uniform(0.45, 0.98) * h
         bend = rng.uniform(-0.25, 0.25) * w
         width = rng.uniform(5, 9) * SS
-        color = jitter(rng, (78, 104, 40), 20)
+        color = jitter(rng, (52, 78, 28), 16)
         if rng.random() < 0.15:
             color = jitter(rng, (120, 112, 60), 15)  # Dry blades.
         points_left, points_right = [], []
@@ -133,7 +133,7 @@ def grass(seed=4, size=(512, 512)):
             points_left.append((x - half, y))
             points_right.append((x + half, y))
         draw.polygon(points_left + list(reversed(points_right)), fill=color)
-    return finalize(image, size, (78, 104, 40))
+    return finalize(image, size, (52, 78, 28))
 
 
 def main():

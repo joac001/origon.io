@@ -30,6 +30,11 @@ struct Material {
     float windStrength = 0.0f;
     float windHeight = 1.0f; // Height at which wind bending reaches full strength.
     float uvScale = 1.0f;
+    // Terrain splat layers (texture arrays): grass, needles, leaves, path, rock, creek bed.
+    unsigned terrainAlbedo = 0;
+    unsigned terrainNormal = 0;
+    unsigned terrainArm = 0;
+    float waterLevel = -1000.0f;
 };
 
 struct DrawItem {

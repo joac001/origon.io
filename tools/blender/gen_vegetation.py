@@ -339,8 +339,8 @@ def grass(name, seed, lod):
     hint = lambda co: Vector((0, 0, 1))
     for k in range(cards):
         a = math.pi * k / cards + rng.uniform(-0.2, 0.2)
-        width = rng.uniform(0.7, 1.0)
-        h = rng.uniform(0.45, 0.7)
+        width = rng.uniform(0.35, 0.55)
+        h = rng.uniform(0.35, 0.6)
         u = Vector((math.cos(a), math.sin(a), 0)) * width
         origin = Vector((rng.uniform(-0.15, 0.15), rng.uniform(-0.15, 0.15), 0))
         b.card(origin, u, Vector((0, 0, h)), mat, segments=1, normal_hint=hint)

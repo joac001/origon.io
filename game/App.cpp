@@ -64,6 +64,7 @@ App::App(const LaunchOptions& options) : m_options(options) {
         m_audio.setAmbienceEnabled(m_settings.ambience);
     }
     m_world.setModelLibrary(&m_models);
+    m_world.setTextureCache(&m_textures);
     m_sim = std::make_unique<Simulation>(m_physics, m_weapons);
     m_hud.setFonts(m_fontRegular, m_fontBold);
     m_mapFiles = listMaps();
@@ -207,6 +208,11 @@ int App::run() {
         m_window->pollEvents();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
+        if (m_shotFbo) {
+            // Photo mode: the UI is laid out and rendered at the capture size.
+            ImGui::GetIO().DisplaySize = ImVec2(static_cast<float>(m_options.shotSize.x), static_cast<float>(m_options.shotSize.y));
+            ImGui::GetIO().DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+        }
         ImGui::NewFrame();
 
         if (m_input.keyPressed(GLFW_KEY_F1)) {
@@ -287,7 +293,9 @@ int App::run() {
         }
 
         ImGui::Render();
+        glBindFramebuffer(GL_FRAMEBUFFER, m_shotFbo);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         if (!m_pendingScreenshot.empty()) {
             saveScreenshot(m_pendingScreenshot, framebuffer.x, framebuffer.y, m_shotFbo);
             if (m_pendingScreenshot == m_options.screenshotPath) {
@@ -507,7 +515,7 @@ void App::submitViewModel(float) {
     const glm::vec3 metal(0.05f, 0.05f, 0.055f);
     const glm::vec3 wood(0.2f, 0.08f, 0.03f);
     const glm::vec3 skin(0.55f, 0.32f, 0.2f);
-    const glm::vec3 sleeve = World::toLinear(me.color) * 0.7f;
+    const glm::vec3 sleeve = glm::mix(glm::vec3(0.06f, 0.07f, 0.04f), World::toLinear(me.color), 0.25f);
     if (weapon.isMelee()) {
         part({0.0f, 0.0f, 0.0f}, body, glm::vec3(0.75f), 1.0f, 0.2f);
         part({0.0f, -0.01f, body.z * 0.5f + 0.06f}, {0.03f, 0.045f, 0.12f}, glm::vec3(0.03f), 0.0f, 0.8f);
