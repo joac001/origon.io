@@ -264,7 +264,9 @@ int App::run() {
             m_world.submit(m_renderer, m_physics);
             m_editor.submit(m_renderer);
         }
-        m_renderer.render(camera, m_world.environment());
+        Environment environment = m_world.environment();
+        environment.time = m_time;
+        m_renderer.render(camera, environment);
 
         // --- UI -----------------------------------------------------------------------
         if (!m_options.hideUi) {

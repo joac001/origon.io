@@ -1,5 +1,7 @@
 #pragma once
 
+#include "world/Terrain.h"
+
 #include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 
@@ -52,6 +54,7 @@ struct MapData {
 
     std::string name = "Untitled";
     EnvironmentData environment;
+    TerrainData terrain;
     std::vector<BlockData> blocks;
     std::vector<SpawnData> spawns;
     std::vector<LightData> lights;

@@ -5,6 +5,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+
 namespace origon {
 namespace {
 
@@ -19,6 +23,68 @@ glm::vec3 readVec3(const json& node, const char* key, const glm::vec3& fallback)
 }
 
 json writeVec3(const glm::vec3& v) { return json::array({v.x, v.y, v.z}); }
+
+constexpr char kBase64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+std::string base64Encode(const std::vector<uint8_t>& data) {
+    std::string out;
+    out.reserve((data.size() + 2) / 3 * 4);
+    for (size_t i = 0; i < data.size(); i += 3) {
+        const uint32_t b0 = data[i];
+        const uint32_t b1 = i + 1 < data.size() ? data[i + 1] : 0;
+        const uint32_t b2 = i + 2 < data.size() ? data[i + 2] : 0;
+        const uint32_t triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push_back(kBase64[(triple >> 18) & 63]);
+        out.push_back(kBase64[(triple >> 12) & 63]);
+        out.push_back(i + 1 < data.size() ? kBase64[(triple >> 6) & 63] : '=');
+        out.push_back(i + 2 < data.size() ? kBase64[triple & 63] : '=');
+    }
+    return out;
+}
+
+std::vector<uint8_t> base64Decode(const std::string& text) {
+    int table[256];
+    std::fill(std::begin(table), std::end(table), -1);
+    for (int i = 0; i < 64; ++i) table[static_cast<unsigned char>(kBase64[i])] = i;
+    std::vector<uint8_t> out;
+    out.reserve(text.size() / 4 * 3);
+    uint32_t buffer = 0;
+    int bits = 0;
+    for (char c : text) {
+        const int value = table[static_cast<unsigned char>(c)];
+        if (value < 0) continue;
+        buffer = (buffer << 6) | static_cast<uint32_t>(value);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<uint8_t>((buffer >> bits) & 0xFF));
+        }
+    }
+    return out;
+}
+
+// Heights are stored as little-endian int16 centimeters.
+std::string encodeHeights(const std::vector<float>& heights) {
+    std::vector<uint8_t> bytes;
+    bytes.reserve(heights.size() * 2);
+    for (float h : heights) {
+        const auto cm = static_cast<int16_t>(std::clamp(std::lround(h * 100.0f), -32768L, 32767L));
+        const auto u = static_cast<uint16_t>(cm);
+        bytes.push_back(static_cast<uint8_t>(u & 0xFF));
+        bytes.push_back(static_cast<uint8_t>(u >> 8));
+    }
+    return base64Encode(bytes);
+}
+
+std::vector<float> decodeHeights(const std::string& text) {
+    const std::vector<uint8_t> bytes = base64Decode(text);
+    std::vector<float> heights(bytes.size() / 2);
+    for (size_t i = 0; i < heights.size(); ++i) {
+        const auto u = static_cast<uint16_t>(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
+        heights[i] = static_cast<float>(static_cast<int16_t>(u)) / 100.0f;
+    }
+    return heights;
+}
 
 } // namespace
 
@@ -53,6 +119,26 @@ std::optional<MapData> MapData::load(const std::filesystem::path& path) {
             env.ambientIntensity = e.value("ambient_intensity", env.ambientIntensity);
             env.fogColor = readVec3(e, "fog_color", env.fogColor);
             env.fogDensity = e.value("fog_density", env.fogDensity);
+        }
+        if (root.contains("terrain")) {
+            const json& t = root["terrain"];
+            TerrainData& terrain = map.terrain;
+            terrain.enabled = t.value("enabled", false);
+            terrain.size = t.value("size", terrain.size);
+            terrain.resolution = t.value("resolution", terrain.resolution);
+            terrain.seed = t.value("seed", terrain.seed);
+            terrain.amplitude = t.value("amplitude", terrain.amplitude);
+            terrain.frequency = t.value("frequency", terrain.frequency);
+            terrain.octaves = t.value("octaves", terrain.octaves);
+            terrain.waterEnabled = t.value("water_enabled", terrain.waterEnabled);
+            terrain.waterLevel = t.value("water_level", terrain.waterLevel);
+            if (t.contains("heights")) terrain.heights = decodeHeights(t["heights"].get<std::string>());
+            if (t.contains("paint")) terrain.paint = base64Decode(t["paint"].get<std::string>());
+            const size_t count = static_cast<size_t>(terrain.resolution) * static_cast<size_t>(terrain.resolution);
+            if (terrain.enabled && terrain.heights.size() != count) {
+                terrain.generate(); // Missing or mismatched data: rebuild from the generator parameters.
+            }
+            terrain.ensureStorage();
         }
         for (const json& b : root.value("blocks", json::array())) {
             BlockData block;
@@ -103,6 +189,21 @@ bool MapData::save(const std::filesystem::path& path) const {
         {"fog_color", writeVec3(environment.fogColor)},
         {"fog_density", environment.fogDensity},
     };
+    if (terrain.enabled) {
+        root["terrain"] = {
+            {"enabled", true},
+            {"size", terrain.size},
+            {"resolution", terrain.resolution},
+            {"seed", terrain.seed},
+            {"amplitude", terrain.amplitude},
+            {"frequency", terrain.frequency},
+            {"octaves", terrain.octaves},
+            {"water_enabled", terrain.waterEnabled},
+            {"water_level", terrain.waterLevel},
+            {"heights", encodeHeights(terrain.heights)},
+            {"paint", base64Encode(terrain.paint)},
+        };
+    }
     json blockArray = json::array();
     for (const BlockData& b : blocks) {
         json block = {{"pos", writeVec3(b.position)},

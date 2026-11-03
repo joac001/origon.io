@@ -3,6 +3,9 @@
 #include "physics/PhysicsWorld.h"
 
 #include <glm/exponential.hpp>
+#include <glm/vec2.hpp>
+
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace origon {
@@ -17,6 +20,39 @@ glm::mat4 World::blockTransform(const BlockData& block) {
 void World::build(const MapData& map, PhysicsWorld& physics) {
     m_map = map;
     physics.clearBodies();
+
+    TerrainData& terrain = m_map.terrain;
+    if (terrain.enabled) {
+        terrain.ensureStorage();
+        if (terrain.valid()) {
+            std::vector<Vertex> vertices;
+            std::vector<uint32_t> indices;
+            terrain.buildVertices(vertices, indices);
+            m_terrainMesh = Mesh(vertices, indices);
+            const glm::vec2 o = terrain.origin();
+            physics.addHeightField(glm::vec3(o.x, 0.0f, o.y), terrain.cellSize(), terrain.resolution, terrain.heights.data());
+            // Spawns placed under the ground are lifted onto it.
+            for (SpawnData& spawn : m_map.spawns) {
+                const float ground = terrain.heightAt(spawn.position.x, spawn.position.z) + 0.05f;
+                spawn.position.y = std::max(spawn.position.y, ground);
+            }
+        }
+        if (terrain.waterEnabled) {
+            const float half = terrain.size * 0.5f;
+            const float y = terrain.waterLevel;
+            const std::vector<Vertex> water = {{{-half, y, -half}, {0, 1, 0}, {0, 0}},
+                                               {{-half, y, half}, {0, 1, 0}, {0, 1}},
+                                               {{half, y, half}, {0, 1, 0}, {1, 1}},
+                                               {{half, y, -half}, {0, 1, 0}, {1, 0}}};
+            m_waterMesh = Mesh(water, {0, 1, 2, 0, 2, 3});
+        } else {
+            m_waterMesh = Mesh();
+        }
+    } else {
+        m_terrainMesh = Mesh();
+        m_waterMesh = Mesh();
+    }
+
     m_blockBodies.clear();
     m_blockBodies.reserve(m_map.blocks.size());
     for (const BlockData& block : m_map.blocks) {
@@ -45,6 +81,22 @@ void World::submit(Renderer& renderer, const PhysicsWorld& physics) const {
         item.material.metallic = block.metallic;
         item.material.gridSize = 1.0f;
         renderer.submit(item);
+    }
+    if (m_terrainMesh.valid()) {
+        DrawItem item;
+        item.mesh = &m_terrainMesh;
+        item.material.shading = 1;
+        item.material.roughness = 0.95f;
+        renderer.submit(item);
+    }
+    if (m_waterMesh.valid()) {
+        DrawItem item;
+        item.mesh = &m_waterMesh;
+        item.material.shading = 2;
+        item.material.albedo = glm::vec3(0.02f, 0.05f, 0.05f);
+        item.material.roughness = 0.08f;
+        item.castShadow = false;
+        renderer.submitTransparent(item);
     }
     for (const LightData& light : m_map.lights) {
         renderer.addLight({light.position, light.radius, toLinear(light.color), light.intensity});

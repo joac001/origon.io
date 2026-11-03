@@ -14,6 +14,7 @@
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
@@ -212,6 +213,24 @@ BodyHandle PhysicsWorld::addDynamicBox(const glm::vec3& center, const glm::vec3&
     const JPH::BodyID id = m_impl->system->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::Activate);
     if (id.IsInvalid()) {
         log::error("Physics: body limit reached");
+        return kInvalidBody;
+    }
+    m_impl->bodies.push_back(id);
+    return id.GetIndexAndSequenceNumber();
+}
+
+BodyHandle PhysicsWorld::addHeightField(const glm::vec3& origin, float cellSize, int sampleCount, const float* samples) {
+    JPH::HeightFieldShapeSettings shapeSettings(samples, toJolt(origin), JPH::Vec3(cellSize, 1.0f, cellSize),
+                                                static_cast<JPH::uint32>(sampleCount));
+    JPH::ShapeSettings::ShapeResult result = shapeSettings.Create();
+    if (result.HasError()) {
+        log::error("Physics: heightfield creation failed: {}", result.GetError().c_str());
+        return kInvalidBody;
+    }
+    JPH::BodyCreationSettings settings(result.Get(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(), JPH::EMotionType::Static,
+                                       Layers::kStatic);
+    const JPH::BodyID id = m_impl->system->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+    if (id.IsInvalid()) {
         return kInvalidBody;
     }
     m_impl->bodies.push_back(id);

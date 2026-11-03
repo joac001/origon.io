@@ -20,6 +20,8 @@ struct Material {
     float metallic = 0.0f;
     // World-space grid line spacing in meters for graybox surfaces. 0 disables the grid.
     float gridSize = 0.0f;
+    // 0 standard, 1 terrain (procedural splat by slope, height and paint in uv.x).
+    int shading = 0;
 };
 
 struct DrawItem {
@@ -45,6 +47,7 @@ struct Environment {
     float ambientIntensity = 0.6f;
     glm::vec3 fogColor{0.62f, 0.7f, 0.78f};
     float fogDensity = 0.008f;
+    float time = 0.0f; // Seconds, for animated materials (water, wind).
 };
 
 struct CameraView {
@@ -85,6 +88,8 @@ public:
     void submit(const DrawItem& item) { m_items.push_back(item); }
     // View-model items use a model matrix in view space (first-person weapon).
     void submitViewModel(const DrawItem& item) { m_viewModelItems.push_back(item); }
+    // Water surfaces: drawn after opaque geometry with access to the scene color and depth.
+    void submitTransparent(const DrawItem& item) { m_transparentItems.push_back(item); }
     void addLight(const PointLight& light);
     // Lines are drawn in HDR after opaque geometry. Overlay lines ignore depth.
     void addLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color, bool overlay = false);
@@ -112,6 +117,7 @@ private:
     void drawLines(const std::vector<LineVertex>& lines, const glm::mat4& viewProj);
     void renderSsao(const glm::mat4& proj);
     void renderBloom();
+    void renderWater(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment, unsigned sceneFbo);
     void renderGodRays(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment);
 
     RenderSettings m_settings;
@@ -139,6 +145,9 @@ private:
     std::array<unsigned, kBloomMips> m_bloomTextures{};
     std::array<unsigned, kBloomMips> m_bloomFbos{};
     std::array<glm::ivec2, kBloomMips> m_bloomSizes{};
+    unsigned m_copyFbo = 0;
+    unsigned m_copyColor = 0;
+    unsigned m_copyDepth = 0;
     unsigned m_godRaysFbo = 0;
     unsigned m_godRaysTexture = 0;
     unsigned m_blackTexture = 0;
@@ -168,6 +177,7 @@ private:
     Shader m_bloomUpShader;
     Shader m_godRaysShader;
     Shader m_lineShader;
+    Shader m_waterShader;
 
     Mesh m_cube;
     Mesh m_capsule;
@@ -175,6 +185,7 @@ private:
 
     std::vector<DrawItem> m_items;
     std::vector<DrawItem> m_viewModelItems;
+    std::vector<DrawItem> m_transparentItems;
     std::vector<PointLight> m_lights;
     std::vector<LineVertex> m_lines;
     std::vector<LineVertex> m_overlayLines;

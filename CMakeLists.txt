@@ -34,6 +34,7 @@ endif()
 
 add_subdirectory(engine)
 add_subdirectory(game)
+add_subdirectory(tools/mapgen)
 
 include(CTest)
 if(BUILD_TESTING)

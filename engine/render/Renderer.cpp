@@ -87,6 +87,7 @@ bool Renderer::init() {
     ok &= m_bloomUpShader.loadFile("assets/shaders/bloom_up.glsl");
     ok &= m_godRaysShader.loadFile("assets/shaders/godrays.glsl");
     ok &= m_lineShader.loadFile("assets/shaders/lines.glsl");
+    ok &= m_waterShader.loadFile("assets/shaders/water.glsl");
     if (!ok) {
         log::error("Renderer: shader loading failed");
         return false;
@@ -115,6 +116,7 @@ void Renderer::beginFrame(const RenderSettings& settings, glm::ivec2 framebuffer
     m_outputSize = glm::max(framebufferSize, glm::ivec2(1));
     m_items.clear();
     m_viewModelItems.clear();
+    m_transparentItems.clear();
     m_lights.clear();
     m_lines.clear();
     m_overlayLines.clear();
@@ -160,6 +162,9 @@ void Renderer::destroyTargets() {
     }
     deleteFbo(m_godRaysFbo);
     deleteTexture(m_godRaysTexture);
+    deleteFbo(m_copyFbo);
+    deleteTexture(m_copyColor);
+    deleteTexture(m_copyDepth);
 }
 
 void Renderer::ensureTargets() {
@@ -208,6 +213,11 @@ void Renderer::ensureTargets() {
         m_bloomFbos[index] = makeColorFbo(m_bloomTextures[index]);
         mipSize = glm::max(mipSize / 2, glm::ivec2(1));
     }
+    m_copyColor = makeTexture2D(GL_RGBA16F, sceneSize, GL_LINEAR);
+    m_copyDepth = makeTexture2D(GL_DEPTH_COMPONENT32F, sceneSize, GL_NEAREST);
+    glCreateFramebuffers(1, &m_copyFbo);
+    glNamedFramebufferTexture(m_copyFbo, GL_COLOR_ATTACHMENT0, m_copyColor, 0);
+    glNamedFramebufferTexture(m_copyFbo, GL_DEPTH_ATTACHMENT, m_copyDepth, 0);
     m_godRaysTexture = makeTexture2D(GL_R11F_G11F_B10F, half, GL_LINEAR);
     m_godRaysFbo = makeColorFbo(m_godRaysTexture);
 }
@@ -312,6 +322,7 @@ void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWo
         m_litShader.set("uMetallic", item.material.metallic);
         m_litShader.set("uEmissive", item.material.emissive);
         m_litShader.set("uGridSize", item.material.gridSize);
+        m_litShader.set("uShading", item.material.shading);
         item.mesh->draw();
         m_stats.drawCalls++;
     }
@@ -425,6 +436,41 @@ void Renderer::renderGodRays(const CameraView& camera, const glm::mat4& viewProj
     m_stats.drawCalls++;
 }
 
+void Renderer::renderWater(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment, unsigned sceneFbo) {
+    if (m_transparentItems.empty()) {
+        return;
+    }
+    // Copy the opaque scene so the water can refract it without a feedback loop.
+    glBlitNamedFramebuffer(sceneFbo, m_copyFbo, 0, 0, m_sceneSize.x, m_sceneSize.y, 0, 0, m_sceneSize.x, m_sceneSize.y,
+                           GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitNamedFramebuffer(sceneFbo, m_copyFbo, 0, 0, m_sceneSize.x, m_sceneSize.y, 0, 0, m_sceneSize.x, m_sceneSize.y,
+                           GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
+    glDisable(GL_CULL_FACE);
+    m_waterShader.bind();
+    m_waterShader.set("uViewProj", viewProj);
+    m_waterShader.set("uCameraPos", camera.position);
+    m_waterShader.set("uTime", environment.time);
+    m_waterShader.set("uSunDirection", glm::normalize(environment.sunDirection));
+    m_waterShader.set("uSunColor", environment.sunColor * environment.sunIntensity);
+    m_waterShader.set("uSkyColor", environment.skyColor);
+    m_waterShader.set("uFogColor", environment.fogColor);
+    m_waterShader.set("uFogDensity", environment.fogDensity);
+    m_waterShader.set("uSceneSize", glm::vec2(m_sceneSize));
+    m_waterShader.set("uNear", camera.nearPlane);
+    m_waterShader.set("uFar", camera.farPlane);
+    m_waterShader.set("uSceneColor", 0);
+    m_waterShader.set("uSceneDepth", 1);
+    glBindTextureUnit(0, m_copyColor);
+    glBindTextureUnit(1, m_copyDepth);
+    for (const DrawItem& item : m_transparentItems) {
+        m_waterShader.set("uModel", item.model);
+        item.mesh->draw();
+        m_stats.drawCalls++;
+    }
+    glEnable(GL_CULL_FACE);
+}
+
 void Renderer::render(const CameraView& camera, const Environment& environment) {
     const glm::mat4 proj = projection(camera);
     const glm::mat4 viewProj = proj * camera.view;
@@ -485,6 +531,8 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         renderSsao(proj);
         glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
         glViewport(0, 0, m_sceneSize.x, m_sceneSize.y);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
     }
 
     // --- Sky -------------------------------------------------------------------------------
@@ -541,6 +589,9 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     }
 
     drawLit(m_items, glm::mat4(1.0f));
+    renderWater(camera, viewProj, environment, sceneFbo);
+    glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
+    glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
     drawLines(m_lines, viewProj);
 
     // View model: own projection, cleared depth so it never clips into walls. No SSAO.

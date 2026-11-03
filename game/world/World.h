@@ -23,9 +23,13 @@ public:
 
     static glm::mat4 blockTransform(const BlockData& block);
     static glm::vec3 toLinear(const glm::vec3& srgb);
+    // Ground height (terrain only; 0 without terrain).
+    float terrainHeight(float x, float z) const { return m_map.terrain.heightAt(x, z); }
 
 private:
     MapData m_map;
+    Mesh m_terrainMesh;
+    Mesh m_waterMesh;
     std::vector<BodyHandle> m_blockBodies; // One per block.
 };
 

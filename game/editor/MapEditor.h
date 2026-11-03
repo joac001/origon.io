@@ -26,7 +26,7 @@ class Window;
 class MapEditor {
 public:
     enum class ObjectType { Block, Spawn, Light };
-    enum class Tool { Select, Move, Rotate, Scale, Place };
+    enum class Tool { Select, Move, Rotate, Scale, Place, Sculpt };
 
     struct ObjectRef {
         ObjectType type;
@@ -100,6 +100,8 @@ private:
     void drawStatusBar();
     void drawGizmo();
     void drawValidation();
+    void drawTerrainPanel();
+    void updateSculpt(float dt, Input& input, const PhysicsWorld& physics);
     void refreshMapList();
     void setStatus(const std::string& text);
 
@@ -141,6 +143,15 @@ private:
     glm::vec3 m_ghostNormal{0.0f, 1.0f, 0.0f};
     bool m_placeRequested = false;
     bool m_keepPlacing = false;
+
+    // Terrain sculpting.
+    int m_brush = 0;
+    float m_brushRadius = 6.0f;
+    float m_brushStrength = 1.0f;
+    bool m_brushValid = false;
+    glm::vec3 m_brushCenter{0.0f};
+    bool m_sculpting = false;
+    float m_flattenHeight = 0.0f;
 
     // History and clipboard.
     std::deque<MapData> m_undo;

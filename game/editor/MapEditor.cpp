@@ -700,11 +700,16 @@ bool MapEditor::update(float dt, Input& input, Window& window, const PhysicsWorl
     if (m_tool == Tool::Place) {
         updatePlacement(physics);
     }
+    if (m_tool == Tool::Sculpt) {
+        updateSculpt(dt, input, physics);
+    }
 
     // Clicks in the viewport.
     const bool viewportClick = input.mousePressed(GLFW_MOUSE_BUTTON_LEFT) && !io.WantCaptureMouse && !alt && !m_flying;
     if (viewportClick) {
-        if (m_tool == Tool::Place) {
+        if (m_tool == Tool::Sculpt) {
+            // Handled by updateSculpt.
+        } else if (m_tool == Tool::Place) {
             placePrefab();
             if (!shift && !m_keepPlacing) {
                 m_tool = Tool::Move;
@@ -745,6 +750,7 @@ bool MapEditor::update(float dt, Input& input, Window& window, const PhysicsWorl
             if (input.keyPressed(GLFW_KEY_W)) m_tool = Tool::Move;
             if (input.keyPressed(GLFW_KEY_E)) m_tool = Tool::Rotate;
             if (input.keyPressed(GLFW_KEY_R)) m_tool = Tool::Scale;
+            if (input.keyPressed(GLFW_KEY_B) && m_map.terrain.enabled) m_tool = Tool::Sculpt;
             if (input.keyPressed(GLFW_KEY_F)) focusSelection();
             if (input.keyPressed(GLFW_KEY_G)) m_snapEnabled = !m_snapEnabled;
             if (input.keyPressed(GLFW_KEY_L)) m_localSpace = !m_localSpace;
@@ -758,7 +764,7 @@ bool MapEditor::update(float dt, Input& input, Window& window, const PhysicsWorl
                 }
             }
             if (input.keyPressed(GLFW_KEY_ESCAPE)) {
-                if (m_tool == Tool::Place) m_tool = Tool::Move;
+                if (m_tool == Tool::Place || m_tool == Tool::Sculpt) m_tool = Tool::Move;
                 else clearSelection();
             }
             const float step = m_snapEnabled ? m_gridStep : 0.1f;
@@ -786,6 +792,7 @@ void MapEditor::drawUi() {
     drawToolsPanel();
     drawInspector();
     drawHierarchy();
+    drawTerrainPanel();
     drawStatusBar();
     if (m_showValidation) {
         drawValidation();
@@ -862,6 +869,7 @@ void MapEditor::drawToolbar() {
     toolButton("Rotar (E)", Tool::Rotate);
     toolButton("Escalar (R)", Tool::Scale);
     toolButton("Colocar (1-0)", Tool::Place);
+    if (m_map.terrain.enabled) toolButton("Esculpir (B)", Tool::Sculpt);
     ImGui::TextDisabled("|");
     ImGui::SameLine();
     if (ImGui::Button(m_localSpace ? "Local (L)" : "Global (L)")) m_localSpace = !m_localSpace;
@@ -1129,7 +1137,7 @@ void MapEditor::drawStatusBar() {
     ImGui::Begin("##status", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-    const char* tools[] = {"Seleccionar", "Mover", "Rotar", "Escalar", "Colocar"};
+    const char* tools[] = {"Seleccionar", "Mover", "Rotar", "Escalar", "Colocar", "Esculpir"};
     ImGui::Text("Herramienta: %s", tools[static_cast<int>(m_tool)]);
     if (m_tool == Tool::Place) {
         ImGui::SameLine();
@@ -1183,6 +1191,96 @@ void MapEditor::drawValidation() {
     }
     for (const std::string& issue : issues) {
         ImGui::BulletText("%s", issue.c_str());
+    }
+    ImGui::End();
+}
+
+void MapEditor::updateSculpt(float dt, Input& input, const PhysicsWorld& physics) {
+    const ImGuiIO& io = ImGui::GetIO();
+    glm::vec3 origin, dir;
+    mouseRay(origin, dir);
+    m_brushValid = false;
+    if (auto hit = physics.rayCast(origin, dir, 500.0f)) {
+        m_brushCenter = hit->position;
+        m_brushValid = true;
+    }
+    const bool alt = input.keyDown(GLFW_KEY_LEFT_ALT) || input.keyDown(GLFW_KEY_RIGHT_ALT);
+    const bool down = input.mouseDown(GLFW_MOUSE_BUTTON_LEFT) && !alt && !m_flying;
+    if (input.mousePressed(GLFW_MOUSE_BUTTON_LEFT) && !io.WantCaptureMouse && !alt && m_brushValid) {
+        pushUndo();
+        m_sculpting = true;
+        m_flattenHeight = m_brushCenter.y;
+    }
+    if (!down) {
+        m_sculpting = false;
+    }
+    if (m_sculpting && m_brushValid) {
+        const auto brush = static_cast<TerrainData::Brush>(m_brush);
+        // Shift inverts raise/lower.
+        TerrainData::Brush effective = brush;
+        if (input.keyDown(GLFW_KEY_LEFT_SHIFT)) {
+            if (brush == TerrainData::Brush::Raise) effective = TerrainData::Brush::Lower;
+            else if (brush == TerrainData::Brush::Lower) effective = TerrainData::Brush::Raise;
+            else if (brush == TerrainData::Brush::Paint) effective = TerrainData::Brush::Erase;
+        }
+        if (m_map.terrain.applyBrush(effective, m_brushCenter, m_brushRadius, m_brushStrength, dt, m_flattenHeight)) {
+            markDirty();
+        }
+    }
+    if (!m_flying && !io.WantCaptureMouse && input.keyDown(GLFW_KEY_LEFT_CONTROL) && input.scrollDelta() != 0.0f) {
+        m_brushRadius = std::clamp(m_brushRadius * std::pow(1.15f, input.scrollDelta()), 0.5f, 60.0f);
+    }
+}
+
+void MapEditor::drawTerrainPanel() {
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(320, io.DisplaySize.y - 300), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(330, 250), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
+    ImGui::Begin("Terreno");
+    TerrainData& t = m_map.terrain;
+    bool enabled = t.enabled;
+    if (ImGui::Checkbox("Usar terreno", &enabled)) {
+        pushUndo();
+        t.enabled = enabled;
+        if (enabled && !t.valid()) t.generate();
+        markDirty();
+    }
+    if (t.enabled) {
+        ImGui::SeparatorText("Generador");
+        ImGui::DragFloat("Tamaño", &t.size, 1.0f, 32.0f, 1024.0f, "%.0f m");
+        const char* resolutions[] = {"128", "256", "512"};
+        int resIndex = t.resolution >= 512 ? 2 : (t.resolution >= 256 ? 1 : 0);
+        if (ImGui::Combo("Resolución", &resIndex, resolutions, 3)) t.resolution = 128 << resIndex;
+        int seed = static_cast<int>(t.seed);
+        if (ImGui::InputInt("Semilla", &seed)) t.seed = static_cast<uint32_t>(std::max(seed, 0));
+        ImGui::SliderFloat("Amplitud", &t.amplitude, 0.0f, 60.0f, "%.1f m");
+        ImGui::SliderFloat("Frecuencia", &t.frequency, 0.001f, 0.05f, "%.4f");
+        if (ImGui::Button("Generar terreno", ImVec2(-1, 0))) {
+            pushUndo();
+            t.heights.clear();
+            t.paint.clear();
+            t.generate();
+            markDirty();
+        }
+        ImGui::SeparatorText("Agua");
+        if (ImGui::Checkbox("Agua", &t.waterEnabled)) markDirty();
+        if (t.waterEnabled) {
+            if (ImGui::IsItemActivated()) pushUndo();
+            if (ImGui::DragFloat("Nivel del agua", &t.waterLevel, 0.05f, -100.0f, 100.0f, "%.2f m")) markDirty();
+        }
+        ImGui::SeparatorText("Pincel (B)");
+        const char* brushes[] = {"Subir", "Bajar", "Suavizar", "Aplanar", "Pintar camino", "Borrar camino"};
+        for (int i = 0; i < 6; ++i) {
+            if (ImGui::RadioButton(brushes[i], m_brush == i)) {
+                m_brush = i;
+                m_tool = Tool::Sculpt;
+            }
+            if (i % 3 != 2) ImGui::SameLine();
+        }
+        ImGui::SliderFloat("Radio", &m_brushRadius, 0.5f, 60.0f, "%.1f m");
+        ImGui::SliderFloat("Fuerza", &m_brushStrength, 0.05f, 5.0f, "%.2f");
+        ImGui::TextDisabled("Shift: invertir. Ctrl+rueda: radio.");
     }
     ImGui::End();
 }
@@ -1267,6 +1365,21 @@ void MapEditor::submit(Renderer& renderer) const {
             const glm::mat4 model = World::blockTransform(b);
             boxLines(renderer, model, glm::vec4(0.3f, 0.6f, 1.0f, 0.6f), false);
         }
+    }
+
+    // Sculpt brush outline following the ground.
+    if (m_tool == Tool::Sculpt && m_brushValid) {
+        const int segments = 64;
+        for (int i = 0; i < segments; ++i) {
+            const float a0 = glm::two_pi<float>() * static_cast<float>(i) / segments;
+            const float a1 = glm::two_pi<float>() * static_cast<float>(i + 1) / segments;
+            glm::vec3 p0 = m_brushCenter + glm::vec3(std::cos(a0), 0, std::sin(a0)) * m_brushRadius;
+            glm::vec3 p1 = m_brushCenter + glm::vec3(std::cos(a1), 0, std::sin(a1)) * m_brushRadius;
+            p0.y = m_map.terrain.heightAt(p0.x, p0.z) + 0.1f;
+            p1.y = m_map.terrain.heightAt(p1.x, p1.z) + 0.1f;
+            renderer.addLine(p0, p1, glm::vec4(1.0f, 0.9f, 0.3f, 1.0f), true);
+        }
+        renderer.addLine(m_brushCenter, m_brushCenter + glm::vec3(0, 1.5f, 0), glm::vec4(1.0f, 0.9f, 0.3f, 1.0f), true);
     }
 
     // Placement ghost.

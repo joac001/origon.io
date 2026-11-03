@@ -91,6 +91,8 @@ public:
                              float mass, BodyLayer layer = BodyLayer::Dynamic,
                              const glm::vec3& linearVelocity = glm::vec3(0.0f),
                              const glm::vec3& angularVelocity = glm::vec3(0.0f));
+    // Square heightfield: samples[z * sampleCount + x], first sample at origin, spacing cellSize.
+    BodyHandle addHeightField(const glm::vec3& origin, float cellSize, int sampleCount, const float* samples);
     void removeBody(BodyHandle body);
     void optimize();
 
