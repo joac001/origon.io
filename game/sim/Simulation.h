@@ -5,6 +5,7 @@
 #include "sim/Weapons.h"
 #include "world/MapData.h"
 
+#include <array>
 #include <random>
 #include <string>
 #include <vector>
@@ -45,6 +46,8 @@ public:
     // Client prediction: moves only the given player with the same movement code as the server.
     void predictMovement(int id, const PlayerCommand& command);
     std::vector<Player>& mutablePlayers() { return m_players; }
+    // Lag compensation: shots from this player test targets as they were this many ticks ago.
+    void setRewindTicks(int playerId, int ticks);
 
     // Events since the last call. The caller takes ownership.
     std::vector<GameEvent> takeEvents();
@@ -75,6 +78,20 @@ private:
     std::vector<GameEvent> m_events;
     std::mt19937 m_rng{1337};
     int m_localId = 0;
+
+    // Per-tick history of hit volumes for lag compensation.
+    static constexpr int kHistoryTicks = 32;
+    struct HitboxSample {
+        glm::vec3 position{0.0f};
+        float eyeHeight = kEyeHeight;
+        bool alive = false;
+    };
+    std::vector<std::array<HitboxSample, kHistoryTicks>> m_history;
+    std::vector<int> m_rewindTicks;
+    uint32_t m_tickCount = 0;
+    void recordHistory();
+    // Copy of a player with its hit volume moved back in time (only position/eyeHeight/alive).
+    bool historicalTarget(const Player& target, int rewind, Player& out) const;
 };
 
 glm::vec3 viewDirection(float yaw, float pitch);

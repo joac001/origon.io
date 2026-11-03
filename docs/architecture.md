@@ -48,8 +48,9 @@ docs/                   design and research
   simulation and sends 30 Hz snapshots (players, match state, dynamic props) plus reliable
   gameplay events. Clients predict their own movement with the same movement code and snap
   back when the error exceeds 1.2 m; remote players are interpolated between snapshots.
-- Known limits: no lag compensation for hitscan yet (the host judges hits at its own time),
-  and weapon fire feedback on clients waits for the server event.
+- Lag compensation: the host keeps 32 ticks of hit-volume history and tests a remote
+  player's shots against targets rewound by half the round trip plus two ticks.
+- Known limit: weapon fire feedback on clients waits for the server event.
 - Game rules (Gun Game) live only in the simulation. The UI reads simulation state.
 
 ## 4. Rendering plan

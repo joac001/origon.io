@@ -207,6 +207,13 @@ const PlayerCommand* NetSession::remoteCommand(int playerId) const {
 
 bool NetSession::isRemotePlayer(int playerId) const { return remoteCommand(playerId) != nullptr; }
 
+float NetSession::playerRttMs(int playerId) const {
+    for (const auto& [peer, client] : m_clients) {
+        if (client.playerId == playerId) return static_cast<float>(peer->roundTripTime);
+    }
+    return 0.0f;
+}
+
 void NetSession::broadcastEvents(const std::vector<GameEvent>& events) {
     if (m_role != Role::Server || events.empty() || m_clients.empty()) return;
     Writer w;

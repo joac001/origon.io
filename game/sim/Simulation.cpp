@@ -196,6 +196,34 @@ void Simulation::predictMovement(int id, const PlayerCommand& command) {
     p.previousButtons = command.buttons;
 }
 
+void Simulation::setRewindTicks(int playerId, int ticks) {
+    if (playerId < 0) return;
+    if (static_cast<int>(m_rewindTicks.size()) <= playerId) m_rewindTicks.resize(static_cast<size_t>(playerId) + 1, 0);
+    m_rewindTicks[static_cast<size_t>(playerId)] = std::clamp(ticks, 0, kHistoryTicks - 1);
+}
+
+void Simulation::recordHistory() {
+    m_history.resize(m_players.size());
+    const size_t slot = m_tickCount % kHistoryTicks;
+    for (const Player& p : m_players) {
+        m_history[static_cast<size_t>(p.id)][slot] = {p.position, p.eyeHeight, p.alive};
+    }
+    ++m_tickCount;
+}
+
+bool Simulation::historicalTarget(const Player& target, int rewind, Player& out) const {
+    if (rewind <= 0 || static_cast<size_t>(target.id) >= m_history.size() || static_cast<uint32_t>(rewind) >= m_tickCount) {
+        return false;
+    }
+    const size_t slot = (m_tickCount - 1 - static_cast<uint32_t>(rewind)) % kHistoryTicks;
+    const HitboxSample& sample = m_history[static_cast<size_t>(target.id)][slot];
+    out.id = target.id;
+    out.position = sample.position;
+    out.eyeHeight = sample.eyeHeight;
+    out.alive = sample.alive;
+    return true;
+}
+
 std::vector<GameEvent> Simulation::takeEvents() {
     std::vector<GameEvent> events;
     events.swap(m_events);
@@ -310,6 +338,7 @@ void Simulation::tick(const std::vector<PlayerCommand>& commands) {
     }
 
     m_gunGame.update(dt, m_players, m_events);
+    recordHistory();
 }
 
 void Simulation::updateMovement(Player& p, const PlayerCommand& command) {
@@ -465,12 +494,19 @@ void Simulation::fire(Player& p, const WeaponDef& weapon) {
         Player* target = nullptr;
         float best = worldDistance;
         bool headshot = false;
+        const int rewind = static_cast<size_t>(p.id) < m_rewindTicks.size() ? m_rewindTicks[static_cast<size_t>(p.id)] : 0;
         for (Player& other : m_players) {
             if (other.id == p.id || !other.alive) {
                 continue;
             }
             bool head = false;
-            const float t = rayVsPlayer(origin, dir, other, head);
+            // Lag compensation: test where the shooter saw the target.
+            Player past;
+            const bool rewound = historicalTarget(other, rewind, past);
+            if (rewound && !past.alive) {
+                continue;
+            }
+            const float t = rayVsPlayer(origin, dir, rewound ? past : other, head);
             if (t >= 0.0f && t < best) {
                 best = t;
                 target = &other;

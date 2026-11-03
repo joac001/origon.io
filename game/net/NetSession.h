@@ -51,6 +51,8 @@ public:
     // Latest command received for a remote player, or nullptr.
     const PlayerCommand* remoteCommand(int playerId) const;
     bool isRemotePlayer(int playerId) const;
+    // Round trip time to the client that controls this player (ms), or 0.
+    float playerRttMs(int playerId) const;
     void broadcastEvents(const std::vector<GameEvent>& events);
     void broadcastSnapshot(const Snapshot& snapshot);
     void broadcastPlayerInfo(const Simulation& sim);

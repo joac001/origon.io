@@ -547,6 +547,9 @@ void App::updatePlaying(float frameDt) {
                 for (const Player& p : m_sim->players()) {
                     if (const PlayerCommand* remote = m_net.remoteCommand(p.id); remote && !p.isBot) {
                         commands[static_cast<size_t>(p.id)] = *remote;
+                        // Half the round trip plus the client's interpolation delay (two ticks).
+                        const float rewindSeconds = m_net.playerRttMs(p.id) * 0.0005f + 2.0f * kTickDt;
+                        m_sim->setRewindTicks(p.id, static_cast<int>(std::round(rewindSeconds / kTickDt)));
                     }
                 }
             }
