@@ -646,7 +646,12 @@ CameraView App::playingCamera(float alpha) const {
 glm::vec3 App::localMuzzle() const {
     const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
     const glm::vec3 body = weaponBodySize(&m_sim->weaponFor(me));
-    const glm::vec3 offset = glm::mix(hipOffset(body), adsOffset(body), m_adsBlend) + glm::vec3(0.0f, 0.0f, -body.z * 0.5f - 0.05f);
+    glm::vec3 offset = glm::mix(hipOffset(body), adsOffset(body), m_adsBlend) + glm::vec3(0.0f, 0.0f, -body.z * 0.5f - 0.05f);
+    if (const Model* model = const_cast<ModelLibrary&>(m_models).getWeapon(m_sim->weaponFor(me).id)) {
+        const glm::vec3 hip(0.14f, -0.13f, -0.26f);
+        const glm::vec3 ads(0.0f, -model->boundsMax().y + 0.004f, -0.2f);
+        offset = glm::mix(hip, ads, m_adsBlend) + glm::vec3(0.0f, 0.035f, model->boundsMin().z - 0.03f);
+    }
     return glm::vec3(glm::inverse(m_lastCamera.view) * glm::vec4(offset, 1.0f));
 }
 
@@ -662,6 +667,7 @@ void App::submitPlayers(float alpha, bool includeLocal) {
         pose.eyeHeight = p.eyeHeight;
         pose.color = World::toLinear(p.color);
         pose.weapon = &m_sim->weaponFor(p);
+        pose.weaponModel = m_models.getWeapon(pose.weapon->id);
         pose.emissiveHighlight = p.spawnProtection > 0.0f;
         submitPlayerModel(m_renderer, pose);
     }
@@ -678,7 +684,14 @@ void App::submitViewModel(float) {
     const float bobAmount = me.onGround ? std::min(speed / 6.0f, 1.0f) * (1.0f - m_adsBlend * 0.8f) : 0.0f;
     const glm::vec3 bob(std::sin(m_bobPhase) * 0.012f * bobAmount, -std::abs(std::cos(m_bobPhase)) * 0.012f * bobAmount, 0.0f);
 
-    glm::vec3 position = glm::mix(hipOffset(body), adsOffset(body), m_adsBlend) + bob;
+    const Model* weaponModel = m_models.getWeapon(weapon.id);
+    glm::vec3 hip = hipOffset(body);
+    glm::vec3 ads = adsOffset(body);
+    if (weaponModel) {
+        hip = glm::vec3(0.14f, -0.13f, -0.26f);
+        ads = glm::vec3(0.0f, -weaponModel->boundsMax().y + 0.004f, -0.2f);
+    }
+    glm::vec3 position = glm::mix(hip, ads, m_adsBlend) + bob;
     position += glm::vec3(m_sway.x, m_sway.y, 0.0f) * (1.0f - m_adsBlend * 0.7f);
     position.y += m_landDip * 0.4f;
     position.z += me.viewKick * 0.8f;
@@ -700,8 +713,10 @@ void App::submitViewModel(float) {
         const float thrust = std::sin(t * glm::pi<float>());
         position += glm::vec3(-0.12f * thrust, 0.04f * thrust, -0.28f * thrust);
     }
-    const glm::mat4 base = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), pitch, glm::vec3(1, 0, 0)) *
-                           glm::rotate(glm::mat4(1.0f), roll, glm::vec3(0, 0, 1));
+    // Slight toe-in toward the crosshair at the hip.
+    const float toeIn = 0.05f * (1.0f - m_adsBlend);
+    const glm::mat4 base = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), toeIn, glm::vec3(0, 1, 0)) *
+                           glm::rotate(glm::mat4(1.0f), pitch, glm::vec3(1, 0, 0)) * glm::rotate(glm::mat4(1.0f), roll, glm::vec3(0, 0, 1));
 
     auto part = [&](const glm::vec3& offset, const glm::vec3& size, const glm::vec3& color, float metallic, float roughness) {
         DrawItem item;
@@ -718,6 +733,27 @@ void App::submitViewModel(float) {
     const glm::vec3 wood(0.2f, 0.08f, 0.03f);
     const glm::vec3 skin(0.55f, 0.32f, 0.2f);
     const glm::vec3 sleeve = glm::mix(glm::vec3(0.06f, 0.07f, 0.04f), World::toLinear(me.color), 0.25f);
+    if (weaponModel) {
+        for (const ModelPart& modelPart : weaponModel->lod(0)) {
+            DrawItem item;
+            item.mesh = &modelPart.mesh;
+            item.material = modelPart.material;
+            item.model = base;
+            item.castShadow = false;
+            m_renderer.submitViewModel(item);
+        }
+        // Right hand on the grip, left hand under the barrel (except pistols and the knife).
+        part({0.0f, -0.05f, 0.015f}, {0.05f, 0.06f, 0.07f}, skin, 0.0f, 0.7f);
+        part({0.03f, -0.1f, 0.2f}, {0.08f, 0.08f, 0.32f}, sleeve, 0.0f, 0.9f);
+        const float length = weaponModel->boundsMax().z - weaponModel->boundsMin().z;
+        if (!weapon.isMelee() && weapon.category != WeaponCategory::Pistol) {
+            const float z = weaponModel->boundsMin().z * 0.45f;
+            part({-0.005f, -0.015f, z}, {0.05f, 0.045f, 0.08f}, skin, 0.0f, 0.7f);
+            part({-0.11f, -0.08f, z + 0.18f}, {0.08f, 0.08f, 0.4f}, sleeve, 0.0f, 0.9f);
+        }
+        (void)length;
+        return;
+    }
     if (weapon.isMelee()) {
         part({0.0f, 0.0f, 0.0f}, body, glm::vec3(0.75f), 1.0f, 0.2f);
         part({0.0f, -0.01f, body.z * 0.5f + 0.06f}, {0.03f, 0.045f, 0.12f}, glm::vec3(0.03f), 0.0f, 0.8f);

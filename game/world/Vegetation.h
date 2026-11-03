@@ -43,6 +43,8 @@ public:
     explicit ModelLibrary(TextureCache* textures) : m_textures(textures) {}
     ~ModelLibrary();
     Model* get(const std::string& name);
+    // Weapon models: assets/models/weapons/<id>.glb (nullptr when missing).
+    Model* getWeapon(const std::string& id);
     ShapeHandle collisionShape(const std::string& name, PhysicsWorld& physics);
 
 private:

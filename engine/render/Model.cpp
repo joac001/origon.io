@@ -190,6 +190,8 @@ bool Model::load(const std::filesystem::path& path, TextureCache* textures) {
         log::error("Model: no LOD geometry in {}", resolved);
         return false;
     }
+    m_boundsMin = minBounds;
+    m_boundsMax = maxBounds;
     m_height = std::max(maxBounds.y, 0.1f);
     m_radius = std::max({std::abs(minBounds.x), std::abs(maxBounds.x), std::abs(minBounds.z), std::abs(maxBounds.z), 0.1f});
     return true;

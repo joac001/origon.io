@@ -35,6 +35,8 @@ public:
     const std::vector<glm::vec3>& collisionVertices() const { return m_collisionVertices; }
     const std::vector<uint32_t>& collisionIndices() const { return m_collisionIndices; }
     float height() const { return m_height; }
+    const glm::vec3& boundsMin() const { return m_boundsMin; }
+    const glm::vec3& boundsMax() const { return m_boundsMax; }
     float radius() const { return m_radius; }
     bool hasFoliage() const { return m_hasFoliage; }
 
@@ -44,6 +46,8 @@ private:
     std::vector<glm::vec3> m_collisionVertices;
     std::vector<uint32_t> m_collisionIndices;
     float m_height = 1.0f;
+    glm::vec3 m_boundsMin{0.0f};
+    glm::vec3 m_boundsMax{0.0f};
     float m_radius = 1.0f;
     bool m_hasFoliage = false;
 };

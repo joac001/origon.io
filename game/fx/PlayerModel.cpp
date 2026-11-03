@@ -1,5 +1,6 @@
 #include "fx/PlayerModel.h"
 
+#include "render/Model.h"
 #include "sim/Weapons.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -98,7 +99,18 @@ glm::vec3 submitPlayerModel(Renderer& renderer, const PlayerPose& pose) {
     limb(renderer, shoulders, glm::vec3(-0.27f, 0.0f, 0.0f), 1.4f, glm::vec3(0.12f, 0.52f, 0.12f), pose.color * 0.9f, hl);
     const glm::vec3 gun = weaponBodySize(pose.weapon);
     const glm::vec3 gunCenter(0.08f, -0.12f, -0.35f - gun.z * 0.5f);
-    box(renderer, shoulders, gunCenter, gun, kGunMetal, 0.45f, hl, 0.8f);
+    if (pose.weaponModel) {
+        const glm::mat4 gunMatrix = shoulders * glm::translate(glm::mat4(1.0f), glm::vec3(0.08f, -0.14f, -0.42f));
+        for (const ModelPart& part : pose.weaponModel->lod(0)) {
+            DrawItem item;
+            item.mesh = &part.mesh;
+            item.material = part.material;
+            item.model = gunMatrix;
+            renderer.submit(item);
+        }
+    } else {
+        box(renderer, shoulders, gunCenter, gun, kGunMetal, 0.45f, hl, 0.8f);
+    }
     box(renderer, shoulders, glm::vec3(0.18f, -0.14f, -0.42f), glm::vec3(0.1f, 0.1f, 0.1f), kSkin, 0.7f, hl);
 
     return glm::vec3(shoulders * glm::vec4(gunCenter + glm::vec3(0.0f, 0.0f, -gun.z * 0.5f - 0.04f), 1.0f));

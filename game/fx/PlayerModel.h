@@ -8,6 +8,7 @@
 namespace origon {
 
 struct WeaponDef;
+class Model;
 
 // Pose input for the blocky humanoid used for other players and corpses.
 struct PlayerPose {
@@ -19,6 +20,7 @@ struct PlayerPose {
     float eyeHeight = 1.62f;
     glm::vec3 color{0.8f};
     const WeaponDef* weapon = nullptr;
+    const class Model* weaponModel = nullptr;
     bool emissiveHighlight = false;
 };
 

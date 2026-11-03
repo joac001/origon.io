@@ -58,6 +58,22 @@ Model* ModelLibrary::get(const std::string& name) {
     return raw;
 }
 
+Model* ModelLibrary::getWeapon(const std::string& id) {
+    const std::string key = "weapon:" + id;
+    auto it = m_models.find(key);
+    if (it != m_models.end()) {
+        return it->second.get();
+    }
+    auto model = std::make_unique<Model>();
+    if (!model->load(std::filesystem::path("assets/models/weapons") / (id + ".glb"), m_textures)) {
+        m_models.emplace(key, nullptr);
+        return nullptr;
+    }
+    Model* raw = model.get();
+    m_models.emplace(key, std::move(model));
+    return raw;
+}
+
 ShapeHandle ModelLibrary::collisionShape(const std::string& name, PhysicsWorld& physics) {
     auto it = m_shapes.find(name);
     if (it != m_shapes.end()) {
