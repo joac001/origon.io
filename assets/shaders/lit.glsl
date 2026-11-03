@@ -72,6 +72,33 @@ uniform int uPcfRadius;
 uniform float uShadowTexel;
 
 uniform sampler2D uAo;
+uniform sampler2D uSceneDepth;
+uniform mat4 uProj;
+uniform int uContactShadows;
+
+// Short screen-space ray toward the sun: small occluders (grass, pebbles, ledges) that the
+// shadow map is too coarse to catch.
+float contactShadow() {
+    vec3 viewPos = (uView * vec4(vWorldPos, 1.0)).xyz;
+    vec3 viewSun = normalize((uView * vec4(uSunDirection, 0.0)).xyz);
+    float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    const int STEPS = 10;
+    float maxDistance = 0.6;
+    for (int i = 1; i <= STEPS; ++i) {
+        vec3 p = viewPos + viewSun * maxDistance * (float(i) - jitter) / float(STEPS);
+        vec4 clip = uProj * vec4(p, 1.0);
+        vec3 ndc = clip.xyz / clip.w;
+        vec2 uv = ndc.xy * 0.5 + 0.5;
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+        float sceneDepth = texture(uSceneDepth, uv).r;
+        float rayDepth = ndc.z * 0.5 + 0.5;
+        float delta = rayDepth - sceneDepth;
+        if (delta > 0.00002 && delta < 0.002) {
+            return 0.25;
+        }
+    }
+    return 1.0;
+}
 uniform int uAoEnabled;
 uniform vec2 uSceneSize;
 
@@ -412,7 +439,11 @@ void main() {
         albedo *= 1.0 - 0.18 * minor - 0.22 * major;
     }
 
-    vec3 color = brdf(n, v, uSunDirection, albedo, roughness, metallic) * uSunColor * sunShadow(n);
+    float shadow = sunShadow(n);
+    if (uContactShadows == 1 && shadow > 0.05 && uShading != 2) {
+        shadow *= contactShadow();
+    }
+    vec3 color = brdf(n, v, uSunDirection, albedo, roughness, metallic) * uSunColor * shadow;
 
     for (int i = 0; i < uLightCount; ++i) {
         vec3 toLight = uLightPosRadius[i].xyz - vWorldPos;

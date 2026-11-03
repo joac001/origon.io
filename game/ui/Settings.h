@@ -18,6 +18,7 @@ struct GameSettings {
     float masterVolume = 0.8f;
     bool ambience = true;
     bool showStats = false;
+    bool adsDepthOfField = true;
     float vegetationDensity = 1.0f;
     float vegetationDistance = 90.0f;
 

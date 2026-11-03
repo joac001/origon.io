@@ -17,6 +17,12 @@ uniform sampler2D uBloom;
 uniform sampler2D uGodRays;
 uniform float uExposure;
 uniform float uBloomStrength;
+uniform sampler2D uDepth;
+uniform sampler2D uBlurred;
+uniform float uDof;
+uniform float uFocus;
+uniform float uNear;
+uniform float uFar;
 
 vec3 acesFitted(vec3 x) {
     const float a = 2.51;
@@ -33,6 +39,12 @@ float hash(vec2 p) {
 
 void main() {
     vec3 hdr = texture(uScene, vUv).rgb;
+    if (uDof > 0.001) {
+        float z = texture(uDepth, vUv).r * 2.0 - 1.0;
+        float linear = 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear));
+        float coc = clamp((linear - uFocus) / max(uFocus * 1.5, 1.0), 0.0, 1.0) * uDof;
+        hdr = mix(hdr, texture(uBlurred, vUv).rgb, coc);
+    }
     hdr = mix(hdr, texture(uBloom, vUv).rgb, uBloomStrength);
     hdr += texture(uGodRays, vUv).rgb;
     vec3 color = acesFitted(hdr * uExposure);

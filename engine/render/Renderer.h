@@ -85,6 +85,9 @@ struct RenderSettings {
     bool bloom = true;
     bool godRays = true;
     bool ssr = true; // Screen-space reflections on water.
+    bool contactShadows = true;
+    float depthOfField = 0.0f; // 0..1 background blur strength (set by the game, e.g. while aiming).
+    float focusDistance = 10.0f;
     float bloomStrength = 0.06f;
 };
 
@@ -212,6 +215,10 @@ private:
     Shader m_godRaysShader;
     Shader m_lineShader;
     Shader m_waterShader;
+    Shader m_blurShader;
+    unsigned m_dofFbo[2] = {0, 0};
+    unsigned m_dofTexture[2] = {0, 0};
+    void renderDofBlur();
 
     Mesh m_cube;
     Mesh m_capsule;

@@ -426,7 +426,16 @@ int App::run() {
         }
 
         // --- Render -------------------------------------------------------------------
-        m_renderer.beginFrame(m_settings.render, framebuffer);
+        RenderSettings frameSettings = m_settings.render;
+        if (m_mode == Mode::Playing && m_settings.adsDepthOfField) {
+            const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
+            const bool scoped = m_sim->weaponFor(me).scoped;
+            frameSettings.depthOfField = scoped ? 0.0f : 0.85f * m_adsBlend;
+            const glm::vec3 eye = me.eyePosition();
+            const auto hit = m_physics.rayCast(eye, viewDirection(m_viewYaw, m_viewPitch), 300.0f, true);
+            frameSettings.focusDistance = hit ? std::max(hit->distance, 2.0f) : 60.0f;
+        }
+        m_renderer.beginFrame(frameSettings, framebuffer);
         CameraView camera;
         if (m_mode == Mode::Playing) {
             const float alpha = std::clamp(m_tickAccumulator / kTickDt, 0.0f, 1.0f);
@@ -845,7 +854,7 @@ void App::drawMenu() {
             RenderSettings& r = m_settings.render;
             ImGui::TextDisabled("Preajustes:");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Batata")) { r.shadowQuality = 1; r.msaaSamples = 0; r.renderScale = 0.7f; r.ssao = false; r.bloom = false; r.godRays = false; r.ssr = false; m_settings.vegetationDensity = 0.3f; m_settings.vegetationDistance = 40.0f; }
+            if (ImGui::SmallButton("Batata")) { r.shadowQuality = 1; r.msaaSamples = 0; r.renderScale = 0.7f; r.ssao = false; r.bloom = false; r.godRays = false; r.ssr = false; r.contactShadows = false; m_settings.adsDepthOfField = false; m_settings.vegetationDensity = 0.3f; m_settings.vegetationDistance = 40.0f; }
             ImGui::SameLine();
             if (ImGui::SmallButton("Media")) { r.shadowQuality = 2; r.msaaSamples = 2; r.renderScale = 0.9f; r.ssao = true; r.bloom = true; r.godRays = false; }
             ImGui::SameLine();
@@ -867,6 +876,8 @@ void App::drawMenu() {
             ImGui::Checkbox("Bloom", &r.bloom);
             ImGui::Checkbox("Luces volumétricas (rayos de sol)", &r.godRays);
             ImGui::Checkbox("Reflejos en el agua (SSR)", &r.ssr);
+            ImGui::Checkbox("Sombras de contacto", &r.contactShadows);
+            ImGui::Checkbox("Profundidad de campo al apuntar", &m_settings.adsDepthOfField);
             if (ImGui::Checkbox("Sincronización vertical (VSync)", &m_settings.vsync)) m_window->setVsync(m_settings.vsync);
             ImGui::BeginDisabled(m_settings.vsync);
             ImGui::SliderInt("FPS máximos", &m_settings.maxFps, 0, 360, m_settings.maxFps == 0 ? "Sin límite" : "%d");

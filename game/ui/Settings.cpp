@@ -31,6 +31,8 @@ GameSettings GameSettings::load(const std::filesystem::path& path) {
         r.bloom = j.value("bloom", r.bloom);
         r.godRays = j.value("volumetric_light", r.godRays);
         r.ssr = j.value("ssr", r.ssr);
+        r.contactShadows = j.value("contact_shadows", r.contactShadows);
+        settings.adsDepthOfField = j.value("ads_depth_of_field", settings.adsDepthOfField);
         settings.masterVolume = std::clamp(j.value("master_volume", settings.masterVolume), 0.0f, 1.0f);
         settings.ambience = j.value("ambience", settings.ambience);
         settings.showStats = j.value("show_stats", settings.showStats);
@@ -59,6 +61,8 @@ bool GameSettings::save(const std::filesystem::path& path) const {
         {"bloom", render.bloom},
         {"volumetric_light", render.godRays},
         {"ssr", render.ssr},
+        {"contact_shadows", render.contactShadows},
+        {"ads_depth_of_field", adsDepthOfField},
         {"master_volume", masterVolume},
         {"ambience", ambience},
         {"show_stats", showStats},

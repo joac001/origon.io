@@ -92,6 +92,7 @@ bool Renderer::init() {
     ok &= m_godRaysShader.loadFile("assets/shaders/godrays.glsl");
     ok &= m_lineShader.loadFile("assets/shaders/lines.glsl");
     ok &= m_waterShader.loadFile("assets/shaders/water.glsl");
+    ok &= m_blurShader.loadFile("assets/shaders/blur.glsl");
     if (!ok) {
         log::error("Renderer: shader loading failed");
         return false;
@@ -172,6 +173,10 @@ void Renderer::destroyTargets() {
     }
     deleteFbo(m_godRaysFbo);
     deleteTexture(m_godRaysTexture);
+    for (int i = 0; i < 2; ++i) {
+        deleteFbo(m_dofFbo[i]);
+        deleteTexture(m_dofTexture[i]);
+    }
     deleteFbo(m_copyFbo);
     deleteTexture(m_copyColor);
     deleteTexture(m_copyDepth);
@@ -222,6 +227,10 @@ void Renderer::ensureTargets() {
         m_bloomTextures[index] = makeTexture2D(GL_R11F_G11F_B10F, mipSize, GL_LINEAR);
         m_bloomFbos[index] = makeColorFbo(m_bloomTextures[index]);
         mipSize = glm::max(mipSize / 2, glm::ivec2(1));
+    }
+    for (int i = 0; i < 2; ++i) {
+        m_dofTexture[i] = makeTexture2D(GL_R11F_G11F_B10F, half, GL_LINEAR);
+        m_dofFbo[i] = makeColorFbo(m_dofTexture[i]);
     }
     m_copyColor = makeTexture2D(GL_RGBA16F, sceneSize, GL_LINEAR);
     m_copyDepth = makeTexture2D(GL_DEPTH_COMPONENT32F, sceneSize, GL_NEAREST);
@@ -412,6 +421,9 @@ void Renderer::setLitFrameUniforms(Shader& shader, const CameraView& camera, con
     shader.set("uShadowMap", 0);
     shader.set("uShadowRaw", 8);
     shader.set("uSoftShadows", m_settings.shadowQuality >= 3 ? 1 : 0);
+    shader.set("uSceneDepth", 9);
+    shader.set("uProj", projection(camera));
+    shader.set("uContactShadows", m_settings.contactShadows ? 1 : 0);
     shader.set("uAo", 1);
     shader.set("uAlbedoMap", 2);
     shader.set("uNormalMap", 3);
@@ -568,6 +580,24 @@ void Renderer::renderBloom() {
     m_stats.drawCalls += kBloomMips * 2 - 1;
 }
 
+void Renderer::renderDofBlur() {
+    // Half-resolution separable blur of the scene for the depth of field.
+    const glm::ivec2 half = m_bloomSizes[0];
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    m_blurShader.bind();
+    m_blurShader.set("uSource", 0);
+    for (int pass = 0; pass < 2; ++pass) {
+        glBindFramebuffer(GL_FRAMEBUFFER, m_dofFbo[pass]);
+        glViewport(0, 0, half.x, half.y);
+        m_blurShader.set("uDirection", pass == 0 ? glm::vec2(1.0f / static_cast<float>(half.x), 0.0f)
+                                                 : glm::vec2(0.0f, 1.0f / static_cast<float>(half.y)));
+        glBindTextureUnit(0, pass == 0 ? m_resolveColor : m_dofTexture[0]);
+        drawFullscreen(m_emptyVao);
+    }
+    m_stats.drawCalls += 2;
+}
+
 void Renderer::renderGodRays(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment) {
     const glm::vec3 sunDir = glm::normalize(environment.sunDirection);
     const glm::vec3 forward = -glm::vec3(glm::inverse(camera.view)[2]);
@@ -705,6 +735,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
     glBindTextureUnit(8, shadowsOn ? m_shadowArray : 0);
     glBindSampler(8, m_shadowRawSampler);
+    glBindTextureUnit(9, m_resolveDepth);
 
     drawLit(m_items, glm::mat4(1.0f), m_itemInstanceOffsets);
     renderWater(camera, viewProj, environment, sceneFbo);
@@ -742,6 +773,9 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     if (m_settings.godRays) {
         renderGodRays(camera, viewProj, environment);
     }
+    if (m_settings.depthOfField > 0.001f) {
+        renderDofBlur();
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_outputFbo);
     glViewport(0, 0, m_outputSize.x, m_outputSize.y);
@@ -750,6 +784,14 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     m_compositeShader.bind();
     m_compositeShader.set("uExposure", m_settings.exposure);
     m_compositeShader.set("uBloomStrength", m_settings.bloom ? m_settings.bloomStrength : 0.0f);
+    m_compositeShader.set("uDof", m_settings.depthOfField);
+    m_compositeShader.set("uFocus", m_settings.focusDistance);
+    m_compositeShader.set("uNear", camera.nearPlane);
+    m_compositeShader.set("uFar", camera.farPlane);
+    m_compositeShader.set("uDepth", 3);
+    m_compositeShader.set("uBlurred", 4);
+    glBindTextureUnit(3, m_resolveDepth);
+    glBindTextureUnit(4, m_settings.depthOfField > 0.001f ? m_dofTexture[1] : m_blackTexture);
     m_compositeShader.set("uScene", 0);
     m_compositeShader.set("uBloom", 1);
     m_compositeShader.set("uGodRays", 2);
@@ -757,7 +799,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glBindTextureUnit(1, m_settings.bloom ? m_bloomTextures[0] : m_blackTexture);
     glBindTextureUnit(2, m_settings.godRays ? m_godRaysTexture : m_blackTexture);
     drawFullscreen(m_emptyVao);
-    for (unsigned unit = 0; unit < 3; ++unit) {
+    for (unsigned unit = 0; unit < 5; ++unit) {
         glBindTextureUnit(unit, 0);
     }
     m_stats.drawCalls++;

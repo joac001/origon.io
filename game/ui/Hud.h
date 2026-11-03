@@ -2,6 +2,8 @@
 
 #include "sim/SimTypes.h"
 
+#include <glm/vec3.hpp>
+
 #include <deque>
 #include <string>
 #include <vector>
@@ -51,6 +53,12 @@ private:
     float m_hitMarker = 0.0f;
     bool m_hitMarkerHead = false;
     float m_damageFlash = 0.0f;
+    struct DamageMarker {
+        glm::vec3 source;
+        float age;
+    };
+    std::vector<DamageMarker> m_damageMarkers;
+    void drawDamageMarkers(const Simulation& sim, float dt);
     int m_lastKillerId = -1;
 };
 

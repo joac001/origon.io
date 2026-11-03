@@ -52,6 +52,7 @@ void Hud::reset() {
     m_banners.clear();
     m_hitMarker = 0.0f;
     m_damageFlash = 0.0f;
+    m_damageMarkers.clear();
     m_lastKillerId = -1;
 }
 
@@ -117,6 +118,9 @@ void Hud::onEvents(const std::vector<GameEvent>& events, const Simulation& sim) 
             }
             if (e.b == local) {
                 m_damageFlash = 0.35f;
+                if (e.a >= 0 && e.a < static_cast<int>(sim.players().size())) {
+                    m_damageMarkers.push_back({sim.players()[static_cast<size_t>(e.a)].position, 0.0f});
+                }
             }
             break;
         default:
@@ -151,6 +155,7 @@ void Hud::draw(const Simulation& sim, float dt, bool showScoreboard, bool aiming
             drawCrosshair(sim);
         }
         drawStatus(sim);
+        drawDamageMarkers(sim, dt);
     }
 
     // Match clock and leader.
@@ -187,6 +192,32 @@ void Hud::draw(const Simulation& sim, float dt, bool showScoreboard, bool aiming
     if (m_hitMarker > 0.0f) {
         m_hitMarker = std::max(0.0f, m_hitMarker - dt);
     }
+}
+
+void Hud::drawDamageMarkers(const Simulation& sim, float dt) {
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    const Player& me = sim.players()[static_cast<size_t>(sim.localPlayerId())];
+    const ImVec2 c(screen.x * 0.5f, screen.y * 0.5f);
+    const float radius = screen.y * 0.16f;
+    for (DamageMarker& marker : m_damageMarkers) {
+        marker.age += dt;
+        const float alpha = std::clamp(1.4f - marker.age, 0.0f, 1.0f);
+        // Angle of the attacker relative to where we look (0 = straight ahead, screen up).
+        const glm::vec3 to = marker.source - me.position;
+        const float worldAngle = std::atan2(-to.x, -to.z);
+        const float relative = worldAngle - me.yaw;
+        const float screenAngle = -relative - 1.5707963f;
+        for (int i = -6; i <= 6; ++i) {
+            const float a0 = screenAngle + static_cast<float>(i) * 0.045f;
+            const float a1 = a0 + 0.045f;
+            const float w = 1.0f - std::abs(static_cast<float>(i)) / 7.0f;
+            dl->AddLine(ImVec2(c.x + std::cos(a0) * radius, c.y + std::sin(a0) * radius),
+                        ImVec2(c.x + std::cos(a1) * radius, c.y + std::sin(a1) * radius),
+                        withAlpha(IM_COL32(230, 40, 30, 255), alpha * w), 6.0f);
+        }
+    }
+    std::erase_if(m_damageMarkers, [](const DamageMarker& m) { return m.age > 1.4f; });
 }
 
 void Hud::drawCrosshair(const Simulation& sim) {
