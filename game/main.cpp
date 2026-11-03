@@ -10,7 +10,8 @@ namespace {
 
 void printUsage() {
     std::puts("Usage: origon [--map NAME] [--editor] [--autoplay] [--hide-ui]\n"
-              "              [--screenshot FILE.png] [--screenshot-frame N]");
+              "              [--screenshot FILE.png] [--screenshot-frame N] [--shot-size WxH]\n"
+              "              [--camera X Y Z YAW PITCH]");
 }
 
 } // namespace
@@ -26,6 +27,20 @@ int main(int argc, char** argv) {
         else if (arg == "--hide-ui") options.hideUi = true;
         else if (arg == "--screenshot") options.screenshotPath = next();
         else if (arg == "--screenshot-frame") options.screenshotFrame = std::atoi(next().c_str());
+        else if (arg == "--camera") {
+            options.fixedCamera = true;
+            options.cameraPosition.x = std::stof(next());
+            options.cameraPosition.y = std::stof(next());
+            options.cameraPosition.z = std::stof(next());
+            options.cameraYaw = std::stof(next());
+            options.cameraPitch = std::stof(next());
+        } else if (arg == "--shot-size") {
+            const std::string size = next();
+            const size_t x = size.find('x');
+            if (x != std::string::npos) {
+                options.shotSize = {std::atoi(size.substr(0, x).c_str()), std::atoi(size.substr(x + 1).c_str())};
+            }
+        }
         else if (arg == "--help" || arg == "-h") {
             printUsage();
             return 0;

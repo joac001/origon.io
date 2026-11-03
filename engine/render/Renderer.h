@@ -95,6 +95,8 @@ public:
     const Mesh& sphere() const { return m_sphere; }
     glm::mat4 projection(const CameraView& camera) const;
     const RenderStats& stats() const { return m_stats; }
+    // Framebuffer that receives the final image (0 = window).
+    void setOutputFramebuffer(unsigned fbo) { m_outputFbo = fbo; }
 
 private:
     struct LineVertex {
@@ -150,6 +152,7 @@ private:
     std::array<float, kMaxCascades> m_cascadeSplits{};
     std::array<float, kMaxCascades> m_cascadeTexel{};
 
+    unsigned m_outputFbo = 0;
     unsigned m_emptyVao = 0;
     unsigned m_lineVao = 0;
     unsigned m_lineVbo = 0;

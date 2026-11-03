@@ -573,7 +573,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         renderGodRays(camera, viewProj, environment);
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_outputFbo);
     glViewport(0, 0, m_outputSize.x, m_outputSize.y);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);

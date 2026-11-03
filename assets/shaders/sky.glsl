@@ -24,12 +24,16 @@ void main() {
     vec3 dir = normalize(farPoint.xyz / farPoint.w - uCameraPos);
 
     float height = clamp(dir.y, -1.0, 1.0);
-    vec3 zenith = uSkyColor * 0.75;
-    vec3 sky = mix(uFogColor, zenith, pow(clamp(height, 0.0, 1.0), 0.45));
-    sky = mix(sky, uFogColor * 0.6, clamp(-height * 4.0, 0.0, 1.0));
+    // Deep zenith, bright hazy horizon, darker ground below the horizon.
+    vec3 zenith = uSkyColor * vec3(0.55, 0.62, 0.85);
+    vec3 horizon = mix(uFogColor, uSkyColor, 0.25) * 1.05;
+    vec3 sky = mix(horizon, zenith, pow(clamp(height, 0.0, 1.0), 0.4));
+    sky = mix(sky, uFogColor * 0.55, clamp(-height * 4.0, 0.0, 1.0));
 
+    // Sun disk plus forward-scattering glow (Mie-like), stronger near the horizon.
     float sunDot = max(dot(dir, uSunDirection), 0.0);
-    sky += uSunColor * (pow(sunDot, 2000.0) * 8.0 + pow(sunDot, 12.0) * 0.08);
+    float horizonBoost = 1.0 - clamp(height, 0.0, 1.0);
+    sky += uSunColor * (pow(sunDot, 1800.0) * 12.0 + pow(sunDot, 64.0) * 0.12 + pow(sunDot, 6.0) * 0.05 * horizonBoost);
 
-    fragColor = vec4(sky * 1.6, 1.0);
+    fragColor = vec4(sky * 1.25, 1.0);
 }

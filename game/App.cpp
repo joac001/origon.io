@@ -6,6 +6,7 @@
 #include "render/Screenshot.h"
 
 #include <GLFW/glfw3.h>
+#include <glad/gl.h>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
@@ -69,6 +70,13 @@ App::App(const LaunchOptions& options) : m_options(options) {
     m_window->setCursorCaptured(!options.autoplay);
     if (options.startInEditor) {
         enterEditor();
+    }
+    if (options.shotSize.x > 0 && options.shotSize.y > 0) {
+        glCreateTextures(GL_TEXTURE_2D, 1, &m_shotColor);
+        glTextureStorage2D(m_shotColor, 1, GL_RGBA8, options.shotSize.x, options.shotSize.y);
+        glCreateFramebuffers(1, &m_shotFbo);
+        glNamedFramebufferTexture(m_shotFbo, GL_COLOR_ATTACHMENT0, m_shotColor, 0);
+        m_renderer.setOutputFramebuffer(m_shotFbo);
     }
 }
 
@@ -215,7 +223,7 @@ int App::run() {
             takeScreenshot(m_options.screenshotPath);
         }
 
-        const glm::ivec2 framebuffer = m_window->framebufferSize();
+        const glm::ivec2 framebuffer = m_shotFbo ? m_options.shotSize : m_window->framebufferSize();
         if (m_mode == Mode::Playing) {
             if (m_input.keyPressed(GLFW_KEY_ESCAPE)) setMenuOpen(!m_menuOpen);
             updatePlaying(dt);
@@ -236,8 +244,15 @@ int App::run() {
             updateCameraFeel(dt);
             camera = playingCamera(alpha);
             m_lastCamera = camera;
+            if (m_options.fixedCamera) {
+                camera.position = m_options.cameraPosition;
+                camera.view = glm::lookAt(camera.position,
+                                          camera.position + viewDirection(glm::radians(m_options.cameraYaw), glm::radians(m_options.cameraPitch)),
+                                          glm::vec3(0, 1, 0));
+                camera.fovYDegrees = m_settings.fov;
+            }
             m_world.submit(m_renderer, m_physics);
-            submitPlayers(alpha);
+            submitPlayers(alpha, m_options.fixedCamera);
             m_effects.submit(m_renderer, m_physics);
             submitViewModel(dt);
             if (m_audioReady) {
@@ -267,7 +282,7 @@ int App::run() {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         if (!m_pendingScreenshot.empty()) {
-            saveScreenshot(m_pendingScreenshot, framebuffer.x, framebuffer.y);
+            saveScreenshot(m_pendingScreenshot, framebuffer.x, framebuffer.y, m_shotFbo);
             if (m_pendingScreenshot == m_options.screenshotPath) {
                 m_window->requestClose();
             }
@@ -418,9 +433,9 @@ glm::vec3 App::localMuzzle() const {
     return glm::vec3(glm::inverse(m_lastCamera.view) * glm::vec4(offset, 1.0f));
 }
 
-void App::submitPlayers(float alpha) {
+void App::submitPlayers(float alpha, bool includeLocal) {
     for (const Player& p : m_sim->players()) {
-        if (p.id == m_sim->localPlayerId() || !p.alive) continue;
+        if ((p.id == m_sim->localPlayerId() && !includeLocal) || !p.alive) continue;
         PlayerPose pose;
         pose.feet = glm::mix(p.previousPosition, p.position, alpha);
         pose.rotation = glm::angleAxis(p.yaw, glm::vec3(0, 1, 0));

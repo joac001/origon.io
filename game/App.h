@@ -29,6 +29,12 @@ struct LaunchOptions {
     bool startInEditor = false;
     bool autoplay = false; // The local player is driven by the bot AI (spectator/demo).
     bool hideUi = false;
+    // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
+    bool fixedCamera = false;
+    glm::vec3 cameraPosition{0.0f};
+    float cameraYaw = 0.0f;
+    float cameraPitch = 0.0f;
+    glm::ivec2 shotSize{0};
 };
 
 class App {
@@ -56,7 +62,7 @@ private:
     CameraView playingCamera(float alpha) const;
     glm::vec3 localMuzzle() const;
     void updateCameraFeel(float frameDt);
-    void submitPlayers(float alpha);
+    void submitPlayers(float alpha, bool includeLocal);
     void submitViewModel(float frameDt);
     void drawMenu();
     void drawStats(float frameDt);
@@ -101,6 +107,8 @@ private:
     float m_frameMs = 16.0f;
     long m_frameCount = 0;
     std::string m_pendingScreenshot;
+    unsigned m_shotFbo = 0;
+    unsigned m_shotColor = 0;
 };
 
 } // namespace origon

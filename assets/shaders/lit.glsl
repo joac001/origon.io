@@ -194,7 +194,7 @@ void main() {
     float dist = length(uCameraPos - vWorldPos);
     float fog = 1.0 - exp(-dist * uFogDensity);
     float sunAmount = max(dot(-v, uSunDirection), 0.0);
-    vec3 fogColor = uFogColor * 1.6 + uSunColor * pow(sunAmount, 8.0) * 0.05;
+    vec3 fogColor = mix(uFogColor, uSkyColor, 0.25) * 1.3 + uSunColor * pow(sunAmount, 8.0) * 0.06;
     color = mix(color, fogColor, fog);
 
     fragColor = vec4(color, 1.0);
