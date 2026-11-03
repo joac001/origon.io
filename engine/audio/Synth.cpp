@@ -261,6 +261,44 @@ Buffer windLoop(float seconds, uint32_t seed) {
     return out;
 }
 
+Buffer streamLoop(float seconds, uint32_t seed) {
+    const float fadeSeconds = 1.0f;
+    Buffer raw(samplesFor(seconds + fadeSeconds), 0.0f);
+    Rng rng(seed);
+    LowPass lp1, lp2, hp;
+    for (size_t i = 0; i < raw.size(); ++i) {
+        const float noise = rng.next();
+        const float low = lp2.process(lp1.process(noise, 1800.0f), 2200.0f);
+        const float band = low - hp.process(low, 350.0f);
+        raw[i] = band * 1.6f;
+    }
+    // Gurgles: short resonant chirps scattered through the loop.
+    const int gurgles = static_cast<int>(seconds * 14.0f);
+    for (int g = 0; g < gurgles; ++g) {
+        const float start = rng.unit() * seconds;
+        const float frequency = 300.0f + rng.unit() * 900.0f;
+        const float length = 0.03f + rng.unit() * 0.06f;
+        Buffer chirp(samplesFor(length), 0.0f);
+        float phase = 0.0f;
+        for (size_t i = 0; i < chirp.size(); ++i) {
+            const float x = static_cast<float>(i) / static_cast<float>(chirp.size());
+            phase += kTwoPi * frequency * (1.0f + 0.6f * x) / kRate;
+            chirp[i] = std::sin(phase) * std::sin(x * std::numbers::pi_v<float>) * 0.25f;
+        }
+        mixInto(raw, chirp, start, 1.0f);
+    }
+    const size_t loopLength = samplesFor(seconds);
+    const size_t fade = samplesFor(fadeSeconds);
+    raw.resize(std::max(raw.size(), loopLength + fade), 0.0f);
+    Buffer out(raw.begin(), raw.begin() + static_cast<long>(loopLength));
+    for (size_t i = 0; i < fade; ++i) {
+        const float w = static_cast<float>(i) / static_cast<float>(fade);
+        out[i] = out[i] * w + raw[loopLength + i] * (1.0f - w);
+    }
+    normalize(out, 0.5f);
+    return out;
+}
+
 Buffer birdCall(uint32_t seed) {
     Rng rng(seed);
     Buffer out;

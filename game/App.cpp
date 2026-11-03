@@ -483,6 +483,20 @@ int App::run() {
             if (m_audioReady) {
                 const glm::mat4 invView = glm::inverse(camera.view);
                 m_audio.update(dt, *m_sim, camera.position, -glm::vec3(invView[2]));
+                // Distance to the nearest water: sparse terrain samples around the listener.
+                const TerrainData& terrain = m_world.map().terrain;
+                float nearest = 1e9f;
+                if (terrain.valid() && terrain.waterEnabled) {
+                    for (int z = -10; z <= 10; ++z) {
+                        for (int x = -10; x <= 10; ++x) {
+                            const glm::vec2 p(camera.position.x + static_cast<float>(x) * 3.0f, camera.position.z + static_cast<float>(z) * 3.0f);
+                            if (terrain.heightAt(p.x, p.y) < terrain.waterLevel) {
+                                nearest = std::min(nearest, glm::length(p - glm::vec2(camera.position.x, camera.position.z)));
+                            }
+                        }
+                    }
+                }
+                m_audio.setWaterProximity(1.0f - std::min(nearest / 30.0f, 1.0f));
             }
         } else {
             camera = m_editor.camera();

@@ -7,6 +7,7 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <string>
@@ -22,6 +23,7 @@ bool GameAudio::init() {
     const float ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
     log::info("Audio: sound bank synthesized in {:.0f} ms", ms);
     m_windLoop = m_audio.startLoop(m_wind, 0.35f);
+    m_streamLoop = m_audio.startLoop(m_stream, 0.0f);
     return true;
 }
 
@@ -81,6 +83,7 @@ void GameAudio::build() {
     m_victory = add("ui_victory", jingle({523.25f, 659.25f, 783.99f, 1046.5f}, 0.13f, 0.5f));
     m_uiClick = add("ui_click", click(1000.0f, 0.01f, 0.3f, 94));
     m_wind = add("wind", windLoop(12.0f, 95));
+    m_stream = add("stream", streamLoop(9.0f, 96));
     for (uint32_t i = 0; i < 5; ++i) m_birds.push_back(add("bird_" + std::to_string(i), birdCall(100 + i)));
 }
 
@@ -94,6 +97,12 @@ void GameAudio::setVolume(float master) { m_audio.setMasterVolume(master); }
 void GameAudio::setAmbienceEnabled(bool enabled) {
     m_ambience = enabled;
     m_audio.setLoopVolume(m_windLoop, enabled ? 0.35f : 0.0f);
+}
+
+void GameAudio::setWaterProximity(float proximity) {
+    // Smooth so the creek fades in and out while walking.
+    m_waterProximity += (std::clamp(proximity, 0.0f, 1.0f) - m_waterProximity) * 0.1f;
+    m_audio.setLoopVolume(m_streamLoop, m_ambience ? m_waterProximity * m_waterProximity * 0.6f : 0.0f);
 }
 
 void GameAudio::playUi(const char* name) { m_audio.play(m_audio.find(name), {.volume = 0.6f}); }

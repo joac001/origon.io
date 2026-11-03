@@ -35,6 +35,8 @@ Buffer grunt(float pitch, uint32_t seed);
 // Notes in Hz, each lasting noteDuration (the last one rings longer).
 Buffer jingle(const std::vector<float>& notes, float noteDuration, float brightness);
 Buffer windLoop(float seconds, uint32_t seed);
+// Babbling creek: band-passed noise with random gurgles, seamless loop.
+Buffer streamLoop(float seconds, uint32_t seed);
 Buffer birdCall(uint32_t seed);
 
 // Mixes b into a starting at offsetSeconds (a grows if needed).

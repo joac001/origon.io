@@ -22,6 +22,8 @@ public:
     void setVolume(float master);
     void setAmbienceEnabled(bool enabled);
     void playUi(const char* name);
+    // 0..1: how close the listener is to water (creek loop volume).
+    void setWaterProximity(float proximity);
 
 private:
     struct Pending {
@@ -43,6 +45,9 @@ private:
     std::vector<float> m_stepDistance;
     float m_birdTimer = 3.0f;
     int m_windLoop = -1;
+    int m_streamLoop = -1;
+    SoundId m_stream = kInvalidSound;
+    float m_waterProximity = 0.0f;
     bool m_ambience = true;
     glm::vec3 m_listener{0.0f};
 
