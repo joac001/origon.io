@@ -12,6 +12,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_stdlib.h>
 
 #include <algorithm>
 #include <chrono>
@@ -70,6 +71,12 @@ App::App(const LaunchOptions& options) : m_options(options) {
     m_mapFiles = listMaps();
     loadMap(options.map);
     m_window->setCursorCaptured(!options.autoplay);
+    m_playerName = options.playerName;
+    if (options.hostPort > 0) {
+        startHosting(options.hostPort);
+    } else if (!options.connectAddress.empty()) {
+        joinServer(options.connectAddress, options.connectPort);
+    }
     if (options.startInEditor) {
         enterEditor();
     }
@@ -152,8 +159,155 @@ void App::restartMatch() {
     }
     m_hud.reset();
     m_tickAccumulator = 0.0f;
+    m_rematchTimer = -1.0f;
     m_walkPhase.assign(m_sim->players().size(), 0.0f);
     processEvents(m_sim->takeEvents());
+    m_net.serverRematch(*m_sim, m_world.map());
+}
+
+// --- Networking ------------------------------------------------------------------------------
+
+void App::startHosting(int port) {
+    leaveNetwork();
+    if (m_net.host(static_cast<uint16_t>(port))) {
+        m_hostPort = port;
+        restartMatch();
+    }
+}
+
+void App::joinServer(const std::string& address, int port) {
+    leaveNetwork();
+    m_clientReady = false;
+    m_net.connect(address, static_cast<uint16_t>(port), m_playerName);
+}
+
+void App::leaveNetwork() {
+    const bool wasClient = m_net.isClient();
+    m_net.shutdown();
+    m_clientReady = false;
+    if (wasClient) {
+        loadMap(m_mapFile); // Back to a local match.
+    }
+}
+
+net::Snapshot App::makeSnapshot() const {
+    net::Snapshot s;
+    s.serverTick = m_netTick;
+    s.timeLeft = m_sim->gunGame().timeLeft();
+    s.phase = m_sim->gunGame().phase() == GunGame::Phase::Finished ? 1 : 0;
+    s.winner = static_cast<int8_t>(m_sim->gunGame().winnerId());
+    for (const Player& p : m_sim->players()) {
+        net::PlayerState state;
+        state.id = static_cast<uint8_t>(p.id);
+        state.flags = static_cast<uint8_t>((p.alive ? 1 : 0) | (p.isBot ? 2 : 0) | (p.crouched ? 4 : 0) | (p.onGround ? 8 : 0) |
+                                           (p.aiming ? 16 : 0));
+        state.position = p.position;
+        state.velocity = p.velocity;
+        state.yaw = p.yaw;
+        state.pitch = p.pitch;
+        state.eyeHeight = p.eyeHeight;
+        state.health = p.health;
+        state.tier = static_cast<uint8_t>(p.tier);
+        state.kills = static_cast<uint16_t>(p.kills);
+        state.deaths = static_cast<uint16_t>(p.deaths);
+        state.ammo = static_cast<uint8_t>(std::clamp(p.ammo, 0, 255));
+        state.reloadTimer = p.reloadTimer;
+        state.respawnTimer = p.respawnTimer;
+        state.spawnProtection = p.spawnProtection;
+        state.viewKick = p.viewKick;
+        state.meleeAnimation = p.meleeAnimation;
+        s.players.push_back(state);
+    }
+    for (BodyHandle body : m_world.dynamicBodies()) {
+        const BodyTransform t = m_physics.transform(body);
+        s.props.push_back({t.position, t.rotation});
+    }
+    return s;
+}
+
+void App::applySnapshot(const net::Snapshot& snapshot) {
+    int count = 0;
+    for (const net::PlayerState& state : snapshot.players) count = std::max(count, static_cast<int>(state.id) + 1);
+    m_sim->ensurePlayerCount(count);
+    m_sim->setMatchState(snapshot.timeLeft, snapshot.phase, snapshot.winner);
+    auto& players = m_sim->mutablePlayers();
+    const int local = m_sim->localPlayerId();
+    for (const net::PlayerState& state : snapshot.players) {
+        Player& p = players[state.id];
+        const bool alive = (state.flags & 1) != 0;
+        const bool respawned = alive && !p.alive;
+        if (p.id == local) {
+            // Prediction owns the local position; correct it only when it drifts or on respawn.
+            const float error = glm::distance(p.position, state.position);
+            if (respawned || !alive || error > 1.2f) {
+                p.character->teleport(state.position);
+                p.position = p.previousPosition = state.position;
+                p.velocity = state.velocity;
+            }
+            if (respawned) {
+                p.yaw = state.yaw;
+                p.pitch = state.pitch;
+                p.viewReset = true;
+            }
+        } else {
+            p.previousPosition = respawned ? state.position : p.position;
+            p.position = state.position;
+            p.velocity = state.velocity;
+            p.yaw = state.yaw;
+            p.pitch = state.pitch;
+            p.onGround = (state.flags & 8) != 0;
+            p.character->teleport(alive ? state.position : glm::vec3(0.0f, -500.0f - 5.0f * static_cast<float>(p.id), 0.0f));
+        }
+        p.alive = alive;
+        p.isBot = (state.flags & 2) != 0;
+        p.crouched = (state.flags & 4) != 0;
+        p.aiming = (state.flags & 16) != 0;
+        p.eyeHeight = state.eyeHeight;
+        p.health = state.health;
+        p.tier = state.tier;
+        p.kills = state.kills;
+        p.deaths = state.deaths;
+        p.ammo = state.ammo;
+        p.reloadTimer = state.reloadTimer;
+        p.respawnTimer = state.respawnTimer;
+        p.spawnProtection = state.spawnProtection;
+        p.viewKick = state.viewKick;
+        p.meleeAnimation = state.meleeAnimation;
+    }
+    m_replicatedProps = snapshot.props;
+    m_snapshotAge = 0.0f;
+}
+
+void App::updateNetworkClient() {
+    net::NetSession::ClientUpdate update = m_net.clientPoll();
+    if (update.welcomed) {
+        if (auto map = MapData::fromJson(update.mapJson)) {
+            buildWorld(*map);
+            m_sim->startClientMatch(m_world.map(), update.localId);
+            m_hud.reset();
+            m_clientReady = true;
+            m_netTick = 0;
+            m_walkPhase.assign(m_sim->players().size(), 0.0f);
+            log::info("Joined as player {} on map '{}'", update.localId, map->name);
+        }
+    }
+    if (!m_clientReady) {
+        if (update.disconnected) leaveNetwork();
+        return;
+    }
+    if (!update.playerInfo.empty()) {
+        int count = 0;
+        for (const auto& info : update.playerInfo) count = std::max(count, info.id + 1);
+        m_sim->ensurePlayerCount(count);
+        for (const auto& info : update.playerInfo) {
+            Player& p = m_sim->mutablePlayers()[static_cast<size_t>(info.id)];
+            p.name = info.name;
+            p.isBot = info.isBot;
+        }
+    }
+    if (update.snapshot) applySnapshot(*update.snapshot);
+    if (!update.events.empty()) processEvents(update.events);
+    if (update.disconnected) leaveNetwork();
 }
 
 void App::enterEditor() {
@@ -215,7 +369,7 @@ int App::run() {
         }
         ImGui::NewFrame();
 
-        if (m_input.keyPressed(GLFW_KEY_F1)) {
+        if (m_input.keyPressed(GLFW_KEY_F1) && !m_net.isClient()) {
             if (m_mode == Mode::Playing) enterEditor();
             else leaveEditor();
         }
@@ -259,7 +413,7 @@ int App::run() {
                 camera.fovYDegrees = m_settings.fov;
             }
             m_world.submit(m_renderer, m_physics);
-            submitPlayers(alpha, m_options.fixedCamera);
+            submitPlayers(m_net.isClient() ? std::clamp(m_snapshotAge / (2.0f * kTickDt), 0.0f, 1.0f) : alpha, m_options.fixedCamera);
             m_effects.submit(m_renderer, m_physics);
             submitViewModel(dt);
             if (m_audioReady) {
@@ -290,6 +444,14 @@ int App::run() {
                 m_editor.drawUi();
             }
             if (m_settings.showStats) drawStats(dt);
+            if (m_net.isClient() && !m_clientReady) {
+                ImDrawList* dl = ImGui::GetForegroundDrawList();
+                const ImVec2 screen = ImGui::GetIO().DisplaySize;
+                dl->AddRectFilled(ImVec2(0, 0), screen, IM_COL32(0, 0, 0, 170));
+                const std::string text = m_net.status() + "   (Esc: menú)";
+                const ImVec2 size = m_fontBold->CalcTextSizeA(26.0f, FLT_MAX, 0.0f, text.c_str());
+                dl->AddText(m_fontBold, 26.0f, ImVec2((screen.x - size.x) * 0.5f, screen.y * 0.45f), IM_COL32(240, 230, 200, 255), text.c_str());
+            }
         }
 
         ImGui::Render();
@@ -315,6 +477,14 @@ int App::run() {
 // --- Playing -------------------------------------------------------------------------------
 
 void App::updatePlaying(float frameDt) {
+    if (m_net.isServer()) {
+        m_net.serverPoll(*m_sim, m_world.map());
+    }
+    if (m_net.isClient()) {
+        updateNetworkClient();
+        m_snapshotAge += frameDt;
+        if (!m_clientReady) return;
+    }
     Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
     if (me.viewReset) {
         m_viewYaw = me.yaw;
@@ -336,22 +506,54 @@ void App::updatePlaying(float frameDt) {
     m_sway = glm::mix(m_sway, glm::clamp(-mouse * 0.0006f, glm::vec2(-0.03f), glm::vec2(0.03f)), std::min(1.0f, frameDt * 10.0f));
 
     const bool matchOver = m_sim->gunGame().phase() == GunGame::Phase::Finished;
-    if (matchOver && !m_menuOpen && (m_input.keyPressed(GLFW_KEY_ENTER) || m_input.keyPressed(GLFW_KEY_KP_ENTER) || m_options.autoplay)) {
-        restartMatch();
-        return;
+    if (!m_net.isClient()) {
+        // Online matches restart by themselves; local ones on Enter.
+        if (matchOver && m_net.isServer()) {
+            if (m_rematchTimer < 0.0f) m_rematchTimer = 10.0f;
+            m_rematchTimer -= frameDt;
+        }
+        const bool enter = m_input.keyPressed(GLFW_KEY_ENTER) || m_input.keyPressed(GLFW_KEY_KP_ENTER);
+        if (matchOver && !m_menuOpen && (enter || m_options.autoplay || (m_net.isServer() && m_rematchTimer <= 0.0f))) {
+            restartMatch();
+            return;
+        }
+        if (!m_menuOpen && m_input.keyPressed(GLFW_KEY_K)) m_sim->killSelf(m_sim->localPlayerId());
     }
-    if (!m_menuOpen && m_input.keyPressed(GLFW_KEY_K)) m_sim->killSelf(m_sim->localPlayerId());
 
     m_tickAccumulator += frameDt;
     int ticks = 0;
     std::vector<PlayerCommand> commands;
     while (m_tickAccumulator >= kTickDt && ticks < kMaxTicksPerFrame) {
-        m_sim->computeBotCommands(commands);
-        if (!m_options.autoplay) {
-            commands[static_cast<size_t>(m_sim->localPlayerId())] = buildLocalCommand();
+        if (m_net.isClient()) {
+            // Client: send the command, predict our own movement, keep props where the server says.
+            const PlayerCommand command = buildLocalCommand();
+            m_net.sendCommand(++m_netTick, command);
+            m_physics.update(kTickDt);
+            const auto bodies = m_world.dynamicBodies();
+            for (size_t i = 0; i < bodies.size() && i < m_replicatedProps.size(); ++i) {
+                m_physics.setTransform(bodies[i], m_replicatedProps[i].position, m_replicatedProps[i].rotation);
+            }
+            m_sim->predictMovement(m_sim->localPlayerId(), command);
+        } else {
+            m_sim->computeBotCommands(commands);
+            if (!m_options.autoplay) {
+                commands[static_cast<size_t>(m_sim->localPlayerId())] = buildLocalCommand();
+            }
+            if (m_net.isServer()) {
+                for (const Player& p : m_sim->players()) {
+                    if (const PlayerCommand* remote = m_net.remoteCommand(p.id); remote && !p.isBot) {
+                        commands[static_cast<size_t>(p.id)] = *remote;
+                    }
+                }
+            }
+            m_sim->tick(commands);
+            const std::vector<GameEvent> events = m_sim->takeEvents();
+            m_net.broadcastEvents(events);
+            processEvents(events);
+            if (m_net.isServer() && (++m_netTick % 2) == 0) {
+                m_net.broadcastSnapshot(makeSnapshot());
+            }
         }
-        m_sim->tick(commands);
-        processEvents(m_sim->takeEvents());
         m_tickAccumulator -= kTickDt;
         ++ticks;
     }
@@ -629,6 +831,35 @@ void App::drawMenu() {
             ImGui::TextUnformatted("R: recargar             V: cuchillo          Tab: tabla");
             ImGui::TextUnformatted("Esc: menú               F1: editor           F3: rendimiento");
             ImGui::TextUnformatted("F12: captura            K: suicidio (prueba)");
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Multijugador")) {
+            ImGui::InputText("Nombre", &m_playerName);
+            ImGui::Separator();
+            ImGui::TextUnformatted("Estado:");
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "%s",
+                               m_net.role() == net::NetSession::Role::None ? "Partida local" : m_net.status().c_str());
+            if (m_net.isClient()) ImGui::Text("Ping: %.0f ms", m_net.pingMs());
+            ImGui::Separator();
+            ImGui::SeparatorText("Crear partida (servidor)");
+            ImGui::InputInt("Puerto", &m_hostPort);
+            ImGui::TextDisabled("Usa el mapa actual. Los jugadores ocupan el lugar de los bots.");
+            if (ImGui::Button("Crear partida", ImVec2(-1, 0))) {
+                startHosting(std::clamp(m_hostPort, 1024, 65535));
+                setMenuOpen(false);
+            }
+            ImGui::SeparatorText("Unirse a una partida");
+            ImGui::InputText("Dirección IP", &m_joinAddress);
+            ImGui::InputInt("Puerto##join", &m_joinPort);
+            if (ImGui::Button("Unirse", ImVec2(-1, 0))) {
+                joinServer(m_joinAddress, std::clamp(m_joinPort, 1, 65535));
+                setMenuOpen(false);
+            }
+            if (m_net.role() != net::NetSession::Role::None && ImGui::Button("Desconectar", ImVec2(-1, 0))) {
+                leaveNetwork();
+            }
+            ImGui::TextDisabled("Conexión directa por IP (abre el puerto UDP en tu router o usa una VPN LAN).");
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Partida")) {

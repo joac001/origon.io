@@ -72,6 +72,12 @@ FetchContent_Declare(cgltf
     GIT_TAG v1.15
     GIT_SHALLOW TRUE)
 
+# --- ENet (reliable UDP networking for the listen server) --------------------------------
+FetchContent_Declare(enet
+    GIT_REPOSITORY https://github.com/lsalzman/enet.git
+    GIT_TAG v1.3.18
+    GIT_SHALLOW TRUE)
+
 # --- miniaudio (audio playback, 3D spatialization) ---------------------------------
 FetchContent_Declare(miniaudio
     GIT_REPOSITORY https://github.com/mackron/miniaudio.git
@@ -80,6 +86,10 @@ FetchContent_Declare(miniaudio
 
 FetchContent_MakeAvailable(glfw glad glm nlohmann_json JoltPhysics imgui)
 # Header-only style sources: fetched without running their own CMake scripts.
+FetchContent_GetProperties(enet)
+if(NOT enet_POPULATED)
+    FetchContent_Populate(enet)
+endif()
 FetchContent_GetProperties(cgltf)
 if(NOT cgltf_POPULATED)
     FetchContent_Populate(cgltf)
@@ -130,3 +140,15 @@ target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 
 add_library(cgltf INTERFACE)
 target_include_directories(cgltf INTERFACE ${cgltf_SOURCE_DIR})
+
+add_library(enet STATIC
+    ${enet_SOURCE_DIR}/callbacks.c ${enet_SOURCE_DIR}/compress.c ${enet_SOURCE_DIR}/host.c
+    ${enet_SOURCE_DIR}/list.c ${enet_SOURCE_DIR}/packet.c ${enet_SOURCE_DIR}/peer.c
+    ${enet_SOURCE_DIR}/protocol.c ${enet_SOURCE_DIR}/unix.c ${enet_SOURCE_DIR}/win32.c)
+target_include_directories(enet PUBLIC ${enet_SOURCE_DIR}/include)
+if(WIN32)
+    target_link_libraries(enet PUBLIC ws2_32 winmm)
+else()
+    target_compile_definitions(enet PRIVATE HAS_FCNTL=1 HAS_POLL=1 HAS_GETADDRINFO=1 HAS_GETNAMEINFO=1
+        HAS_INET_PTON=1 HAS_INET_NTOP=1 HAS_MSGHDR_FLAGS=1 HAS_SOCKLEN_T=1)
+endif()

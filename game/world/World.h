@@ -23,6 +23,8 @@ public:
     void submitVegetation(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera,
                           const VegetationSettings& settings) const;
     const VegetationField& vegetation() const { return m_vegetation; }
+    // Bodies of dynamic map props, in block order (for network replication).
+    std::vector<BodyHandle> dynamicBodies() const;
 
     Environment environment() const;
     const MapData& map() const { return m_map; }

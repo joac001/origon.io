@@ -30,7 +30,21 @@ public:
     const std::vector<Player>& players() const { return m_players; }
     const GunGame& gunGame() const { return m_gunGame; }
     const WeaponDef& weaponFor(const Player& player) const { return m_gunGame.weaponFor(player); }
-    int localPlayerId() const { return 0; }
+    int localPlayerId() const { return m_localId; }
+    void setLocalPlayerId(int id) { m_localId = id; }
+
+    // --- Networking (listen server) ---
+    // Server: a joining human takes over a bot slot (or a new slot). Returns the player id, -1 if full.
+    int addRemotePlayer(const std::string& name);
+    // Server: the slot goes back to a bot.
+    void removeRemotePlayer(int id);
+    // Client: replica of the server state. Creates players (and their controllers) as needed.
+    void startClientMatch(const MapData& map, int localId);
+    void ensurePlayerCount(int count);
+    void setMatchState(float timeLeft, int phase, int winner) { m_gunGame.setReplicated(timeLeft, phase, winner); }
+    // Client prediction: moves only the given player with the same movement code as the server.
+    void predictMovement(int id, const PlayerCommand& command);
+    std::vector<Player>& mutablePlayers() { return m_players; }
 
     // Events since the last call. The caller takes ownership.
     std::vector<GameEvent> takeEvents();
@@ -60,6 +74,7 @@ private:
     std::vector<Player> m_players;
     std::vector<GameEvent> m_events;
     std::mt19937 m_rng{1337};
+    int m_localId = 0;
 };
 
 glm::vec3 viewDirection(float yaw, float pitch);

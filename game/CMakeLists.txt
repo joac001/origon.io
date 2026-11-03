@@ -12,6 +12,7 @@ file(GLOB ORIGON_GAME_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/editor/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/audio/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/fx/*.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/fx/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/net/*.cpp)
 add_executable(origon ${ORIGON_GAME_SOURCES})
-target_link_libraries(origon PRIVATE origon_sim imgui imguizmo origon_warnings)
+target_link_libraries(origon PRIVATE origon_sim imgui imguizmo enet origon_warnings)

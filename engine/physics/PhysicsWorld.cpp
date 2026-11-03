@@ -303,6 +303,15 @@ BodyTransform PhysicsWorld::transform(BodyHandle body) const {
     return result;
 }
 
+void PhysicsWorld::setTransform(BodyHandle body, const glm::vec3& position, const glm::quat& rotation) {
+    JPH::BodyInterface& bodies = m_impl->system->GetBodyInterface();
+    const JPH::BodyID id(body);
+    if (bodies.IsAdded(id)) {
+        bodies.SetPositionAndRotation(id, JPH::RVec3(toJolt(position)), toJolt(glm::normalize(rotation)), JPH::EActivation::DontActivate);
+        bodies.SetLinearAndAngularVelocity(id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+    }
+}
+
 void PhysicsWorld::applyImpulse(BodyHandle body, const glm::vec3& impulse, const glm::vec3& point) {
     JPH::BodyInterface& bodies = m_impl->system->GetBodyInterface();
     const JPH::BodyID id(body);

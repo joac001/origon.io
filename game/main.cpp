@@ -11,7 +11,7 @@ namespace {
 void printUsage() {
     std::puts("Usage: origon [--map NAME] [--editor] [--autoplay] [--hide-ui]\n"
               "              [--screenshot FILE.png] [--screenshot-frame N] [--shot-size WxH]\n"
-              "              [--camera X Y Z YAW PITCH]");
+              "              [--camera X Y Z YAW PITCH] [--host [PORT]] [--connect HOST[:PORT]] [--name NAME]");
 }
 
 } // namespace
@@ -40,6 +40,20 @@ int main(int argc, char** argv) {
             if (x != std::string::npos) {
                 options.shotSize = {std::atoi(size.substr(0, x).c_str()), std::atoi(size.substr(x + 1).c_str())};
             }
+        }
+        else if (arg == "--host") {
+            options.hostPort = origon::net::kDefaultPort;
+            if (i + 1 < argc && argv[i + 1][0] != '-') options.hostPort = std::atoi(argv[++i]);
+        } else if (arg == "--connect") {
+            std::string target = next();
+            const size_t colon = target.find(':');
+            if (colon != std::string::npos) {
+                options.connectPort = std::atoi(target.substr(colon + 1).c_str());
+                target = target.substr(0, colon);
+            }
+            options.connectAddress = target;
+        } else if (arg == "--name") {
+            options.playerName = next();
         }
         else if (arg == "--help" || arg == "-h") {
             printUsage();

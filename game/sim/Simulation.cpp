@@ -129,6 +129,73 @@ void Simulation::startMatch(const MapData& map, int botCount) {
     }
 }
 
+int Simulation::addRemotePlayer(const std::string& name) {
+    for (Player& p : m_players) {
+        if (p.isBot && p.id != m_localId) {
+            p.isBot = false;
+            p.name = name;
+            p.bot = BotState{};
+            return p.id;
+        }
+    }
+    if (static_cast<int>(m_players.size()) >= m_gunGame.rules().maxPlayers) {
+        return -1;
+    }
+    Player p;
+    p.id = static_cast<int>(m_players.size());
+    p.name = name;
+    p.color = kPlayerColors[static_cast<size_t>(p.id) % std::size(kPlayerColors)];
+    p.character = m_physics.createCharacter({}, glm::vec3(0.0f, -500.0f - 5.0f * static_cast<float>(p.id), 0.0f));
+    m_players.push_back(std::move(p));
+    spawn(m_players.back());
+    return m_players.back().id;
+}
+
+void Simulation::removeRemotePlayer(int id) {
+    if (id < 0 || id == m_localId || id >= static_cast<int>(m_players.size())) {
+        return;
+    }
+    Player& p = m_players[static_cast<size_t>(id)];
+    p.isBot = true;
+    p.name = std::string("Bot ") + kBotNames[static_cast<size_t>(id - 1) % std::size(kBotNames)];
+    p.bot = BotState{};
+}
+
+void Simulation::startClientMatch(const MapData& map, int localId) {
+    m_map = map;
+    m_players.clear();
+    m_events.clear();
+    m_gunGame.reset();
+    m_localId = localId;
+    ensurePlayerCount(localId + 1);
+}
+
+void Simulation::ensurePlayerCount(int count) {
+    while (static_cast<int>(m_players.size()) < count) {
+        Player p;
+        p.id = static_cast<int>(m_players.size());
+        p.name = "Jugador " + std::to_string(p.id + 1);
+        p.color = kPlayerColors[static_cast<size_t>(p.id) % std::size(kPlayerColors)];
+        p.character = m_physics.createCharacter({}, glm::vec3(0.0f, -500.0f - 5.0f * static_cast<float>(p.id), 0.0f));
+        m_players.push_back(std::move(p));
+    }
+}
+
+void Simulation::predictMovement(int id, const PlayerCommand& command) {
+    if (id < 0 || id >= static_cast<int>(m_players.size())) {
+        return;
+    }
+    Player& p = m_players[static_cast<size_t>(id)];
+    if (!p.alive) {
+        return;
+    }
+    p.previousPosition = p.position;
+    p.yaw = wrapAngle(command.yaw);
+    p.pitch = std::clamp(command.pitch, -kMaxPitch, kMaxPitch);
+    updateMovement(p, command);
+    p.previousButtons = command.buttons;
+}
+
 std::vector<GameEvent> Simulation::takeEvents() {
     std::vector<GameEvent> events;
     events.swap(m_events);

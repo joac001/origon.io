@@ -105,6 +105,8 @@ public:
     void update(float dt);
 
     BodyTransform transform(BodyHandle body) const;
+    // Moves a body without simulating (network replicas).
+    void setTransform(BodyHandle body, const glm::vec3& position, const glm::quat& rotation);
     void applyImpulse(BodyHandle body, const glm::vec3& impulse, const glm::vec3& point);
 
     std::unique_ptr<Character> createCharacter(const CharacterDesc& desc, const glm::vec3& feetPosition);

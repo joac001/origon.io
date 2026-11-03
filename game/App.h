@@ -5,6 +5,7 @@
 #include "core/Window.h"
 #include "editor/MapEditor.h"
 #include "fx/Effects.h"
+#include "net/NetSession.h"
 #include "physics/PhysicsWorld.h"
 #include "render/Renderer.h"
 #include "render/Texture.h"
@@ -37,6 +38,11 @@ struct LaunchOptions {
     float cameraYaw = 0.0f;
     float cameraPitch = 0.0f;
     glm::ivec2 shotSize{0};
+    // Networking.
+    int hostPort = 0;              // > 0: start a listen server on this port.
+    std::string connectAddress;    // Non-empty: join this server.
+    int connectPort = net::kDefaultPort;
+    std::string playerName = "Jugador";
 };
 
 class App {
@@ -69,6 +75,12 @@ private:
     void drawMenu();
     void drawStats(float frameDt);
     void takeScreenshot(const std::string& path);
+    net::Snapshot makeSnapshot() const;
+    void applySnapshot(const net::Snapshot& snapshot);
+    void updateNetworkClient();
+    void startHosting(int port);
+    void joinServer(const std::string& address, int port);
+    void leaveNetwork();
 
     LaunchOptions m_options;
     std::unique_ptr<Window> m_window;
@@ -111,6 +123,16 @@ private:
     float m_frameMs = 16.0f;
     long m_frameCount = 0;
     std::string m_pendingScreenshot;
+    net::NetSession m_net;
+    uint32_t m_netTick = 0;
+    bool m_clientReady = false;
+    float m_snapshotAge = 0.0f;
+    float m_rematchTimer = -1.0f;
+    std::vector<net::PropState> m_replicatedProps;
+    std::string m_joinAddress = "127.0.0.1";
+    int m_joinPort = net::kDefaultPort;
+    int m_hostPort = net::kDefaultPort;
+    std::string m_playerName = "Jugador";
     unsigned m_shotFbo = 0;
     unsigned m_shotColor = 0;
 };

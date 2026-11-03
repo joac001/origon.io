@@ -137,6 +137,14 @@ void World::submitVegetation(Renderer& renderer, const glm::mat4& viewProj, cons
     m_vegetation.submit(renderer, viewProj, camera, settings);
 }
 
+std::vector<BodyHandle> World::dynamicBodies() const {
+    std::vector<BodyHandle> bodies;
+    for (size_t i = 0; i < m_map.blocks.size() && i < m_blockBodies.size(); ++i) {
+        if (m_map.blocks[i].dynamic) bodies.push_back(m_blockBodies[i]);
+    }
+    return bodies;
+}
+
 Environment World::environment() const {
     const EnvironmentData& e = m_map.environment;
     Environment env;

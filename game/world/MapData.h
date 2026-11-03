@@ -65,6 +65,9 @@ struct MapData {
 
     static std::optional<MapData> load(const std::filesystem::path& path);
     bool save(const std::filesystem::path& path) const;
+    // In-memory JSON (used to send custom maps to clients).
+    static std::optional<MapData> fromJson(const std::string& text);
+    std::string toJson() const;
     static MapData makeDefault();
 };
 

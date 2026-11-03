@@ -99,11 +99,19 @@ std::optional<MapData> MapData::load(const std::filesystem::path& path) {
     if (!text) {
         return std::nullopt;
     }
+    auto map = fromJson(*text);
+    if (!map) {
+        log::error("Map {} could not be parsed", path.string());
+    }
+    return map;
+}
+
+std::optional<MapData> MapData::fromJson(const std::string& text) {
     try {
-        const json root = json::parse(*text);
+        const json root = json::parse(text);
         const int version = root.value("version", 0);
         if (version > kVersion) {
-            log::error("Map {} has version {}, this build supports {}", path.string(), version, kVersion);
+            log::error("Map has version {}, this build supports {}", version, kVersion);
             return std::nullopt;
         }
         MapData map;
@@ -190,12 +198,20 @@ std::optional<MapData> MapData::load(const std::filesystem::path& path) {
                   map.spawns.size(), map.lights.size());
         return map;
     } catch (const std::exception& e) {
-        log::error("Map {} parse error: {}", path.string(), e.what());
+        log::error("Map parse error: {}", e.what());
         return std::nullopt;
     }
 }
 
 bool MapData::save(const std::filesystem::path& path) const {
+    const bool ok = fs::writeText(path, toJson());
+    if (ok) {
+        log::info("Map saved: {}", path.string());
+    }
+    return ok;
+}
+
+std::string MapData::toJson() const {
     json root;
     root["version"] = kVersion;
     root["name"] = name;
@@ -262,11 +278,7 @@ bool MapData::save(const std::filesystem::path& path) const {
                               {"radius", l.radius}});
     }
     root["lights"] = lightArray;
-    const bool ok = fs::writeText(path, root.dump(1));
-    if (ok) {
-        log::info("Map saved: {}", path.string());
-    }
-    return ok;
+    return root.dump(1);
 }
 
 MapData MapData::makeDefault() {

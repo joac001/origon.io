@@ -26,6 +26,12 @@ public:
     int finalTier() const { return m_weapons.tierCount() - 1; }
     const GunGameRules& rules() const { return m_weapons.rules(); }
 
+    // Client replica: state comes from the server.
+    void setReplicated(float timeLeft, int phase, int winner) {
+        m_timeLeft = timeLeft;
+        m_phase = phase == 1 ? Phase::Finished : Phase::Playing;
+        m_winnerId = winner;
+    }
     Phase phase() const { return m_phase; }
     int winnerId() const { return m_winnerId; }
     float timeLeft() const { return m_timeLeft; }
