@@ -1,0 +1,115 @@
+#pragma once
+
+#include <glm/gtc/quaternion.hpp>
+#include <glm/vec3.hpp>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+
+namespace JPH {
+class CharacterVirtual;
+class Shape;
+} // namespace JPH
+
+namespace origon {
+
+using BodyHandle = uint32_t;
+constexpr BodyHandle kInvalidBody = 0xFFFFFFFFu;
+
+// Collision layers.
+//  Static:  map geometry.
+//  Dynamic: physics props that affect gameplay (characters collide with them, bullets push them).
+//  Debris:  cosmetic bodies (corpses, shells). Never collide with characters or bullets.
+enum class BodyLayer { Static, Dynamic, Debris };
+
+struct RayHit {
+    glm::vec3 position{0.0f};
+    glm::vec3 normal{0.0f, 1.0f, 0.0f};
+    float distance = 0.0f;
+    BodyHandle body = kInvalidBody;
+    bool dynamic = false;
+};
+
+struct BodyTransform {
+    glm::vec3 position{0.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+};
+
+struct CharacterDesc {
+    float radius = 0.4f;
+    float height = 1.8f;       // Standing height, feet to top.
+    float crouchHeight = 1.2f; // Crouched height.
+    float maxSlopeDegrees = 50.0f;
+    float stepHeight = 0.4f;
+};
+
+class PhysicsWorld;
+
+// Kinematic FPS character (Jolt CharacterVirtual). Position is at the feet.
+class Character {
+public:
+    ~Character();
+    Character(const Character&) = delete;
+    Character& operator=(const Character&) = delete;
+
+    void update(float dt, const glm::vec3& velocity, const glm::vec3& gravity);
+    void teleport(const glm::vec3& feetPosition);
+    // Returns false when there is no room to change stance (for example standing up under a ledge).
+    bool setCrouched(bool crouched);
+    bool crouched() const { return m_crouched; }
+
+    glm::vec3 position() const;
+    glm::vec3 velocity() const;
+    bool onGround() const;
+
+private:
+    friend class PhysicsWorld;
+    Character(PhysicsWorld& world, const CharacterDesc& desc, const glm::vec3& feetPosition);
+
+    PhysicsWorld& m_world;
+    CharacterDesc m_desc;
+    JPH::CharacterVirtual* m_character = nullptr;
+    const JPH::Shape* m_standingShape = nullptr;
+    const JPH::Shape* m_crouchingShape = nullptr;
+    bool m_crouched = false;
+};
+
+// Rigid body world. Static collision always comes from map data and never depends on graphics
+// settings (competitive parity).
+class PhysicsWorld {
+public:
+    PhysicsWorld();
+    ~PhysicsWorld();
+    PhysicsWorld(const PhysicsWorld&) = delete;
+    PhysicsWorld& operator=(const PhysicsWorld&) = delete;
+
+    // Removes every body (static, dynamic and debris).
+    void clearBodies();
+    BodyHandle addStaticBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation);
+    BodyHandle addDynamicBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation,
+                             float mass, BodyLayer layer = BodyLayer::Dynamic,
+                             const glm::vec3& linearVelocity = glm::vec3(0.0f),
+                             const glm::vec3& angularVelocity = glm::vec3(0.0f));
+    void removeBody(BodyHandle body);
+    void optimize();
+
+    // Advances dynamic bodies.
+    void update(float dt);
+
+    BodyTransform transform(BodyHandle body) const;
+    void applyImpulse(BodyHandle body, const glm::vec3& impulse, const glm::vec3& point);
+
+    std::unique_ptr<Character> createCharacter(const CharacterDesc& desc, const glm::vec3& feetPosition);
+
+    // Ray cast against static geometry, and dynamic props when includeDynamic is true.
+    std::optional<RayHit> rayCast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
+                                  bool includeDynamic = false) const;
+
+private:
+    friend class Character;
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
+};
+
+} // namespace origon

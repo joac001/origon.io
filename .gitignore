@@ -1,0 +1,6 @@
+build/
+.cache/
+settings.json
+imgui.ini
+compile_commands.json
+screenshots/

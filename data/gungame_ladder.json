@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "rules": {
+    "max_players": 10,
+    "time_limit_s": 600,
+    "respawn_delay_s": 3.0,
+    "spawn_protection_s": 1.5,
+    "melee_demotes_victim": true,
+    "melee_promotes_killer": false,
+    "suicide_demotes": true
+  },
+  "tiers": [
+    "mp40",
+    "thompson",
+    "ppsh41",
+    "stg44",
+    "bar",
+    "bren",
+    "sten",
+    "m3",
+    "pps42",
+    "trenchgun",
+    "m1carbine",
+    "garand",
+    "g43",
+    "svt40",
+    "enfield",
+    "mosin",
+    "kar98k_scoped",
+    "webley",
+    "m1911",
+    "knife"
+  ]
+}
