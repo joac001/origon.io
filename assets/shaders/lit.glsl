@@ -64,6 +64,10 @@ uniform int uCascadeCount;
 uniform mat4 uCascadeViewProj[MAX_CASCADES];
 uniform float uCascadeSplit[MAX_CASCADES];
 uniform float uCascadeTexel[MAX_CASCADES];
+uniform float uCascadeDepthRange[MAX_CASCADES];
+uniform sampler2DArray uShadowRaw;
+uniform int uSoftShadows;
+
 uniform int uPcfRadius;
 uniform float uShadowTexel;
 
@@ -107,6 +111,42 @@ vec3 brdf(vec3 n, vec3 v, vec3 l, vec3 albedo, float roughness, float metallic) 
     return (kd * albedo / PI + specular) * nDotL;
 }
 
+const vec2 POISSON[16] = vec2[](
+    vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725), vec2(-0.094184101, -0.92938870), vec2(0.34495938, 0.29387760),
+    vec2(-0.91588581, 0.45771432), vec2(-0.81544232, -0.87912464), vec2(-0.38277543, 0.27676845), vec2(0.97484398, 0.75648379),
+    vec2(0.44323325, -0.97511554), vec2(0.53742981, -0.47373420), vec2(-0.26496911, -0.41893023), vec2(0.79197514, 0.19090188),
+    vec2(-0.24188840, 0.99706507), vec2(-0.81409955, 0.91437590), vec2(0.19984126, 0.78641367), vec2(0.14383161, -0.14100790));
+
+// Contact-hardening soft shadow: blocker search, penumbra estimate, rotated Poisson PCF.
+float pcssShadow(int cascade, vec3 coord) {
+    float texel = uShadowTexel;
+    float angle = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) * 6.2831853;
+    mat2 rotation = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
+    float searchRadius = 6.0 * texel;
+    float blockerSum = 0.0;
+    float blockers = 0.0;
+    for (int i = 0; i < 16; ++i) {
+        float depth = texture(uShadowRaw, vec3(coord.xy + rotation * POISSON[i] * searchRadius, float(cascade))).r;
+        if (depth < coord.z - 0.0005) {
+            blockerSum += depth;
+            blockers += 1.0;
+        }
+    }
+    if (blockers < 0.5) {
+        return 1.0;
+    }
+    float blocker = blockerSum / blockers;
+    // Penumbra in world meters from the depth gap (orthographic, linear depth), then in texels.
+    float gapMeters = (coord.z - blocker) * uCascadeDepthRange[cascade];
+    float penumbraMeters = gapMeters * 0.035;
+    float radius = clamp(penumbraMeters / uCascadeTexel[cascade], 1.0, 14.0) * texel;
+    float lit = 0.0;
+    for (int i = 0; i < 16; ++i) {
+        lit += texture(uShadowMap, vec4(coord.xy + rotation * POISSON[i] * radius, float(cascade), coord.z));
+    }
+    return lit / 16.0;
+}
+
 float sampleCascade(int cascade, vec3 n, float nDotL) {
     // Normal offset scaled by the cascade texel size reduces acne without peter-panning.
     float texel = uCascadeTexel[cascade];
@@ -115,6 +155,9 @@ float sampleCascade(int cascade, vec3 n, float nDotL) {
     vec3 coord = lightClip.xyz / lightClip.w * 0.5 + 0.5;
     if (coord.z > 1.0) {
         return 1.0;
+    }
+    if (uSoftShadows == 1) {
+        return pcssShadow(cascade, coord);
     }
     float sum = 0.0;
     float count = 0.0;

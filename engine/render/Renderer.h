@@ -182,6 +182,8 @@ private:
     std::array<glm::mat4, kMaxCascades> m_cascadeViewProj{};
     std::array<float, kMaxCascades> m_cascadeSplits{};
     std::array<float, kMaxCascades> m_cascadeTexel{};
+    std::array<float, kMaxCascades> m_cascadeDepthRange{};
+    unsigned m_shadowRawSampler = 0; // Same shadow texture, no depth compare (PCSS blocker search).
 
     unsigned m_outputFbo = 0;
     unsigned m_emptyVao = 0;

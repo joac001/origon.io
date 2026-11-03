@@ -106,6 +106,12 @@ bool Renderer::init() {
     glVertexArrayAttribFormat(m_lineVao, 1, 4, GL_FLOAT, GL_FALSE, offsetof(LineVertex, color));
     glVertexArrayAttribBinding(m_lineVao, 1, 0);
 
+    glCreateSamplers(1, &m_shadowRawSampler);
+    glSamplerParameteri(m_shadowRawSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glSamplerParameteri(m_shadowRawSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glSamplerParameteri(m_shadowRawSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(m_shadowRawSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(m_shadowRawSampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
     m_whiteTexture = makeSolidTexture(1.0f);
     m_blackTexture = makeSolidTexture(0.0f);
     m_cube = Mesh::makeCube();
@@ -309,6 +315,7 @@ void Renderer::computeCascades(const CameraView& camera, const Environment& envi
         m_cascadeViewProj[index] = lightProj * lightView;
         m_cascadeSplits[index] = sliceFar;
         m_cascadeTexel[index] = texel;
+        m_cascadeDepthRange[index] = depthRange + radius + 20.0f;
         sliceNear = sliceFar;
     }
 }
@@ -400,8 +407,11 @@ void Renderer::setLitFrameUniforms(Shader& shader, const CameraView& camera, con
         shader.set(("uCascadeViewProj" + index).c_str(), m_cascadeViewProj[static_cast<size_t>(c)]);
         shader.set(("uCascadeSplit" + index).c_str(), m_cascadeSplits[static_cast<size_t>(c)]);
         shader.set(("uCascadeTexel" + index).c_str(), m_cascadeTexel[static_cast<size_t>(c)]);
+        shader.set(("uCascadeDepthRange" + index).c_str(), m_cascadeDepthRange[static_cast<size_t>(c)]);
     }
     shader.set("uShadowMap", 0);
+    shader.set("uShadowRaw", 8);
+    shader.set("uSoftShadows", m_settings.shadowQuality >= 3 ? 1 : 0);
     shader.set("uAo", 1);
     shader.set("uAlbedoMap", 2);
     shader.set("uNormalMap", 3);
@@ -693,6 +703,8 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     setLitFrameUniforms(m_litFoliage, camera, viewProj, environment, shadowsOn);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
+    glBindTextureUnit(8, shadowsOn ? m_shadowArray : 0);
+    glBindSampler(8, m_shadowRawSampler);
 
     drawLit(m_items, glm::mat4(1.0f), m_itemInstanceOffsets);
     renderWater(camera, viewProj, environment, sceneFbo);
