@@ -26,12 +26,13 @@ namespace origon {
 
 // Command line options (mostly for automated captures and testing).
 struct LaunchOptions {
-    std::string map = "graybox";
+    std::string map = "bosque";
     std::string screenshotPath; // When set, save a screenshot at screenshotFrame and exit.
     int screenshotFrame = 300;
     bool startInEditor = false;
     bool autoplay = false; // The local player is driven by the bot AI (spectator/demo).
     bool hideUi = false;
+    bool forceTitle = false; // Show the title screen even in capture mode.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
     glm::vec3 cameraPosition{0.0f};
@@ -73,6 +74,7 @@ private:
     void submitPlayers(float alpha, bool includeLocal);
     void submitViewModel(float frameDt);
     void drawMenu();
+    void drawTitleScreen();
     void drawStats(float frameDt);
     void takeScreenshot(const std::string& path);
     net::Snapshot makeSnapshot() const;
@@ -101,7 +103,9 @@ private:
 
     Mode m_mode = Mode::Playing;
     bool m_menuOpen = false;
-    std::string m_mapFile = "graybox";
+    bool m_titleScreen = false;
+    int m_menuTab = -1; // Tab to open when the pause menu appears (-1: keep).
+    std::string m_mapFile = "bosque";
     std::vector<std::string> m_mapFiles;
 
     float m_viewYaw = 0.0f;

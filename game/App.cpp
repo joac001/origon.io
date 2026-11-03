@@ -71,6 +71,12 @@ App::App(const LaunchOptions& options) : m_options(options) {
     m_mapFiles = listMaps();
     loadMap(options.map);
     m_window->setCursorCaptured(!options.autoplay);
+    // The title screen appears on a normal launch (not for captures, hosting or joining).
+    m_titleScreen = (options.screenshotPath.empty() || options.forceTitle) && !options.autoplay && options.hostPort == 0 && options.connectAddress.empty() &&
+                    !options.startInEditor;
+    if (m_titleScreen) {
+        m_window->setCursorCaptured(false);
+    }
     m_playerName = options.playerName;
     if (options.hostPort > 0) {
         startHosting(options.hostPort);
@@ -168,6 +174,8 @@ void App::restartMatch() {
 // --- Networking ------------------------------------------------------------------------------
 
 void App::startHosting(int port) {
+    m_titleScreen = false;
+    m_sim->players()[0].isBot = false;
     leaveNetwork();
     if (m_net.host(static_cast<uint16_t>(port))) {
         m_hostPort = port;
@@ -176,6 +184,7 @@ void App::startHosting(int port) {
 }
 
 void App::joinServer(const std::string& address, int port) {
+    m_titleScreen = false;
     leaveNetwork();
     m_clientReady = false;
     m_net.connect(address, static_cast<uint16_t>(port), m_playerName);
@@ -359,7 +368,7 @@ void App::setMenuOpen(bool open) {
     }
     m_menuOpen = open;
     if (m_mode == Mode::Playing) {
-        m_window->setCursorCaptured(!open && !m_options.autoplay);
+        m_window->setCursorCaptured(!open && !m_options.autoplay && !m_titleScreen);
     }
     if (open) {
         m_mapFiles = listMaps();
@@ -411,7 +420,15 @@ int App::run() {
         }
 
         const glm::ivec2 framebuffer = m_shotFbo ? m_options.shotSize : m_window->framebufferSize();
-        if (m_mode == Mode::Playing) {
+        if (m_mode == Mode::Playing && m_titleScreen) {
+            // Bots keep playing behind the title screen.
+            const bool wasAutoplay = m_options.autoplay;
+            m_options.autoplay = true;
+            m_sim->players()[0].isBot = true;
+            updatePlaying(dt);
+            m_options.autoplay = wasAutoplay;
+            m_effects.update(dt, m_physics);
+        } else if (m_mode == Mode::Playing) {
             if (m_input.keyPressed(GLFW_KEY_ESCAPE)) setMenuOpen(!m_menuOpen);
             updatePlaying(dt);
             m_effects.update(dt, m_physics);
@@ -442,6 +459,16 @@ int App::run() {
             updateCameraFeel(dt);
             camera = playingCamera(alpha);
             m_lastCamera = camera;
+            if (m_titleScreen) {
+                // Slow orbit above the map center.
+                const float angle = m_time * 0.05f;
+                const float x = std::sin(angle) * 38.0f;
+                const float z = std::cos(angle) * 38.0f;
+                const glm::vec3 position(x, 9.0f + m_world.terrainHeight(x, z), z);
+                camera.position = position;
+                camera.view = glm::lookAt(position, glm::vec3(0.0f, m_world.terrainHeight(0.0f, 0.0f) + 2.0f, 0.0f), glm::vec3(0, 1, 0));
+                camera.fovYDegrees = 70.0f;
+            }
             if (m_options.fixedCamera) {
                 camera.position = m_options.cameraPosition;
                 camera.view = glm::lookAt(camera.position,
@@ -452,7 +479,7 @@ int App::run() {
             m_world.submit(m_renderer, m_physics);
             submitPlayers(m_net.isClient() ? std::clamp(m_snapshotAge / (2.0f * kTickDt), 0.0f, 1.0f) : alpha, m_options.fixedCamera);
             m_effects.submit(m_renderer, m_physics);
-            submitViewModel(dt);
+            if (!m_titleScreen) submitViewModel(dt);
             if (m_audioReady) {
                 const glm::mat4 invView = glm::inverse(camera.view);
                 m_audio.update(dt, *m_sim, camera.position, -glm::vec3(invView[2]));
@@ -472,7 +499,10 @@ int App::run() {
 
         // --- UI -----------------------------------------------------------------------
         if (!m_options.hideUi) {
-            if (m_mode == Mode::Playing) {
+            if (m_mode == Mode::Playing && m_titleScreen) {
+                drawTitleScreen();
+                if (m_menuOpen) drawMenu();
+            } else if (m_mode == Mode::Playing) {
                 const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
                 const bool scoped = m_sim->weaponFor(me).scoped && m_adsBlend > 0.9f;
                 m_hud.draw(*m_sim, dt, m_input.keyDown(GLFW_KEY_TAB) && !m_menuOpen, scoped);
@@ -775,7 +805,7 @@ void App::submitViewModel(float) {
     const glm::vec3 metal(0.05f, 0.05f, 0.055f);
     const glm::vec3 wood(0.2f, 0.08f, 0.03f);
     const glm::vec3 skin(0.55f, 0.32f, 0.2f);
-    const glm::vec3 sleeve = glm::mix(glm::vec3(0.06f, 0.07f, 0.04f), World::toLinear(me.color), 0.25f);
+    const glm::vec3 sleeve(0.05f, 0.06f, 0.03f); // Olive drab jacket.
     if (weaponModel) {
         for (const ModelPart& modelPart : weaponModel->lod(0)) {
             DrawItem item;
@@ -849,8 +879,11 @@ void App::drawMenu() {
     if (ImGui::Button("Salir", ImVec2(-1, 0))) m_window->requestClose();
     ImGui::Separator();
 
+    if (m_titleScreen && ImGui::Button("Volver al título", ImVec2(-1, 0))) setMenuOpen(false);
     if (ImGui::BeginTabBar("menu_tabs")) {
-        if (ImGui::BeginTabItem("Gráficos")) {
+        const int forcedTab = m_menuTab;
+        m_menuTab = -1;
+        if (ImGui::BeginTabItem("Gráficos", nullptr, forcedTab == 0 ? ImGuiTabItemFlags_SetSelected : 0)) {
             RenderSettings& r = m_settings.render;
             ImGui::TextDisabled("Preajustes:");
             ImGui::SameLine();
@@ -915,7 +948,7 @@ void App::drawMenu() {
             ImGui::TextUnformatted("F12: captura            K: suicidio (prueba)");
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Multijugador")) {
+        if (ImGui::BeginTabItem("Multijugador", nullptr, forcedTab == 1 ? ImGuiTabItemFlags_SetSelected : 0)) {
             ImGui::InputText("Nombre", &m_playerName);
             ImGui::Separator();
             ImGui::TextUnformatted("Estado:");
@@ -972,6 +1005,54 @@ void App::drawMenu() {
         ImGui::EndTabBar();
     }
     ImGui::End();
+}
+
+void App::drawTitleScreen() {
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(screen.x * 0.45f, screen.y), IM_COL32(0, 0, 0, 200), IM_COL32(0, 0, 0, 0),
+                                IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 200));
+    dl->AddText(m_fontBold, 96.0f, ImVec2(80.0f, screen.y * 0.18f), IM_COL32(235, 225, 200, 255), "ORIGON");
+    dl->AddText(m_fontRegular, 22.0f, ImVec2(86.0f, screen.y * 0.18f + 104.0f), IM_COL32(190, 200, 170, 230),
+                "Gun Game  ·  Bosque  ·  Hasta 10 jugadores");
+    if (m_menuOpen) return;
+    ImGui::SetNextWindowPos(ImVec2(80.0f, screen.y * 0.42f));
+    ImGui::SetNextWindowSize(ImVec2(320.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+    ImGui::Begin("##title", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushFont(m_fontBold, 22.0f);
+    const ImVec2 size(-1, 46);
+    if (ImGui::Button("Jugar contra bots", size)) {
+        m_titleScreen = false;
+        m_sim->players()[0].isBot = false;
+        restartMatch();
+        m_window->setCursorCaptured(true);
+    }
+    if (ImGui::Button("Multijugador", size)) {
+        m_menuTab = 1;
+        setMenuOpen(true);
+    }
+    if (ImGui::Button("Editor de mapas", size)) {
+        m_titleScreen = false;
+        m_sim->players()[0].isBot = false;
+        enterEditor();
+    }
+    if (ImGui::Button("Configuración", size)) {
+        m_menuTab = 0;
+        setMenuOpen(true);
+    }
+    if (ImGui::Button("Salir", size)) m_window->requestClose();
+    ImGui::PopFont();
+    ImGui::Spacing();
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::BeginCombo("##map", ("Mapa: " + m_mapFile).c_str())) {
+        for (const std::string& file : m_mapFiles) {
+            if (ImGui::Selectable(file.c_str(), file == m_mapFile)) loadMap(file);
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
 }
 
 void App::drawStats(float) {

@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
         else if (arg == "--editor") options.startInEditor = true;
         else if (arg == "--autoplay") options.autoplay = true;
         else if (arg == "--hide-ui") options.hideUi = true;
+        else if (arg == "--title") options.forceTitle = true;
         else if (arg == "--screenshot") options.screenshotPath = next();
         else if (arg == "--screenshot-frame") options.screenshotFrame = std::atoi(next().c_str());
         else if (arg == "--camera") {
