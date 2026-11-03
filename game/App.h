@@ -127,6 +127,9 @@ private:
     uint32_t m_netTick = 0;
     bool m_clientReady = false;
     float m_snapshotAge = 0.0f;
+    float m_predictedFireCooldown = 0.0f;
+    uint32_t m_previousClientButtons = 0;
+    void predictLocalFire(const PlayerCommand& command);
     float m_rematchTimer = -1.0f;
     std::vector<net::PropState> m_replicatedProps;
     std::string m_joinAddress = "127.0.0.1";

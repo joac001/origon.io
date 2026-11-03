@@ -278,6 +278,27 @@ void App::applySnapshot(const net::Snapshot& snapshot) {
     m_snapshotAge = 0.0f;
 }
 
+void App::predictLocalFire(const PlayerCommand& command) {
+    Player& me = m_sim->mutablePlayers()[static_cast<size_t>(m_sim->localPlayerId())];
+    const WeaponDef& weapon = m_sim->weaponFor(me);
+    m_predictedFireCooldown = std::max(0.0f, m_predictedFireCooldown - kTickDt);
+    const uint32_t pressed = command.buttons & ~m_previousClientButtons;
+    m_previousClientButtons = command.buttons;
+    if (!me.alive || weapon.isMelee() || me.reloadTimer > 0.0f || me.ammo <= 0 || m_predictedFireCooldown > 0.0f) {
+        return;
+    }
+    const bool wantsFire = weapon.automatic ? (command.buttons & kButtonFire) != 0 : (pressed & kButtonFire) != 0;
+    if (!wantsFire) {
+        return;
+    }
+    m_predictedFireCooldown = weapon.fireInterval();
+    me.viewKick += glm::radians(weapon.recoilDegrees) * (me.aiming ? 0.6f : 1.0f);
+    // Local feedback now; the server's copy of this event is skipped when it arrives.
+    const std::vector<GameEvent> fired = {GameEvent{.type = GameEvent::Type::Fired, .a = me.id, .start = me.eyePosition(), .category = weapon.category}};
+    m_effects.onEvents(fired, *m_sim, m_physics, localMuzzle());
+    if (m_audioReady) m_audio.onEvents(fired, *m_sim);
+}
+
 void App::updateNetworkClient() {
     net::NetSession::ClientUpdate update = m_net.clientPoll();
     if (update.welcomed) {
@@ -306,7 +327,12 @@ void App::updateNetworkClient() {
         }
     }
     if (update.snapshot) applySnapshot(*update.snapshot);
-    if (!update.events.empty()) processEvents(update.events);
+    if (!update.events.empty()) {
+        // Our own shots were already played locally by predictLocalFire.
+        const int local = m_sim->localPlayerId();
+        std::erase_if(update.events, [local](const GameEvent& e) { return e.type == GameEvent::Type::Fired && e.a == local; });
+        processEvents(update.events);
+    }
     if (update.disconnected) leaveNetwork();
 }
 
@@ -538,6 +564,7 @@ void App::updatePlaying(float frameDt) {
                 m_physics.setTransform(bodies[i], m_replicatedProps[i].position, m_replicatedProps[i].rotation);
             }
             m_sim->predictMovement(m_sim->localPlayerId(), command);
+            predictLocalFire(command);
         } else {
             m_sim->computeBotCommands(commands);
             if (!m_options.autoplay) {
