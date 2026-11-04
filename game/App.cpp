@@ -1339,7 +1339,13 @@ void App::submitLookGallery(const glm::vec3& eye, float yaw, int seed) {
         feet.y = m_world.terrainHeight(feet.x, feet.z);
         const float turn = glm::pi<float>() + (static_cast<float>(i) - 2.0f) * 0.25f;
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), yaw + turn, glm::vec3(0, 1, 0));
-        drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
+        const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
+        // Rifle in the right hand, as in third person.
+        const int hand = sk.findJoint("hand.R");
+        if (const Model* gun = m_models.getWeapon("garand"); gun && hand >= 0) {
+            submitModel(*gun, model * glm::translate(glm::mat4(1.0f), glm::vec3(globals[static_cast<size_t>(hand)][3])) *
+                                  glm::translate(glm::mat4(1.0f), glm::vec3(-0.02f, -0.02f, 0.03f)));
+        }
     }
 }
 
