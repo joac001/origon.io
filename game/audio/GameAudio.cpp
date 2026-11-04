@@ -1,6 +1,7 @@
 #include "audio/GameAudio.h"
 
 #include "audio/Synth.h"
+#include "core/FileSystem.h"
 #include "core/Log.h"
 #include "sim/Simulation.h"
 
@@ -10,6 +11,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <format>
+#include <filesystem>
 #include <string>
 
 namespace origon {
@@ -21,9 +24,10 @@ bool GameAudio::init() {
     const auto start = std::chrono::steady_clock::now();
     build();
     const float ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
-    log::info("Audio: sound bank synthesized in {:.0f} ms", ms);
-    m_windLoop = m_audio.startLoop(m_wind, 0.35f);
+    log::info("Audio: sound bank ready in {:.0f} ms ({} recorded ambience)", ms, m_recordedAmbience ? "with" : "without");
+    m_windLoop = m_audio.startLoop(m_wind, m_recordedAmbience ? 0.22f : 0.35f);
     m_streamLoop = m_audio.startLoop(m_stream, 0.0f);
+    if (m_forest != kInvalidSound) m_forestLoop = m_audio.startLoop(m_forest, 0.4f);
     return true;
 }
 
@@ -100,6 +104,55 @@ void GameAudio::build() {
     m_wind = add("wind", windLoop(12.0f, 95));
     m_stream = add("stream", streamLoop(9.0f, 96));
     for (uint32_t i = 0; i < 5; ++i) m_birds.push_back(add("bird_" + std::to_string(i), birdCall(100 + i)));
+
+    // Recorded CC0 sounds replace the synthesized ones where they exist (same WeaponCategory order).
+    const char* shotNames[] = {"pistol", "smg", "rifle", "lmg", "semi", "bolt", "sniper", "shotgun"};
+    const SoundId synthShots[] = {m_shotPistol, m_shotSmg, m_shotRifle, m_shotLmg, m_shotSemi, m_shotBolt, m_shotSniper, m_shotShotgun};
+    for (size_t i = 0; i < std::size(shotNames); ++i) {
+        std::vector<SoundId> set = loadRecorded(std::string("shot_") + shotNames[i], 1.0f);
+        if (set.empty()) set.push_back(synthShots[i]);
+        m_shotSets.push_back(std::move(set));
+    }
+    m_shotSets.push_back({m_swish}); // Melee.
+    auto orSynth = [](std::vector<SoundId> set, SoundId fallback) {
+        if (set.empty()) set.push_back(fallback);
+        return set;
+    };
+    m_farSet = loadRecorded("shot_far", 1.0f);
+    m_boltSet = orSynth(loadRecorded("bolt", 1.0f), m_bolt);
+    m_reloadSet = loadRecorded("reload", 1.0f);
+    m_reloadPistolSet = loadRecorded("reload_pistol", 1.0f);
+    m_recordedReloads = !m_reloadSet.empty();
+    m_casings = loadRecorded("casing", 1.0f);
+    if (auto steps = loadRecorded("step_dirt", 1.0f); !steps.empty()) m_steps = std::move(steps);
+    m_stepsWood = orSynth(loadRecorded("step_wood", 1.0f), m_steps.front());
+    m_knives = orSynth(loadRecorded("knife", 1.0f), m_swish);
+    m_bodyHits = orSynth(loadRecorded("body_hit", 1.0f), m_bodyHit);
+    m_lands = orSynth(loadRecorded("land", 1.0f), m_land);
+    if (auto forest = loadRecorded("ambience_forest", 1.0f); !forest.empty()) {
+        m_forest = forest.front();
+        m_recordedAmbience = true;
+    }
+    if (auto wind = loadRecorded("ambience_wind", 1.0f); !wind.empty()) m_wind = wind.front();
+    if (auto stream = loadRecorded("ambience_stream", 1.0f); !stream.empty()) m_stream = stream.front();
+}
+
+std::vector<SoundId> GameAudio::loadRecorded(const std::string& name, float gain) {
+    std::vector<SoundId> out;
+    for (int i = 1; i < 100; ++i) {
+        const std::string file = std::format("assets/sounds/{}_{:02d}.flac", name, i);
+        const std::filesystem::path path = fs::resolve(file);
+        if (!std::filesystem::exists(path)) break;
+        const SoundId id = m_audio.addFile(std::format("{}_{:02d}", name, i), path.string(), gain);
+        if (id != kInvalidSound) out.push_back(id);
+    }
+    return out;
+}
+
+SoundId GameAudio::pick(const std::vector<SoundId>& set) {
+    if (set.empty()) return kInvalidSound;
+    std::uniform_int_distribution<size_t> dist(0, set.size() - 1);
+    return set[dist(m_rng)];
 }
 
 float GameAudio::jitter(float amount) {
@@ -111,7 +164,8 @@ void GameAudio::setVolume(float master) { m_audio.setMasterVolume(master); }
 
 void GameAudio::setAmbienceEnabled(bool enabled) {
     m_ambience = enabled;
-    m_audio.setLoopVolume(m_windLoop, enabled ? 0.35f : 0.0f);
+    m_audio.setLoopVolume(m_windLoop, enabled ? (m_recordedAmbience ? 0.22f : 0.35f) : 0.0f);
+    m_audio.setLoopVolume(m_forestLoop, enabled ? 0.4f : 0.0f);
 }
 
 void GameAudio::setWaterProximity(float proximity) {
@@ -167,20 +221,32 @@ void GameAudio::onEvents(const std::vector<GameEvent>& events, const Simulation&
         const bool isLocal = e.a == local;
         switch (e.type) {
         case GameEvent::Type::Fired: {
-            SoundId id = shotSound(e.category);
+            const auto category = static_cast<size_t>(e.category);
+            SoundId id = category < m_shotSets.size() ? pick(m_shotSets[category]) : shotSound(e.category);
             float volume = isLocal ? 0.55f : 1.0f;
-            // Far shots: muffled with a rolling echo instead of the close crack.
+            // Far shots: a distant recording (or the muffled synthesized variant) instead of the close crack.
             const float distance = glm::distance(e.start, m_listener);
-            const int category = static_cast<int>(e.category);
-            if (!isLocal && distance > 35.0f && category < static_cast<int>(m_farShots.size())) {
-                id = m_farShots[static_cast<size_t>(category)];
-                volume = 1.4f;
+            if (!isLocal && distance > 35.0f) {
+                if (!m_farSet.empty()) {
+                    id = pick(m_farSet);
+                    volume = 1.0f;
+                } else if (category < m_farShots.size()) {
+                    id = m_farShots[category];
+                    volume = 1.4f;
+                }
             }
             playAt(id, e.start, volume, 0.04f, isLocal);
-            if (e.category == WeaponCategory::BoltRifle || e.category == WeaponCategory::Sniper ||
-                e.category == WeaponCategory::Shotgun) {
+            const bool manual = e.category == WeaponCategory::BoltRifle || e.category == WeaponCategory::Sniper ||
+                                e.category == WeaponCategory::Shotgun;
+            if (manual) {
                 PlayParams cycle{.volume = isLocal ? 0.45f : 0.6f, .pitch = jitter(0.03f), .spatial = !isLocal, .position = e.start};
-                schedule(0.35f, m_bolt, cycle);
+                schedule(0.35f, pick(m_boltSet), cycle);
+            } else if (!m_casings.empty() && e.category != WeaponCategory::Melee && distance < 25.0f &&
+                       unit(m_rng) < (isLocal ? 0.7f : 0.4f)) {
+                // Brass hitting the ground next to the shooter.
+                PlayParams casing{.volume = isLocal ? 0.35f : 0.5f, .pitch = jitter(0.08f), .spatial = !isLocal,
+                                  .position = e.start - glm::vec3(0.0f, 1.4f, 0.0f), .minDistance = 1.0f, .maxDistance = 20.0f};
+                schedule(0.45f + unit(m_rng) * 0.2f, pick(m_casings), casing);
             }
             break;
         }
@@ -202,7 +268,7 @@ void GameAudio::onEvents(const std::vector<GameEvent>& events, const Simulation&
                 std::uniform_int_distribution<size_t> pick2(0, m_hurts.size() - 1);
                 play(m_hurts[pick2(m_rng)], {.volume = 0.5f, .pitch = jitter(0.06f)});
             } else {
-                playAt(m_bodyHit, positionOf(e.b) + glm::vec3(0, 1.2f, 0), 0.7f, 0.1f, false);
+                playAt(pick(m_bodyHits), positionOf(e.b) + glm::vec3(0, 1.2f, 0), 0.7f, 0.1f, false);
             }
             break;
         case GameEvent::Type::Kill:
@@ -214,20 +280,29 @@ void GameAudio::onEvents(const std::vector<GameEvent>& events, const Simulation&
             const bool bolt = e.category == WeaponCategory::BoltRifle || e.category == WeaponCategory::Sniper;
             PlayParams params{.volume = isLocal ? 0.5f : 0.6f, .pitch = jitter(0.03f), .spatial = !isLocal, .position = e.start,
                               .minDistance = 1.5f, .maxDistance = 30.0f};
-            play(bolt ? m_bolt : m_reloadOut, params);
+            if (bolt) {
+                play(pick(m_boltSet), params);
+            } else if (m_recordedReloads) {
+                // One recorded magazine change (pistols have their own).
+                const bool pistol = e.category == WeaponCategory::Pistol && !m_reloadPistolSet.empty();
+                play(pick(pistol ? m_reloadPistolSet : m_reloadSet), params);
+                break;
+            } else {
+                play(m_reloadOut, params);
+            }
             const WeaponDef& weapon = sim.weaponFor(players[static_cast<size_t>(e.a)]);
-            schedule(weapon.reloadSeconds * 0.7f, m_reloadIn, params);
+            schedule(weapon.reloadSeconds * 0.7f, bolt ? pick(m_boltSet) : m_reloadIn, params);
             break;
         }
         case GameEvent::Type::MeleeSwing:
-            playAt(m_swish, e.start, isLocal ? 0.5f : 0.7f, 0.08f, isLocal);
+            playAt(pick(m_knives), e.start, isLocal ? 0.5f : 0.7f, 0.08f, isLocal);
             break;
         case GameEvent::Type::Jumped:
             playAt(m_jump, e.start, isLocal ? 0.25f : 0.35f, 0.1f, isLocal);
             break;
         case GameEvent::Type::Landed: {
             const float volume = std::clamp(e.magnitude / 12.0f, 0.15f, 1.0f);
-            playAt(m_land, e.start, isLocal ? volume * 0.6f : volume, 0.1f, isLocal);
+            playAt(pick(m_lands), e.start, isLocal ? volume * 0.6f : volume, 0.1f, isLocal);
             break;
         }
         case GameEvent::Type::Promoted:
@@ -265,7 +340,6 @@ void GameAudio::update(float dt, const Simulation& sim, const glm::vec3& listene
     // Footsteps from horizontal movement.
     const auto& players = sim.players();
     m_stepDistance.resize(players.size(), 0.0f);
-    std::uniform_int_distribution<size_t> pick(0, m_steps.size() - 1);
     for (const Player& p : players) {
         float& distance = m_stepDistance[static_cast<size_t>(p.id)];
         const float speed = glm::length(glm::vec2(p.velocity.x, p.velocity.z));
@@ -279,12 +353,15 @@ void GameAudio::update(float dt, const Simulation& sim, const glm::vec3& listene
             distance = 0.0f;
             const bool local = p.id == sim.localPlayerId();
             float volume = std::clamp(speed / 6.0f, 0.25f, 1.0f) * (p.crouched ? 0.35f : 1.0f);
-            playAt(m_steps[pick(m_rng)], p.position, local ? volume * 0.35f : volume * 0.8f, 0.08f, local);
+            const bool wood = m_onWood && m_onWood(p.position);
+            const std::vector<SoundId>& set = wood ? m_stepsWood : m_steps;
+            playAt(set[std::uniform_int_distribution<size_t>(0, set.size() - 1)(m_rng)], p.position,
+                   local ? volume * 0.35f : volume * 0.8f, 0.08f, local);
         }
     }
 
     // Ambient birds around the listener.
-    if (m_ambience) {
+    if (m_ambience && !m_recordedAmbience) {
         m_birdTimer -= dt;
         if (m_birdTimer <= 0.0f) {
             std::uniform_real_distribution<float> unit(0.0f, 1.0f);

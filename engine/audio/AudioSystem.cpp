@@ -118,6 +118,28 @@ void AudioSystem::dumpWav(const std::string& folder) const {
     log::info("Audio: {} sounds written to {}", m_impl->sounds.size(), folder);
 }
 
+SoundId AudioSystem::addFile(const std::string& name, const std::string& path, float gain) {
+    const ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 1, kSampleRate);
+    ma_decoder decoder;
+    if (ma_decoder_init_file(path.c_str(), &config, &decoder) != MA_SUCCESS) {
+        log::warn("Audio: cannot decode {}", path);
+        return kInvalidSound;
+    }
+    std::vector<float> samples;
+    float chunk[4096];
+    for (;;) {
+        ma_uint64 read = 0;
+        if (ma_decoder_read_pcm_frames(&decoder, chunk, std::size(chunk), &read) != MA_SUCCESS || read == 0) break;
+        samples.insert(samples.end(), chunk, chunk + read);
+    }
+    ma_decoder_uninit(&decoder);
+    if (samples.empty()) return kInvalidSound;
+    if (gain != 1.0f) {
+        for (float& s : samples) s *= gain;
+    }
+    return add(name, std::move(samples));
+}
+
 SoundId AudioSystem::find(const std::string& name) const {
     for (size_t i = 0; i < m_impl->sounds.size(); ++i) {
         if (m_impl->sounds[i].name == name) {

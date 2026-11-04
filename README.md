@@ -19,8 +19,10 @@ up to 10 players. Target look: dense photoreal forest (see `docs/art-direction.m
   spawn protection, bots, hitscan with spread/falloff/headshots, recoil, ADS and scopes.
 - **Networking (ENet):** listen server, direct IP; custom maps are sent to joining players;
   client-side prediction; 30 Hz snapshots; automatic rematch.
-- **Audio (miniaudio):** 3D positional sound, all effects synthesized procedurally at startup
-  (gunshots per weapon class, footsteps, impacts, reloads, UI cues, wind and birds).
+- **Audio (miniaudio):** 3D positional sound. Recorded CC0 sounds from Freesound (gunshots per
+  weapon class with variants, distant shots, bolt cycles, reloads, brass casings, footsteps on dirt
+  and wood, knife, hits, forest/wind/creek ambience loops), built by `tools/sounds/build_sounds.py`;
+  procedurally synthesized fallbacks for anything missing, plus UI cues.
 - **Map builder (F1):** gizmos, fly/orbit/pan/zoom camera, prefabs, materials, terrain sculpting
   and path painting, water level, vegetation layers, undo/redo, copy/paste, validation.
 - **Graphics presets:** Batata / Media / Alta / Ultra. Settings never change collision or the

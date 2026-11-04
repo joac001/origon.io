@@ -67,6 +67,10 @@ App::App(const LaunchOptions& options) : m_options(options) {
         throw std::runtime_error("Weapon data could not be loaded");
     }
     m_audioReady = m_audio.init();
+    // Footsteps on structures (bridges, floors, docks) sound like wood, on the ground like dirt.
+    m_audio.setSurfaceQuery([this](const glm::vec3& feet) {
+        return m_world.map().terrain.valid() ? feet.y > m_world.terrainHeight(feet.x, feet.z) + 0.25f : true;
+    });
     if (m_audioReady && !options.dumpSounds.empty()) {
         m_audio.dumpWav(options.dumpSounds);
     }
