@@ -1,14 +1,13 @@
-"""Rigged WWII soldier for Origon, generated headless in Blender.
+"""Soldier skeleton and animations for Origon (used by gen_human.py), generated headless in Blender.
 
-Run:
+Run (builds both soldiers through gen_human.py):
     blender --background --factory-startup --python tools/blender/gen_character.py
 
-Writes assets/models/characters/soldier.glb: an armature, the skinned body, clothing and accessory
-pieces from character_parts.py (male and female variants), and NLA tracks exported as animations: idle, run, crouch, reload, knife,
+BONES is the 17-bone skeleton in the rifle-holding rest pose. add_animations() writes NLA tracks
+exported as animations: idle, run, crouch, reload, knife,
 death (falls backward) and death_forward. Reload and knife only key the upper body; the engine
 blends them over the locomotion pose.
-The character faces Blender +Y (engine -Z), feet at the origin, holding a rifle pose.
-The engine picks the visible pieces and recolors materials from each player's look.
+The character faces Blender +Y (engine -Z), feet at the origin.
 """
 import math
 import pathlib
@@ -19,7 +18,6 @@ import bpy
 from mathutils import Vector
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import character_parts  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "assets" / "models" / "characters"
@@ -46,13 +44,14 @@ BONES = {
     "foot.L": ((-0.11, 0, 0.09), (-0.11, 0.17, 0.03), "shin.L"),
 }
 
-def make_armature():
+def make_armature(bones=None):
+    bones = bones or BONES
     data = bpy.data.armatures.new("soldier_rig")
     rig = bpy.data.objects.new("soldier_rig", data)
     bpy.context.scene.collection.objects.link(rig)
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode="EDIT")
-    for name, (head, tail, parent) in BONES.items():
+    for name, (head, tail, parent) in bones.items():
         bone = data.edit_bones.new(name)
         bone.head = Vector(head)
         bone.tail = Vector(tail)
@@ -96,13 +95,7 @@ def make_action(rig, name, frames, bones=None):
     rig.animation_data.action = None
 
 
-def main():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.context.scene.render.fps = FPS
-    rig = make_armature()
-    rig_bones = {name: (head, tail) for name, (head, tail, _) in BONES.items()}
-    objects = [piece.build(rig) for piece in character_parts.build_pieces(rig_bones)]
-
+def add_animations(rig):
     # Idle: breathing.
     make_action(rig, "idle", [
         (1, {"chest": (2, 0, 0)}, 0.0),
@@ -175,19 +168,30 @@ def main():
         (31, settle_forward, -0.76, -0.25),
     ])
 
+
+
+def export(rig, objects, filename):
     OUTPUT.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     rig.select_set(True)
     for obj in objects:
         obj.select_set(True)
     bpy.context.view_layer.objects.active = rig
-    bpy.ops.export_scene.gltf(filepath=str(OUTPUT / "soldier.glb"), export_format="GLB", use_selection=True,
+    bpy.ops.export_scene.gltf(filepath=str(OUTPUT / filename), export_format="GLB", use_selection=True,
                               export_yup=True, export_skins=True, export_animations=True,
                               export_animation_mode="NLA_TRACKS", export_materials="EXPORT",
                               export_image_format="NONE", export_apply=False)
     for obj in objects:
         print(f"[origon]   {obj.name}: {len(obj.data.vertices)} verts, {len(obj.data.polygons)} faces")
-    print(f"[origon] soldier: {len(objects)} pieces, {len(BONES)} bones")
+    print(f"[origon] {filename}: {len(objects)} pieces, {len(rig.data.bones)} bones")
+
+
+
+
+def main():
+    # The soldiers are built from MakeHuman data on this skeleton: see gen_human.py.
+    import gen_human
+    gen_human.main()
 
 
 if __name__ == "__main__":

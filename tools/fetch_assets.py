@@ -4,7 +4,8 @@
 Textures (Poly Haven) go to assets/textures/<id>/: albedo.jpg (sRGB), normal.jpg (OpenGL
 convention) and arm.jpg (R = ambient occlusion, G = roughness, B = metallic).
 Leaf atlases (ambientCG) go to .cache/ambientcg/<id>/: color.png and opacity.png; they are
-inputs for tools/textures/gen_foliage.py. Downloaded files are not committed.
+inputs for tools/textures/gen_foliage.py. MakeHuman CC0 data (mesh, targets, rig, system asset pack)
+goes to .cache/makehuman/ for tools/blender/gen_human.py. Downloaded files are not committed.
 """
 import io
 import json
@@ -57,6 +58,48 @@ def fetch_atlases(manifest):
         print(f"  .cache/ambientcg/{asset_id}")
 
 
+def safe_extract(archive, member, target_root, strip_prefix):
+    """Writes one archive member under target_root, refusing absolute paths and '..'."""
+    relative = member[len(strip_prefix):]
+    path = pathlib.PurePosixPath(relative)
+    if not relative or path.is_absolute() or ".." in path.parts or member.endswith("/"):
+        return False
+    target = target_root.joinpath(*path.parts)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(archive.read(member))
+    return True
+
+
+def fetch_makehuman(manifest):
+    """MakeHuman CC0 data only: mesh, targets and rig files plus the system asset pack."""
+    config = manifest.get("makehuman")
+    if not config:
+        return
+    cache = ROOT / ".cache" / "makehuman"
+    data = cache / "mpfb_data"
+    if not (data / "3dobjs" / "base.obj").exists():
+        request = urllib.request.Request(config["mpfb_zip"], headers={"User-Agent": "origon-asset-fetch"})
+        with urllib.request.urlopen(request, timeout=600) as response:
+            archive = zipfile.ZipFile(io.BytesIO(response.read()))
+        count = 0
+        for member in archive.namelist():
+            marker = "/src/mpfb/data/"
+            if marker not in member:
+                continue
+            prefix = member[: member.index(marker) + len(marker)]
+            if any(member[len(prefix):].startswith(d) for d in config["mpfb_data"]):
+                count += safe_extract(archive, member, data, prefix)
+        print(f"  .cache/makehuman/mpfb_data ({count} files)")
+    assets = cache / "system_assets"
+    if not (assets / "clothes").exists():
+        for url in config["packs"]:
+            request = urllib.request.Request(url, headers={"User-Agent": "origon-asset-fetch"})
+            with urllib.request.urlopen(request, timeout=900) as response:
+                archive = zipfile.ZipFile(io.BytesIO(response.read()))
+            count = sum(safe_extract(archive, member, assets, "") for member in archive.namelist())
+            print(f"  .cache/makehuman/system_assets ({count} files)")
+
+
 def main():
     manifest = json.loads((ROOT / "tools" / "asset_manifest.json").read_text())
     resolution = manifest["resolution"]
@@ -78,6 +121,7 @@ def main():
             download(url, target)
             print(f"  {asset_id}/{name}.jpg")
     fetch_atlases(manifest)
+    fetch_makehuman(manifest)
     print("done")
     return 0
 

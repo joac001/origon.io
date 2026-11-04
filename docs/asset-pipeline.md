@@ -37,6 +37,7 @@ One pipeline for the whole project. No manual modeling.
 | Script | Output |
 |---|---|
 | `tools/blender/gen_vegetation.py` | `assets/models/vegetation/*.glb`: pine_a, pine_b, fir_a, redwood, maple, rock_a, rock_b, boulder, fern, grass, bush, log, stump (LOD0-2, `_COL` collision) |
+| `tools/blender/gen_human.py` | `assets/models/characters/soldier_{m,f}.glb` + `.pieces.json`, `assets/textures/characters/*`: realistic male and female soldiers built from MakeHuman CC0 data (base mesh, macro targets, game_engine rig weights, system-asset skins, hair, eyebrows, eyelashes, eyes, outfits, shoes and a fedora) that `tools/fetch_assets.py` caches in `.cache/makehuman/`. Our own reader (`makehuman.py`) shapes the mesh, fits the MHCLO proxies, poses everything into the rifle rest pose with curled fingers, splits the skin by the garments that cover it (`delete_verts`), and binds it to the 17-bone skeleton and animations of `gen_character.py`. Helmets, caps, eyewear and facial hair come from `character_parts.py`, scaled to the measured head. |
 | `tools/blender/gen_weapons.py` | `assets/models/weapons/*.glb`: the 19 ladder weapons and the knife |
 | `tools/textures/gen_foliage.py` | `assets/textures/foliage/*.png`: needles, fern, leaves, grass cards, composed from scanned CC0 ambientCG leaf atlases (LeafSet019, LeafSet026, LeafSet024, Foliage001) that `tools/fetch_assets.py` caches in `.cache/ambientcg/`. Without the cache it falls back to procedural drawings. |
 | `tools/fetch_assets.py` | `assets/textures/<id>/{albedo,normal,arm}.jpg` from Poly Haven (CC0) |
@@ -44,4 +45,7 @@ One pipeline for the whole project. No manual modeling.
 
 Material naming contract (models do not embed images): `bark_<id>`, `rock_<id>` and `pbr_<id>`
 use `assets/textures/<id>/`; `foliage_<name>` uses `assets/textures/foliage/<name>.png` with
-alpha testing, two-sided lighting and wind; other materials use their glTF color factors.
+alpha testing, two-sided lighting and wind; `char_<id>` / `charalpha_<id>` (characters) use
+`assets/textures/characters/<id>.{jpg,png}` plus an optional `<id>_normal`, alpha-tested for the
+`charalpha_` form; the body material `char_skin` gets its texture from the player's look; other
+materials use their glTF color factors.

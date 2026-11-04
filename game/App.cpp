@@ -15,6 +15,9 @@
 #include <imgui_stdlib.h>
 
 #include <algorithm>
+#include <nlohmann/json.hpp>
+#include <map>
+#include <fstream>
 #include <array>
 #include <chrono>
 #include <cstdlib>
@@ -69,7 +72,8 @@ App::App(const LaunchOptions& options) : m_options(options) {
         m_audio.setVolume(m_settings.masterVolume);
         m_audio.setAmbienceEnabled(m_settings.ambience);
     }
-    m_soldierReady = m_soldier.load("assets/models/characters/soldier.glb");
+    m_soldierReady = m_soldiers[0].load("assets/models/characters/soldier_m.glb", &m_textures);
+    m_soldierFemale = m_soldierReady && m_soldiers[1].load("assets/models/characters/soldier_f.glb", &m_textures);
     m_effects.setSkinnedCorpses(m_soldierReady);
     m_world.setModelLibrary(&m_models);
     m_world.setTextureCache(&m_textures);
@@ -229,7 +233,7 @@ void App::drawCharacterTab() {
     bool changed = false;
     ImGui::TextDisabled("Solo cambia el aspecto: todos los personajes tienen el mismo tamaño y las mismas zonas de impacto.");
     auto field = [&](CharacterLook::Field f) {
-        const LookCatalog options = lookOptions(f);
+        const LookCatalog options = lookOptions(f, look.female());
         size_t colorCount = 0;
         const LookColor* colors = lookColors(f, colorCount);
         const size_t count = colors ? colorCount : options.count;
@@ -276,12 +280,9 @@ void App::drawCharacterTab() {
     field(CharacterLook::Headwear);
     field(CharacterLook::Eyewear);
     ImGui::SeparatorText("Ropa");
-    field(CharacterLook::Top);
-    field(CharacterLook::TopColor);
-    field(CharacterLook::Bottom);
-    field(CharacterLook::BottomColor);
-    field(CharacterLook::Boots);
-    field(CharacterLook::Gear);
+    field(CharacterLook::Outfit);
+    field(CharacterLook::OutfitColor);
+    field(CharacterLook::Shoes);
     ImGui::Spacing();
     if (ImGui::Button("Aleatorio", ImVec2(180, 0))) {
         look = CharacterLook::random(static_cast<uint32_t>(m_time * 1000.0));
@@ -1001,41 +1002,42 @@ float clipEnvelope(float progress, float edge) {
 } // namespace
 
 void App::submitSoldier(const Player& p, float alpha) {
-    static const SoldierRig rig(m_soldier);
+    const SkinnedModel& sk = soldierModel(p.look);
+    static const SoldierRig rig(m_soldiers[0]);
     const glm::vec3 feet = glm::mix(p.previousPosition, p.position, alpha);
     const float speed = glm::length(glm::vec2(p.velocity.x, p.velocity.z));
     const float crouch = std::clamp((kEyeHeight - p.eyeHeight) / (kEyeHeight - kCrouchEyeHeight), 0.0f, 1.0f);
     const float cycle = m_walkPhase[static_cast<size_t>(p.id)];
     const WeaponDef& weapon = m_sim->weaponFor(p);
 
-    SkinnedModel::Pose pose = m_soldier.restPose();
-    m_soldier.sample(rig.idle, m_time + static_cast<float>(p.id) * 0.37f, pose);
+    SkinnedModel::Pose pose = sk.restPose();
+    sk.sample(rig.idle, m_time + static_cast<float>(p.id) * 0.37f, pose);
     if (p.onGround && speed > 0.3f) {
-        SkinnedModel::Pose run = m_soldier.restPose();
-        m_soldier.sample(rig.run, cycle * m_soldier.clipDuration(rig.run), run);
+        SkinnedModel::Pose run = sk.restPose();
+        sk.sample(rig.run, cycle * sk.clipDuration(rig.run), run);
         SkinnedModel::blend(pose, run, std::clamp(speed / 3.5f, 0.0f, 1.0f));
     }
     if (crouch > 0.01f) {
-        SkinnedModel::Pose crouched = m_soldier.restPose();
-        m_soldier.sample(rig.crouch, 0.0f, crouched);
+        SkinnedModel::Pose crouched = sk.restPose();
+        sk.sample(rig.crouch, 0.0f, crouched);
         SkinnedModel::blend(pose, crouched, crouch);
     }
     // Upper-body actions layered over locomotion.
     if (p.reloadTimer > 0.0f && weapon.reloadSeconds > 0.0f && rig.reload >= 0) {
         const float progress = std::clamp(1.0f - p.reloadTimer / weapon.reloadSeconds, 0.0f, 0.999f);
-        SkinnedModel::Pose reload = m_soldier.restPose();
-        m_soldier.sample(rig.reload, progress * m_soldier.clipDuration(rig.reload), reload);
+        SkinnedModel::Pose reload = sk.restPose();
+        sk.sample(rig.reload, progress * sk.clipDuration(rig.reload), reload);
         SkinnedModel::blend(pose, reload, clipEnvelope(progress, 0.08f), rig.upperBody);
     }
     if (p.meleeAnimation > 0.0f && rig.knife >= 0) {
         const float progress = std::clamp(1.0f - p.meleeAnimation / 0.3f, 0.0f, 0.999f);
-        SkinnedModel::Pose knife = m_soldier.restPose();
-        m_soldier.sample(rig.knife, progress * m_soldier.clipDuration(rig.knife), knife);
+        SkinnedModel::Pose knife = sk.restPose();
+        sk.sample(rig.knife, progress * sk.clipDuration(rig.knife), knife);
         SkinnedModel::blend(pose, knife, clipEnvelope(progress, 0.1f), rig.upperBody);
     }
     // Aim: bend the spine and chest toward the view pitch (positive pitch leans back = looks up).
-    m_soldier.rotateJoint(pose, rig.spine, glm::vec3(1, 0, 0), p.pitch * 0.45f);
-    m_soldier.rotateJoint(pose, rig.chest, glm::vec3(1, 0, 0), p.pitch * 0.45f);
+    sk.rotateJoint(pose, rig.spine, glm::vec3(1, 0, 0), p.pitch * 0.45f);
+    sk.rotateJoint(pose, rig.chest, glm::vec3(1, 0, 0), p.pitch * 0.45f);
 
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), p.yaw, glm::vec3(0, 1, 0));
     const glm::vec3 tint = World::toLinear(p.color);
@@ -1054,19 +1056,40 @@ const std::vector<glm::mat4>& App::drawSoldierPose(const SkinnedModel::Pose& pos
                                                    const CharacterLook& look, const glm::vec3& tint, bool highlight) {
     m_skinBuffers.emplace_back();
     std::vector<glm::mat4>& skin = m_skinBuffers.back();
-    m_soldier.evaluate(pose, m_soldierGlobals, skin);
-    if (m_soldierPieces.size() != m_soldier.parts().size()) {
-        m_soldierPieces.clear();
-        for (const SkinnedModel::Part& part : m_soldier.parts()) m_soldierPieces.push_back(parseSoldierPiece(part.name));
+    const size_t gender = look.female() && m_soldierFemale ? 1 : 0;
+    const SkinnedModel& sk = m_soldiers[gender];
+    std::vector<SoldierPiece>& pieces = m_soldierPieces[gender];
+    sk.evaluate(pose, m_soldierGlobals, skin);
+    if (pieces.size() != sk.parts().size()) {
+        // Which garments hide each skin part, written next to the model by gen_human.py.
+        std::map<std::string, std::vector<std::string>> hiddenBy;
+        try {
+            std::ifstream file(fs::resolve(gender ? "assets/models/characters/soldier_f.pieces.json"
+                                                  : "assets/models/characters/soldier_m.pieces.json"));
+            if (file) {
+                const nlohmann::json root = nlohmann::json::parse(file);
+                for (const auto& [name, items] : root.at("hidden_by").items()) {
+                    hiddenBy[name] = items.get<std::vector<std::string>>();
+                }
+            }
+        } catch (const std::exception& e) {
+            log::warn("Soldier pieces file: {}", e.what());
+        }
+        pieces.clear();
+        for (const SkinnedModel::Part& part : sk.parts()) {
+            SoldierPiece piece = parseSoldierPiece(part.name);
+            if (auto it = hiddenBy.find(part.name); it != hiddenBy.end()) piece.hiddenBy = it->second;
+            pieces.push_back(std::move(piece));
+        }
     }
-    for (size_t i = 0; i < m_soldier.parts().size(); ++i) {
-        const SkinnedModel::Part& part = m_soldier.parts()[i];
-        if (!soldierPieceVisible(m_soldierPieces[i], look)) continue;
+    for (size_t i = 0; i < sk.parts().size(); ++i) {
+        const SkinnedModel::Part& part = sk.parts()[i];
+        if (!soldierPieceVisible(pieces[i], look)) continue;
         DrawItem item;
         item.mesh = &part.mesh;
         item.model = model;
         item.material = part.material;
-        applyLookMaterial(item.material, part.materialName, look, tint);
+        applyLookMaterial(item.material, part.materialName, look, tint, m_textures);
         if (highlight) item.material.emissive = item.material.albedo * 0.35f;
         item.bones = skin.data();
         item.boneCount = static_cast<int>(skin.size());
@@ -1087,12 +1110,13 @@ void App::submitModel(const Model& model, const glm::mat4& transform) {
 
 void App::submitCorpses() {
     if (!m_soldierReady) return;
-    static const SoldierRig rig(m_soldier);
+    static const SoldierRig rig(m_soldiers[0]);
     for (const Effects::Corpse& c : m_effects.corpses()) {
+        const SkinnedModel& sk = soldierModel(c.look);
         const int clip = c.forward ? rig.deathForward : rig.death;
-        const float duration = m_soldier.clipDuration(clip);
-        SkinnedModel::Pose pose = m_soldier.restPose();
-        m_soldier.sample(clip, std::min(c.age, duration * 0.999f), pose);
+        const float duration = sk.clipDuration(clip);
+        SkinnedModel::Pose pose = sk.restPose();
+        sk.sample(clip, std::min(c.age, duration * 0.999f), pose);
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), c.feet) * glm::rotate(glm::mat4(1.0f), c.yaw, glm::vec3(0, 1, 0));
         drawSoldierPose(pose, model, c.look, World::toLinear(c.color) * 0.8f, false);
         // The weapon drops beside the body, lying on its side.
@@ -1122,15 +1146,17 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
     const int count = static_cast<int>(std::size(entries));
     for (int i = 0; i < count; ++i) {
         const Entry& e = entries[i];
-        const int clip = m_soldier.findClip(e.clip);
-        SkinnedModel::Pose pose = m_soldier.restPose();
-        m_soldier.sample(clip, e.progress * m_soldier.clipDuration(clip), pose);
+        const CharacterLook look = CharacterLook::random(static_cast<uint32_t>(i));
+        const SkinnedModel& sk = soldierModel(look);
+        const int clip = sk.findClip(e.clip);
+        SkinnedModel::Pose pose = sk.restPose();
+        sk.sample(clip, e.progress * sk.clipDuration(clip), pose);
         glm::vec3 feet = eye + forward * 7.0f + right * ((static_cast<float>(i) - (count - 1) * 0.5f) * 1.3f);
         feet.y = m_world.terrainHeight(feet.x, feet.z);
         // Face the camera, turned a quarter so profiles read.
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) *
                                 glm::rotate(glm::mat4(1.0f), yaw + glm::pi<float>() * 0.7f, glm::vec3(0, 1, 0));
-        drawSoldierPose(pose, model, CharacterLook::random(static_cast<uint32_t>(i)), glm::vec3(0.6f, 0.1f, 0.08f), false);
+        drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
     }
 }
 
@@ -1138,15 +1164,17 @@ void App::submitLookGallery(const glm::vec3& eye, float yaw, int seed) {
     if (!m_soldierReady) return;
     const glm::vec3 forward = viewDirection(yaw, 0.0f);
     const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
-    const int idle = m_soldier.findClip("idle");
     for (int i = 0; i < 5; ++i) {
-        SkinnedModel::Pose pose = m_soldier.restPose();
-        m_soldier.sample(idle, 0.0f, pose);
+        const CharacterLook look = CharacterLook::random(static_cast<uint32_t>(seed * 5 + i));
+        const SkinnedModel& sk = soldierModel(look);
+        const int idle = sk.findClip("idle");
+        SkinnedModel::Pose pose = sk.restPose();
+        sk.sample(idle, 0.0f, pose);
         glm::vec3 feet = eye + forward * 2.8f + right * ((static_cast<float>(i) - 2.0f) * 0.8f);
         feet.y = m_world.terrainHeight(feet.x, feet.z);
         const float turn = glm::pi<float>() + (static_cast<float>(i) - 2.0f) * 0.25f;
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), yaw + turn, glm::vec3(0, 1, 0));
-        drawSoldierPose(pose, model, CharacterLook::random(static_cast<uint32_t>(seed * 5 + i)), glm::vec3(0.6f, 0.1f, 0.08f), false);
+        drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
     }
 }
 

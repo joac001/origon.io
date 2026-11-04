@@ -1,6 +1,9 @@
 #include "render/SkinnedModel.h"
 
 #include "core/FileSystem.h"
+#include "render/Texture.h"
+
+#include "core/FileSystem.h"
 #include "core/Log.h"
 
 #include <cgltf.h>
@@ -12,7 +15,20 @@
 
 namespace origon {
 
-bool SkinnedModel::load(const std::filesystem::path& path) {
+namespace {
+
+std::filesystem::path findTexture(const std::string& id) {
+    const std::filesystem::path folder = std::filesystem::path("assets/textures/characters");
+    for (const char* ext : {".jpg", ".png"}) {
+        const std::filesystem::path candidate = folder / (id + ext);
+        if (std::filesystem::exists(fs::resolve(candidate))) return candidate;
+    }
+    return {};
+}
+
+} // namespace
+
+bool SkinnedModel::load(const std::filesystem::path& path, TextureCache* textures) {
     const std::string resolved = fs::resolve(path).string();
     cgltf_options options{};
     cgltf_data* data = nullptr;
@@ -130,6 +146,20 @@ bool SkinnedModel::load(const std::filesystem::path& path) {
                 }
                 part.materialName = prim.material->name ? prim.material->name : "";
                 part.tint = part.materialName == "tint";
+                const bool alpha = part.materialName.rfind("charalpha_", 0) == 0;
+                if (textures && (alpha || part.materialName.rfind("char_", 0) == 0)) {
+                    const std::string id = part.materialName.substr(part.materialName.find('_') + 1);
+                    if (const auto albedo = findTexture(id); !albedo.empty()) {
+                        part.material.albedoMap = textures->load(albedo, true).id;
+                        part.material.albedo = glm::vec3(1.0f);
+                    }
+                    if (const auto normal = findTexture(id + "_normal"); !normal.empty()) {
+                        part.material.normalMap = textures->load(normal, false).id;
+                    }
+                    part.material.alphaTest = alpha;
+                    part.material.roughness = alpha ? 0.7f : part.material.roughness;
+                    part.material.metallic = 0.0f;
+                }
             }
             m_parts.push_back(std::move(part));
         }

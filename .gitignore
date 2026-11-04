@@ -6,3 +6,4 @@ compile_commands.json
 screenshots/
 assets/textures/*/
 !assets/textures/foliage/
+__pycache__/

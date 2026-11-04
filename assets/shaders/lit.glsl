@@ -440,7 +440,7 @@ void main() {
         albedo *= tex.rgb;
         alpha = tex.a;
     }
-#ifdef FOLIAGE
+#if defined(FOLIAGE) || defined(ALPHA_TEST)
     // Sharpened alpha for alpha-to-coverage; plain alpha test otherwise.
     alpha = (alpha - 0.5) / max(fwidth(alpha), 1e-4) + 0.5;
     if (alpha < 0.02) {

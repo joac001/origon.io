@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include "audio/GameAudio.h"
 #include "core/Input.h"
 #include "core/Window.h"
@@ -139,14 +141,18 @@ private:
     float m_roll = 0.0f;
     glm::vec2 m_sway{0.0f};
     std::vector<float> m_walkPhase;
-    SkinnedModel m_soldier;
+    std::array<SkinnedModel, 2> m_soldiers; // Male, female (tools/blender/gen_human.py).
     bool m_soldierReady = false;
+    bool m_soldierFemale = false;
+    const SkinnedModel& soldierModel(const CharacterLook& look) const {
+        return m_soldiers[look.female() && m_soldierFemale ? 1 : 0];
+    }
     std::vector<glm::mat4> m_soldierGlobals; // Scratch: joint globals of the last drawn soldier.
     std::vector<std::vector<glm::mat4>> m_skinBuffers;
     void submitSoldier(const Player& p, float alpha);
     const std::vector<glm::mat4>& drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model,
                                                     const CharacterLook& look, const glm::vec3& tint, bool highlight);
-    std::vector<SoldierPiece> m_soldierPieces; // Parsed piece names, parallel to m_soldier.parts().
+    std::array<std::vector<SoldierPiece>, 2> m_soldierPieces; // Parsed piece names, parallel to each model's parts.
     void submitModel(const Model& model, const glm::mat4& transform);
     void submitCorpses();
     void submitPoseGallery(const glm::vec3& eye, float yaw);

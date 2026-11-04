@@ -204,6 +204,8 @@ private:
     Shader m_litFoliage;
     Shader m_litSkinned;
     Shader m_depthSkinned;
+    Shader m_litSkinnedAlpha;   // Hair, eyebrows, eyelashes.
+    Shader m_depthSkinnedAlpha;
     Shader m_depthShader;
     Shader m_depthInstanced;
     Shader m_depthFoliage;

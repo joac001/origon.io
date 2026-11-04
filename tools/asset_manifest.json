@@ -77,5 +77,18 @@
         "use": "grass blades: ground cover cards"
       }
     ]
+  },
+  "makehuman": {
+    "source": "MakeHuman CC0 data: base mesh, targets and rig from the MPFB2 repository (data released as CC0; the GPL code is not used) and the makehuman_system_assets pack (CC0).",
+    "mpfb_zip": "https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.18.zip",
+    "mpfb_data": [
+      "3dobjs/",
+      "targets/macrodetails/",
+      "rigs/standard/"
+    ],
+    "packs": [
+      "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+    ],
+    "note": "Cached in .cache/makehuman/ (not committed). tools/blender/gen_human.py builds the soldiers from it."
   }
 }

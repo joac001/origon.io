@@ -1,0 +1,68 @@
+{
+ "hidden_by": {
+  "x_skin_00": [],
+  "x_skin_01": [
+   "male_casualsuit01",
+   "male_casualsuit02",
+   "male_casualsuit03",
+   "male_casualsuit04",
+   "male_casualsuit05",
+   "male_casualsuit06",
+   "male_worksuit01"
+  ],
+  "x_skin_02": [
+   "shoes01",
+   "shoes02",
+   "shoes03",
+   "shoes04",
+   "shoes05",
+   "shoes06"
+  ],
+  "x_skin_03": [
+   "male_casualsuit01",
+   "male_casualsuit02",
+   "male_casualsuit03",
+   "male_casualsuit05"
+  ],
+  "x_skin_04": [
+   "male_casualsuit01"
+  ],
+  "x_skin_05": [
+   "male_worksuit01"
+  ],
+  "x_skin_06": [
+   "male_casualsuit01",
+   "male_casualsuit02",
+   "male_casualsuit03",
+   "male_casualsuit05",
+   "male_worksuit01"
+  ],
+  "x_skin_07": [
+   "male_worksuit01",
+   "shoes01",
+   "shoes02",
+   "shoes03",
+   "shoes04",
+   "shoes05",
+   "shoes06"
+  ],
+  "x_skin_08": [
+   "male_casualsuit01",
+   "male_worksuit01",
+   "shoes01",
+   "shoes02",
+   "shoes03",
+   "shoes04",
+   "shoes05",
+   "shoes06"
+  ],
+  "x_skin_09": [
+   "male_casualsuit02",
+   "male_casualsuit03",
+   "male_casualsuit04",
+   "male_casualsuit05",
+   "male_casualsuit06",
+   "male_worksuit01"
+  ]
+ }
+}

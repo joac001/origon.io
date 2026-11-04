@@ -15,12 +15,12 @@ void main() {
 
 #pragma stage fragment
 in vec2 vUv;
-#ifdef FOLIAGE
+#if defined(FOLIAGE) || defined(ALPHA_TEST)
 uniform sampler2D uAlbedoMap;
 #endif
 
 void main() {
-#ifdef FOLIAGE
+#if defined(FOLIAGE) || defined(ALPHA_TEST)
     if (texture(uAlbedoMap, vUv).a < 0.5) {
         discard;
     }

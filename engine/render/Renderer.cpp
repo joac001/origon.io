@@ -82,6 +82,8 @@ bool Renderer::init() {
     ok &= m_litFoliage.loadFile("assets/shaders/lit.glsl", "#define INSTANCED\n#define FOLIAGE\n");
     ok &= m_litSkinned.loadFile("assets/shaders/lit.glsl", "#define SKINNED\n");
     ok &= m_depthSkinned.loadFile("assets/shaders/depth.glsl", "#define SKINNED\n");
+    ok &= m_litSkinnedAlpha.loadFile("assets/shaders/lit.glsl", "#define SKINNED\n#define ALPHA_TEST\n");
+    ok &= m_depthSkinnedAlpha.loadFile("assets/shaders/depth.glsl", "#define SKINNED\n#define ALPHA_TEST\n");
     ok &= m_depthShader.loadFile("assets/shaders/depth.glsl");
     ok &= m_depthInstanced.loadFile("assets/shaders/depth.glsl", "#define INSTANCED\n");
     ok &= m_depthFoliage.loadFile("assets/shaders/depth.glsl", "#define INSTANCED\n#define FOLIAGE\n");
@@ -336,7 +338,7 @@ void Renderer::computeCascades(const CameraView& camera, const Environment& envi
 
 Shader& Renderer::litVariant(const DrawItem& item) {
     if (item.boneCount > 0) {
-        return m_litSkinned;
+        return item.material.alphaTest ? m_litSkinnedAlpha : m_litSkinned;
     }
     if (item.instanceCount > 0) {
         return item.material.alphaTest ? m_litFoliage : m_litInstanced;
@@ -375,7 +377,7 @@ void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& vi
         if (!item.mesh || (shadowPass && !item.castShadow)) {
             continue;
         }
-        Shader& shader = item.boneCount > 0 ? m_depthSkinned
+        Shader& shader = item.boneCount > 0 ? (item.material.alphaTest ? m_depthSkinnedAlpha : m_depthSkinned)
                          : item.instanceCount > 0 ? (item.material.alphaTest ? m_depthFoliage : m_depthInstanced)
                                                   : m_depthShader;
         if (&shader != current) {
@@ -396,6 +398,7 @@ void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& vi
         } else {
             shader.set("uModel", item.model);
             if (item.boneCount > 0) shader.setArray("uBones[0]", item.bones, std::min(item.boneCount, 32));
+            if (item.material.alphaTest) glBindTextureUnit(2, item.material.albedoMap);
             item.mesh->draw();
         }
         if (twoSided) glEnable(GL_CULL_FACE);

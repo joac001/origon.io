@@ -14,7 +14,7 @@
 namespace origon::net {
 
 constexpr uint16_t kDefaultPort = 27015;
-constexpr uint32_t kProtocolVersion = 4;
+constexpr uint32_t kProtocolVersion = 5;
 constexpr int kChannelReliable = 0;
 constexpr int kChannelUnreliable = 1;
 constexpr int kChannelCount = 2;

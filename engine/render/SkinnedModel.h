@@ -29,7 +29,9 @@ public:
         std::string materialName; // glTF material name (e.g. "skin", "hair", "top").
     };
 
-    bool load(const std::filesystem::path& path);
+    // With a texture cache, materials named "char_<id>" / "charalpha_<id>" (alpha-tested) load
+    // assets/textures/characters/<id>.{jpg,png} and an optional <id>_normal map.
+    bool load(const std::filesystem::path& path, class TextureCache* textures = nullptr);
 
     int jointCount() const { return static_cast<int>(m_joints.size()); }
     int findJoint(const std::string& name) const;
