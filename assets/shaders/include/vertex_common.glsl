@@ -22,12 +22,24 @@ layout(std430, binding = 1) readonly buffer BonePalettes {
     mat4 uBones[];
 };
 uniform int uBoneOffset;
+// Bitmask of joints to draw (0 = all): first-person arms keep only arm-weighted geometry.
+uniform uint uJointMask;
+float jointVisibility() {
+    if (uJointMask == 0u) return 1.0;
+    float visible = 0.0;
+    for (int i = 0; i < 4; ++i) {
+        uint joint = aJoints[i];
+        if (joint < 32u && (uJointMask & (1u << joint)) != 0u) visible += aWeights[i];
+    }
+    return visible;
+}
 mat4 skinMatrix() {
     return uBones[uBoneOffset + int(aJoints.x)] * aWeights.x + uBones[uBoneOffset + int(aJoints.y)] * aWeights.y +
            uBones[uBoneOffset + int(aJoints.z)] * aWeights.z + uBones[uBoneOffset + int(aJoints.w)] * aWeights.w;
 }
 #else
 mat4 skinMatrix() { return mat4(1.0); }
+float jointVisibility() { return 1.0; }
 #endif
 
 uniform mat4 uViewProj;

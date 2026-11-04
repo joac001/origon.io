@@ -297,6 +297,22 @@ void SkinnedModel::rotateJoint(Pose& pose, int joint, const glm::vec3& modelAxis
     r = glm::angleAxis(angle, localAxis) * r;
 }
 
+void SkinnedModel::aimJoint(Pose& pose, int joint, int child, const glm::vec3& target) const {
+    if (joint < 0 || child < 0) return;
+    std::vector<glm::mat4> globals, skin;
+    evaluate(pose, globals, skin);
+    const glm::vec3 from(globals[static_cast<size_t>(joint)][3]);
+    const glm::vec3 to(globals[static_cast<size_t>(child)][3]);
+    const glm::vec3 a = to - from;
+    const glm::vec3 b = target - from;
+    if (glm::length(a) < 1e-5f || glm::length(b) < 1e-5f) return;
+    const glm::vec3 na = glm::normalize(a), nb = glm::normalize(b);
+    const glm::vec3 axis = glm::cross(na, nb);
+    const float sine = glm::length(axis);
+    if (sine < 1e-5f) return;
+    rotateJoint(pose, joint, axis / sine, std::atan2(sine, glm::dot(na, nb)));
+}
+
 void SkinnedModel::evaluate(const Pose& pose, std::vector<glm::mat4>& globals, std::vector<glm::mat4>& skin) const {
     globals.assign(m_joints.size(), glm::mat4(1.0f));
     skin.assign(m_joints.size(), glm::mat4(1.0f));

@@ -360,10 +360,12 @@ void Renderer::uploadInstances() {
     // Skin palettes.
     m_boneStaging.clear();
     m_boneOffsets.clear();
-    for (const DrawItem& item : m_items) {
-        if (item.boneCount <= 0 || !item.bones || m_boneOffsets.contains(item.bones)) continue;
-        m_boneOffsets[item.bones] = static_cast<int>(m_boneStaging.size());
-        m_boneStaging.insert(m_boneStaging.end(), item.bones, item.bones + item.boneCount);
+    for (const std::vector<DrawItem>* list : {&m_items, &m_viewModelItems}) {
+        for (const DrawItem& item : *list) {
+            if (item.boneCount <= 0 || !item.bones || m_boneOffsets.contains(item.bones)) continue;
+            m_boneOffsets[item.bones] = static_cast<int>(m_boneStaging.size());
+            m_boneStaging.insert(m_boneStaging.end(), item.bones, item.bones + item.boneCount);
+        }
     }
     if (!m_boneStaging.empty()) {
         const size_t bytes = m_boneStaging.size() * sizeof(glm::mat4);
@@ -538,6 +540,7 @@ void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWo
         } else {
             shader.set("uModel", toWorld * item.model);
             if (item.boneCount > 0) shader.set("uBoneOffset", boneOffset(item));
+            if (item.boneCount > 0) shader.set("uJointMask", item.jointMask);
             item.mesh->draw();
         }
         if (m.alphaTest) {
@@ -882,11 +885,19 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         vmCamera.fovYDegrees = m_settings.viewModelFov;
         vmCamera.nearPlane = 0.01f;
         vmCamera.farPlane = 10.0f;
-        m_litShader.bind();
-        m_litShader.set("uViewProj", projection(vmCamera) * camera.view);
-        m_litShader.set("uAoEnabled", 0);
+        const glm::mat4 vmViewProj = projection(vmCamera) * camera.view;
+        // First-person weapon and arms (skinned): every variant gets the view-model projection.
+        for (Shader* shader : {&m_litShader, &m_litSkinned, &m_litSkinnedAlpha}) {
+            shader->bind();
+            shader->set("uViewProj", vmViewProj);
+            shader->set("uAoEnabled", 0);
+        }
         drawLit(m_viewModelItems, glm::inverse(camera.view), m_noOffsets);
-        m_litShader.set("uAoEnabled", m_settings.ssao ? 1 : 0);
+        for (Shader* shader : {&m_litShader, &m_litSkinned, &m_litSkinnedAlpha}) {
+            shader->bind();
+            shader->set("uViewProj", viewProj);
+            shader->set("uAoEnabled", m_settings.ssao ? 1 : 0);
+        }
     }
 
     glDisable(GL_DEPTH_TEST);

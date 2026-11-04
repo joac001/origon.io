@@ -47,6 +47,9 @@ public:
     static void blend(Pose& a, const Pose& b, float weight, const std::vector<float>& mask);
     // 1 for the joint and all its descendants, 0 elsewhere.
     std::vector<float> jointMask(int root) const;
+    // Rotates a joint so the direction from it to `child` (a descendant joint) points along
+    // `target` (model space). Used for two-bone IK.
+    void aimJoint(Pose& pose, int joint, int child, const glm::vec3& target) const;
     // Adds a rotation (axis in model space) to one joint's local rotation, given the pose's globals.
     void rotateJoint(Pose& pose, int joint, const glm::vec3& modelAxis, float angle) const;
     // Model-space joint matrices (globals) and skinning matrices (global * inverse bind).

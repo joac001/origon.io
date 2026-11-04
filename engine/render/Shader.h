@@ -26,6 +26,7 @@ public:
     unsigned id() const { return m_program; }
 
     void set(const char* name, int value);
+    void set(const char* name, unsigned value);
     void set(const char* name, float value);
     void set(const char* name, const glm::vec2& value);
     void set(const char* name, const glm::vec3& value);

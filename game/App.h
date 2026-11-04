@@ -43,6 +43,8 @@ struct LaunchOptions {
     int followPlayer = -1;   // Third-person spectator camera behind this player.
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
     int lookGallery = -1;
+    bool weaponGallery = false;
+    bool forceAds = false;      // Debug: the local player aims down sights (view model captures). // Debug: all weapons in profile in front of the fixed camera.
     int pressPlayFrame = 0;
     int forceLod = -1;
     std::string recordFolder;  // Debug: save frames to PNGs (fixed 60 Hz simulation step per frame).
@@ -191,6 +193,8 @@ private:
     std::array<std::vector<SoldierPiece>, 2> m_soldierPieces; // Parsed piece names, parallel to each model's parts.
     void submitModel(const Model& model, const glm::mat4& transform);
     void submitCorpses();
+    // First-person arms: the player's own soldier, arms solved onto the weapon (two-bone IK).
+    bool submitViewArms(const glm::mat4& gunBase, const Model& gun, const WeaponDef& weapon);
     void submitPoseGallery(const glm::vec3& eye, float yaw);
     void submitLookGallery(const glm::vec3& eye, float yaw, int seed);
     CameraView m_lastCamera;

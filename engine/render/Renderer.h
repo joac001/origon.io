@@ -53,6 +53,7 @@ struct DrawItem {
     // Skinned draw: joint matrices (model space). Must stay valid until render().
     const glm::mat4* bones = nullptr;
     int boneCount = 0;
+    unsigned jointMask = 0; // Skinned: draw only geometry weighted to these joints (bit per joint, 0 = all).
 };
 
 struct PointLight {

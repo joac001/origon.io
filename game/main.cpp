@@ -37,6 +37,8 @@ int main(int argc, char** argv) {
         else if (arg == "--bots") options.botCount = std::atoi(next().c_str());
         else if (arg == "--bench") options.benchSeconds = std::stof(next());
         else if (arg == "--press-play") options.pressPlayFrame = std::atoi(next().c_str());
+        else if (arg == "--ads") options.forceAds = true;
+        else if (arg == "--weapon-gallery") options.weaponGallery = true;
         else if (arg == "--look-gallery") options.lookGallery = std::atoi(next().c_str());
         else if (arg == "--dump-sounds") options.dumpSounds = next();
         else if (arg == "--screenshot") options.screenshotPath = next();

@@ -156,6 +156,8 @@ int Shader::location(const char* name) {
 
 void Shader::set(const char* name, int value) { glProgramUniform1i(m_program, location(name), value); }
 
+void Shader::set(const char* name, unsigned value) { glProgramUniform1ui(m_program, location(name), value); }
+
 void Shader::set(const char* name, float value) { glProgramUniform1f(m_program, location(name), value); }
 
 void Shader::set(const char* name, const glm::vec2& value) {

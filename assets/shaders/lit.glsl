@@ -8,6 +8,7 @@ out vec3 vNormal;
 out vec2 vUv;
 out vec3 vLocalPos;
 out vec3 vLocalNormal;
+out float vJointVisible;
 invariant gl_Position;
 
 void main() {
@@ -19,10 +20,12 @@ void main() {
     vUv = aUv;
     vLocalPos = aPosition;
     vLocalNormal = aNormal;
+    vJointVisible = jointVisibility();
     gl_Position = uViewProj * world;
 }
 
 #pragma stage fragment
+in float vJointVisible;
 const int MAX_LIGHTS = 32;
 const int MAX_CASCADES = 4;
 const float PI = 3.14159265359;
@@ -391,6 +394,9 @@ float gridLines(vec3 worldPos, vec3 n, float size) {
 }
 
 void main() {
+    if (vJointVisible < 0.5) {
+        discard; // Masked-out joints (first-person arms only).
+    }
     vec3 n = normalize(vNormal);
     if (!gl_FrontFacing) {
         n = -n;
