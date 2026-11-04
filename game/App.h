@@ -44,6 +44,7 @@ struct LaunchOptions {
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
     int lookGallery = -1;
     int pressPlayFrame = 0;
+    int botCount = -1;         // >= 0: overrides the saved bot count for this run.
     float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.

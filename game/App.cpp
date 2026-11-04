@@ -184,7 +184,7 @@ void App::loadMap(const std::string& fileName) {
 
 void App::restartMatch() {
     buildWorld(m_world.map()); // Props back to their map positions.
-    m_sim->startMatch(m_world.map(), m_settings.botCount);
+    m_sim->startMatch(m_world.map(), m_options.botCount >= 0 ? m_options.botCount : m_settings.botCount);
     if (m_options.autoplay) {
         m_sim->players()[0].isBot = true;
     }
