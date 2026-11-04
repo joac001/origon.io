@@ -1063,6 +1063,8 @@ void MapEditor::drawInspector() {
             tracked(ImGui::ColorEdit3("Color", &b.color.x));
             tracked(ImGui::SliderFloat("Rugosidad", &b.roughness, 0.05f, 1.0f));
             tracked(ImGui::SliderFloat("Metálico", &b.metallic, 0.0f, 1.0f));
+            tracked(ImGui::Checkbox("Cilindro (tronco, poste)", &b.cylinder));
+            if (b.cylinder) ImGui::TextDisabled("Eje a lo largo de Z: diámetro = tamaño X/Y, largo = Z.");
             tracked(ImGui::Checkbox("Física dinámica", &b.dynamic));
             if (b.dynamic) {
                 tracked(ImGui::DragFloat("Masa", &b.mass, 1.0f, 1.0f, 2000.0f, "%.0f kg"));

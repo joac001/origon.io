@@ -134,6 +134,7 @@ public:
     const Mesh& cube() const { return m_cube; }
     const Mesh& capsule() const { return m_capsule; }
     const Mesh& sphere() const { return m_sphere; }
+    const Mesh& cylinder() const { return m_cylinder; }
     glm::mat4 projection(const CameraView& camera) const;
     const RenderStats& stats() const { return m_stats; }
     // Framebuffer that receives the final image (0 = window).
@@ -263,6 +264,7 @@ private:
     Mesh m_cube;
     Mesh m_capsule;
     Mesh m_sphere;
+    Mesh m_cylinder;
 
     std::vector<DrawItem> m_items;
     std::vector<DrawItem> m_viewModelItems;

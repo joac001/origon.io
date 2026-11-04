@@ -64,8 +64,9 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
     }
     for (const BlockData& block : m_map.blocks) {
         const BodyHandle body = block.dynamic
-                                    ? physics.addDynamicBox(block.position, block.size * 0.5f, block.orientation(), block.mass)
-                                    : physics.addStaticBox(block.position, block.size * 0.5f, block.orientation());
+                                    ? physics.addDynamicBox(block.position, block.size * 0.5f, block.orientation(), block.mass,
+                                                            BodyLayer::Dynamic, glm::vec3(0.0f), glm::vec3(0.0f), block.cylinder)
+                                    : physics.addStaticBox(block.position, block.size * 0.5f, block.orientation(), block.cylinder);
         m_blockBodies.push_back(body);
     }
     physics.optimize();
@@ -75,7 +76,7 @@ void World::submit(Renderer& renderer, const PhysicsWorld& physics) const {
     for (size_t i = 0; i < m_map.blocks.size(); ++i) {
         const BlockData& block = m_map.blocks[i];
         DrawItem item;
-        item.mesh = &renderer.cube();
+        item.mesh = block.cylinder ? &renderer.cylinder() : &renderer.cube();
         if (block.dynamic && i < m_blockBodies.size() && m_blockBodies[i] != kInvalidBody) {
             const BodyTransform t = physics.transform(m_blockBodies[i]);
             item.model = glm::translate(glm::mat4(1.0f), t.position) * glm::mat4_cast(t.rotation) *

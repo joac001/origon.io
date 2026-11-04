@@ -14,6 +14,7 @@
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/ScaledShape.h>
@@ -145,6 +146,16 @@ JPH::Ref<JPH::Shape> makeBox(const glm::vec3& halfExtents) {
     return new JPH::BoxShape(toJolt(half), convexRadius);
 }
 
+JPH::Ref<JPH::Shape> makeBlockShape(const glm::vec3& halfExtents, bool cylinder) {
+    if (!cylinder) return makeBox(halfExtents);
+    const glm::vec3 half = glm::max(halfExtents, glm::vec3(0.01f));
+    const float radius = std::min(half.x, half.y);
+    // Jolt cylinders run along Y: rotate onto Z.
+    JPH::RotatedTranslatedShapeSettings rotated(JPH::Vec3::sZero(), JPH::Quat::sRotation(JPH::Vec3::sAxisX(), JPH::JPH_PI * 0.5f),
+                                                new JPH::CylinderShape(half.z, radius, std::min(0.05f, radius * 0.5f)));
+    return rotated.Create().Get();
+}
+
 } // namespace
 
 struct PhysicsWorld::Impl {
@@ -188,8 +199,9 @@ void PhysicsWorld::clearBodies() {
     m_impl->bodies.clear();
 }
 
-BodyHandle PhysicsWorld::addStaticBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation) {
-    JPH::BodyCreationSettings settings(makeBox(halfExtents), JPH::RVec3(toJolt(center)), toJolt(glm::normalize(rotation)),
+BodyHandle PhysicsWorld::addStaticBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation,
+                                      bool cylinder) {
+    JPH::BodyCreationSettings settings(makeBlockShape(halfExtents, cylinder), JPH::RVec3(toJolt(center)), toJolt(glm::normalize(rotation)),
                                        JPH::EMotionType::Static, Layers::kStatic);
     const JPH::BodyID id = m_impl->system->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
     if (id.IsInvalid()) {
@@ -202,8 +214,8 @@ BodyHandle PhysicsWorld::addStaticBox(const glm::vec3& center, const glm::vec3& 
 
 BodyHandle PhysicsWorld::addDynamicBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation,
                                        float mass, BodyLayer layer, const glm::vec3& linearVelocity,
-                                       const glm::vec3& angularVelocity) {
-    JPH::BodyCreationSettings settings(makeBox(halfExtents), JPH::RVec3(toJolt(center)), toJolt(glm::normalize(rotation)),
+                                       const glm::vec3& angularVelocity, bool cylinder) {
+    JPH::BodyCreationSettings settings(makeBlockShape(halfExtents, cylinder), JPH::RVec3(toJolt(center)), toJolt(glm::normalize(rotation)),
                                        JPH::EMotionType::Dynamic, toObjectLayer(layer));
     settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
     settings.mMassPropertiesOverride.mMass = std::max(mass, 0.1f);

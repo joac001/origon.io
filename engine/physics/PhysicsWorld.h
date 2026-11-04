@@ -88,11 +88,13 @@ public:
 
     // Removes every body (static, dynamic and debris).
     void clearBodies();
-    BodyHandle addStaticBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation);
+    BodyHandle addStaticBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation,
+                            bool cylinder = false);
     BodyHandle addDynamicBox(const glm::vec3& center, const glm::vec3& halfExtents, const glm::quat& rotation,
                              float mass, BodyLayer layer = BodyLayer::Dynamic,
                              const glm::vec3& linearVelocity = glm::vec3(0.0f),
-                             const glm::vec3& angularVelocity = glm::vec3(0.0f));
+                             const glm::vec3& angularVelocity = glm::vec3(0.0f), bool cylinder = false);
+    // cylinder: the box becomes a cylinder along its local Z (radius = smaller of X/Y half extents).
     // Static triangle mesh shapes, created once (per model) and instanced many times.
     ShapeHandle createMeshShape(const std::vector<glm::vec3>& vertices, const std::vector<uint32_t>& indices);
     BodyHandle addStaticShape(ShapeHandle shape, const glm::vec3& position, const glm::quat& rotation, float scale);

@@ -118,6 +118,38 @@ Mesh Mesh::makeCube() {
     return Mesh(vertices, indices);
 }
 
+Mesh Mesh::makeCylinder(int segments) {
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    for (int seg = 0; seg <= segments; ++seg) {
+        const float theta = glm::two_pi<float>() * static_cast<float>(seg) / static_cast<float>(segments);
+        const glm::vec3 normal(std::cos(theta), std::sin(theta), 0.0f);
+        const float u = static_cast<float>(seg) / static_cast<float>(segments);
+        vertices.push_back({normal * 0.5f + glm::vec3(0, 0, -0.5f), normal, {u, 0.0f}});
+        vertices.push_back({normal * 0.5f + glm::vec3(0, 0, 0.5f), normal, {u, 1.0f}});
+    }
+    for (int seg = 0; seg < segments; ++seg) {
+        const auto a = static_cast<uint32_t>(seg * 2);
+        indices.insert(indices.end(), {a, a + 2, a + 1, a + 1, a + 2, a + 3});
+    }
+    for (const float side : {-1.0f, 1.0f}) {
+        const auto center = static_cast<uint32_t>(vertices.size());
+        const glm::vec3 normal(0.0f, 0.0f, side);
+        vertices.push_back({glm::vec3(0, 0, 0.5f * side), normal, {0.5f, 0.5f}});
+        for (int seg = 0; seg <= segments; ++seg) {
+            const float theta = glm::two_pi<float>() * static_cast<float>(seg) / static_cast<float>(segments);
+            const glm::vec2 c(std::cos(theta), std::sin(theta));
+            vertices.push_back({glm::vec3(c * 0.5f, 0.5f * side), normal, c * 0.5f + 0.5f});
+        }
+        for (int seg = 0; seg < segments; ++seg) {
+            const auto a = center + 1 + static_cast<uint32_t>(seg);
+            if (side > 0.0f) indices.insert(indices.end(), {center, a, a + 1});
+            else indices.insert(indices.end(), {center, a + 1, a});
+        }
+    }
+    return Mesh(vertices, indices);
+}
+
 Mesh Mesh::makeCapsule(float radius, float cylinderHeight, int segments, int rings) {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;

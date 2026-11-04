@@ -176,6 +176,7 @@ std::optional<MapData> MapData::fromJson(const std::string& text) {
             block.roughness = b.value("roughness", block.roughness);
             block.metallic = b.value("metallic", block.metallic);
             block.dynamic = b.value("dynamic", block.dynamic);
+            block.cylinder = b.value("shape", std::string("box")) == "cylinder";
             block.mass = b.value("mass", block.mass);
             block.texture = b.value("texture", std::string());
             map.blocks.push_back(block);
@@ -258,6 +259,7 @@ std::string MapData::toJson() const {
                       {"roughness", b.roughness},
                       {"metallic", b.metallic}};
         if (!b.texture.empty()) block["texture"] = b.texture;
+        if (b.cylinder) block["shape"] = "cylinder";
         if (b.dynamic) {
             block["dynamic"] = true;
             block["mass"] = b.mass;

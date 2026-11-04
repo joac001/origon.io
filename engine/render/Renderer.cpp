@@ -123,6 +123,7 @@ bool Renderer::init() {
     m_cube = Mesh::makeCube();
     m_capsule = Mesh::makeCapsule(0.4f, 1.0f);
     m_sphere = Mesh::makeCapsule(0.5f, 0.0f, 16, 8);
+    m_cylinder = Mesh::makeCylinder();
     return true;
 }
 

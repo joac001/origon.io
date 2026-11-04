@@ -340,11 +340,12 @@ MapData makeSawmill() {
     const glm::vec3 darkWood(0.3f, 0.2f, 0.12f);
     const glm::vec3 freshWood(0.62f, 0.46f, 0.3f);
     const glm::vec3 stone(0.45f, 0.43f, 0.4f);
-    // Round-ish log: two square prisms rotated 45 degrees around the long axis (an octagon).
+    // Log: a cylinder block (axis along its local Z) with scanned bark.
     auto roundLog = [&](glm::vec3 center, float length, float diameter, float yaw, glm::vec3 color) {
-        const float side = diameter * 0.83f;
-        map.blocks.push_back(block(center, {side, side, length}, color, {0.0f, yaw, 0.0f}));
-        map.blocks.push_back(block(center, {side, side, length - 0.04f}, color * 0.92f, {0.0f, yaw, 45.0f}));
+        BlockData b = block(center, {diameter, diameter, length}, color, {0.0f, yaw, 0.0f});
+        b.cylinder = true;
+        b.texture = "bark_brown_02";
+        map.blocks.push_back(b);
     };
     auto metal = [](glm::vec3 position, glm::vec3 size, glm::vec3 color, glm::vec3 rotation = {}) {
         BlockData b = block(position, size, color, rotation, 0.6f);

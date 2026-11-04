@@ -44,6 +44,8 @@ public:
     static Mesh makeCube();
     // Capsule along +Y, centered at the origin.
     static Mesh makeCapsule(float radius, float cylinderHeight, int segments = 16, int rings = 6);
+    // Unit cylinder along Z (diameter 1, length 1) with flat caps: logs, posts, pipes.
+    static Mesh makeCylinder(int segments = 20);
 
 private:
     void release();

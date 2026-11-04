@@ -630,7 +630,9 @@ int App::run() {
 
         // --- Render -------------------------------------------------------------------
         RenderSettings frameSettings = m_settings.render;
-        if (m_mode == Mode::Playing && m_settings.adsDepthOfField) {
+        // Aim blur belongs to the first-person view only (not spectator, photo or title cameras).
+        const bool firstPerson = !m_options.fixedCamera && m_options.followPlayer < 0 && !m_titleScreen;
+        if (m_mode == Mode::Playing && m_settings.adsDepthOfField && firstPerson) {
             const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
             const bool scoped = m_sim->weaponFor(me).scoped;
             frameSettings.depthOfField = scoped ? 0.0f : 0.85f * m_adsBlend;
