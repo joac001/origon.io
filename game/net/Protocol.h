@@ -5,6 +5,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -79,6 +80,9 @@ public:
         return {x, y, z};
     }
     bool ok() const { return !m_failed; }
+    // Unread bytes (for wrapped packets).
+    const uint8_t* cursor() const { return m_bytes + std::min(m_offset, m_size); }
+    size_t remaining() const { return m_offset < m_size ? m_size - m_offset : 0; }
 
 private:
     const uint8_t* m_bytes;

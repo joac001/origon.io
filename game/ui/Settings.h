@@ -3,6 +3,7 @@
 #include "render/Renderer.h"
 
 #include <filesystem>
+#include <string>
 
 namespace origon {
 
@@ -21,6 +22,8 @@ struct GameSettings {
     bool adsDepthOfField = true;
     float vegetationDensity = 1.0f;
     float vegetationDistance = 90.0f;
+    // Relay (servidor intermedio) for internet games: "host:port".
+    std::string relayAddress = "127.0.0.1:27030";
 
     static GameSettings load(const std::filesystem::path& path);
     bool save(const std::filesystem::path& path) const;

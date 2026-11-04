@@ -6,6 +6,8 @@
 #include "editor/MapEditor.h"
 #include "fx/Effects.h"
 #include "net/LanDiscovery.h"
+#include "net/RelayBrowser.h"
+#include "net/RelayProtocol.h"
 #include "net/NetSession.h"
 #include "physics/PhysicsWorld.h"
 #include "render/Renderer.h"
@@ -49,6 +51,9 @@ struct LaunchOptions {
     std::string connectAddress;    // Non-empty: join this server.
     int connectPort = net::kDefaultPort;
     std::string playerName = "Jugador";
+    std::string relayAddress;      // Overrides the relay (servidor intermedio) from settings.
+    bool publish = false;          // With hostPort: publish the game on the relay.
+    std::string joinCode;          // Join a relay room by code.
 };
 
 class App {
@@ -85,8 +90,10 @@ private:
     net::Snapshot makeSnapshot() const;
     void applySnapshot(const net::Snapshot& snapshot);
     void updateNetworkClient();
-    void startHosting(int port);
+    void startHosting(int port, bool publish = false);
     void joinServer(const std::string& address, int port);
+    void joinRelayRoom(const std::string& code);
+    void drawInternetSection();
     void leaveNetwork();
 
     LaunchOptions m_options;
@@ -144,6 +151,9 @@ private:
     std::string m_pendingScreenshot;
     net::NetSession m_net;
     net::LanDiscovery m_lan;
+    net::RelayBrowser m_relayBrowser;
+    double m_nextRelayRefresh = 0.0;
+    std::string m_joinCode;
     bool m_browserOpen = false;
     uint32_t m_netTick = 0;
     bool m_clientReady = false;

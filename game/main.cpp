@@ -11,7 +11,8 @@ namespace {
 void printUsage() {
     std::puts("Usage: origon [--map NAME] [--editor] [--autoplay] [--hide-ui]\n"
               "              [--screenshot FILE.png] [--screenshot-frame N] [--shot-size WxH]\n"
-              "              [--camera X Y Z YAW PITCH] [--host [PORT]] [--connect HOST[:PORT]] [--name NAME]");
+              "              [--camera X Y Z YAW PITCH] [--host [PORT]] [--connect HOST[:PORT]] [--name NAME]\n"
+              "              [--relay HOST[:PORT]] [--publish] [--join-code CODE]");
 }
 
 } // namespace
@@ -58,6 +59,12 @@ int main(int argc, char** argv) {
             options.connectAddress = target;
         } else if (arg == "--name") {
             options.playerName = next();
+        } else if (arg == "--relay") {
+            options.relayAddress = next();
+        } else if (arg == "--publish") {
+            options.publish = true;
+        } else if (arg == "--join-code") {
+            options.joinCode = next();
         }
         else if (arg == "--help" || arg == "-h") {
             printUsage();

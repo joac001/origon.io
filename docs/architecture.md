@@ -50,7 +50,14 @@ docs/                   design and research
   back when the error exceeds 1.2 m; remote players are interpolated between snapshots.
 - Lag compensation: the host keeps 32 ticks of hit-volume history and tests a remote
   player's shots against targets rewound by half the round trip plus two ticks.
-- Known limit: weapon fire feedback on clients waits for the server event.
+- Client fire feedback (muzzle flash, sound, recoil) is predicted locally; impacts and
+  tracers come from the server.
+- Relay (`tools/relay`, protocol in `game/net/RelayProtocol.h`): hosts behind NAT connect out
+  to a public relay and register a room (five-character code). Clients connect to the relay
+  and join by code; from then on they speak the normal game protocol, and the relay wraps
+  each packet as `Data(clientId, reliable, bytes)` for the host and unwraps the replies. The
+  host treats relayed clients like direct peers. The relay reports each client's round trip
+  every second so lag compensation uses client-relay plus relay-host latency.
 - Game rules (Gun Game) live only in the simulation. The UI reads simulation state.
 
 ## 4. Rendering plan

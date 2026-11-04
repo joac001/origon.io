@@ -55,8 +55,14 @@ Tests (headless): `ctest --test-dir build --output-on-failure`
 - Host: menu (Esc) → **Multijugador** → *Crear partida*, or `origon --host 27015`.
 - Join: menu → **Multijugador**: LAN games appear automatically (UDP broadcast on port 27020);
   or type an IP and *Unirse*, or `origon --connect 192.168.1.10:27015 --name Ana`.
-- Open UDP port 27015 on the host's router for internet games (or use a LAN VPN). There is no
-  NAT punch-through yet: that needs a small public rendezvous/relay server.
+- Internet without opening ports: run the relay (`origon_relay`, UDP 27030) on any machine with a
+  public IP, e.g. a small VPS. Set *Servidor intermedio* to `host:27030` in **Multijugador**.
+  The host clicks *Crear partida y publicarla por internet* and shares the five-character code;
+  players pick the room from the list or type the code. Both sides only connect out, so NAT
+  is not a problem. Every packet goes through the relay, which adds the relay's round trip.
+  Command line: `origon --host --publish --relay HOST:27030` and
+  `origon --join-code ABCDE --relay HOST:27030`.
+- Direct IP still works: open UDP port 27015 on the host's router, or use a LAN VPN.
 - Joining players replace bots. The host's current map (including custom maps) is sent to them.
 
 ## Controls
@@ -100,7 +106,10 @@ See `docs/asset-pipeline.md`.
 ## Command line
 
 `origon [--map NAME] [--editor] [--host [PORT]] [--connect HOST[:PORT]] [--name NAME]`
+`[--relay HOST[:PORT]] [--publish] [--join-code CODE]`
 `[--autoplay] [--hide-ui] [--title] [--follow PLAYER] [--pose-gallery] [--camera X Y Z YAW PITCH] [--shot-size WxH] [--screenshot FILE] [--screenshot-frame N]`
+
+`origon_relay [--port 27030] [--max-rooms 256]`: the relay server (headless).
 
 ## Layout
 

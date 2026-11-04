@@ -15,6 +15,7 @@
 #include <imgui_stdlib.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <cmath>
@@ -78,16 +79,20 @@ App::App(const LaunchOptions& options) : m_options(options) {
     loadMap(options.map);
     m_window->setCursorCaptured(!options.autoplay);
     // The title screen appears on a normal launch (not for captures, hosting or joining).
-    m_titleScreen = (options.screenshotPath.empty() || options.forceTitle) && !options.autoplay && options.hostPort == 0 && options.connectAddress.empty() &&
+    m_titleScreen = (options.screenshotPath.empty() || options.forceTitle) && !options.autoplay && options.hostPort == 0 &&
+                    options.connectAddress.empty() && options.joinCode.empty() &&
                     !options.startInEditor;
     if (m_titleScreen) {
         m_window->setCursorCaptured(false);
     }
     m_playerName = options.playerName;
+    if (!options.relayAddress.empty()) m_settings.relayAddress = options.relayAddress;
     if (options.hostPort > 0) {
-        startHosting(options.hostPort);
+        startHosting(options.hostPort, options.publish);
     } else if (!options.connectAddress.empty()) {
         joinServer(options.connectAddress, options.connectPort);
+    } else if (!options.joinCode.empty()) {
+        joinRelayRoom(options.joinCode);
     }
     if (options.startInEditor) {
         enterEditor();
@@ -179,14 +184,86 @@ void App::restartMatch() {
 
 // --- Networking ------------------------------------------------------------------------------
 
-void App::startHosting(int port) {
+void App::startHosting(int port, bool publish) {
     m_titleScreen = false;
     m_sim->players()[0].isBot = false;
     leaveNetwork();
     if (m_net.host(static_cast<uint16_t>(port))) {
         m_hostPort = port;
         restartMatch();
+        std::string relayHost;
+        uint16_t relayPort = 0;
+        if (publish && net::parseHostPort(m_settings.relayAddress, relayHost, relayPort, net::kRelayDefaultPort)) {
+            m_net.publishToRelay(relayHost, relayPort);
+        }
     }
+}
+
+void App::joinRelayRoom(const std::string& code) {
+    std::string relayHost;
+    uint16_t relayPort = 0;
+    if (!net::parseHostPort(m_settings.relayAddress, relayHost, relayPort, net::kRelayDefaultPort)) {
+        log::warn("Invalid relay address '{}'", m_settings.relayAddress);
+        return;
+    }
+    m_titleScreen = false;
+    leaveNetwork();
+    m_clientReady = false;
+    m_net.connectViaRelay(relayHost, relayPort, code, m_playerName);
+}
+
+void App::drawInternetSection() {
+    ImGui::SeparatorText("Por internet (servidor intermedio)");
+    if (ImGui::InputText("Servidor intermedio", &m_settings.relayAddress)) {
+        m_nextRelayRefresh = 0.0;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit()) m_settings.save(settingsPath());
+    std::string relayHost;
+    uint16_t relayPort = 0;
+    const bool relayValid = net::parseHostPort(m_settings.relayAddress, relayHost, relayPort, net::kRelayDefaultPort);
+    if (m_net.isServer()) {
+        if (m_net.isPublished()) {
+            if (!m_net.relayCode().empty()) {
+                ImGui::Text("Código de la partida:");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", m_net.relayCode().c_str());
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Copiar")) ImGui::SetClipboardText(m_net.relayCode().c_str());
+            }
+            ImGui::TextDisabled("%s", m_net.relayStatus().c_str());
+            if (ImGui::Button("Dejar de publicar", ImVec2(-1, 0))) m_net.unpublishFromRelay();
+        } else {
+            if (!m_net.relayStatus().empty()) ImGui::TextDisabled("%s", m_net.relayStatus().c_str());
+            ImGui::BeginDisabled(!relayValid);
+            if (ImGui::Button("Publicar esta partida por internet", ImVec2(-1, 0))) m_net.publishToRelay(relayHost, relayPort);
+            ImGui::EndDisabled();
+        }
+    } else if (relayValid) {
+        if (m_time >= m_nextRelayRefresh) {
+            m_relayBrowser.refresh(relayHost, relayPort);
+            m_nextRelayRefresh = m_time + 3.0;
+        }
+        m_relayBrowser.poll();
+        if (!m_relayBrowser.status().empty()) ImGui::TextDisabled("%s", m_relayBrowser.status().c_str());
+        for (const net::RelayBrowser::Room& room : m_relayBrowser.rooms()) {
+            ImGui::PushID(room.code.c_str());
+            ImGui::Text("%s  ·  %s  ·  %d/%d  [%s]", room.name.c_str(), room.map.c_str(), room.players, room.maxPlayers, room.code.c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Unirse")) {
+                joinRelayRoom(room.code);
+                setMenuOpen(false);
+            }
+            ImGui::PopID();
+        }
+    }
+    ImGui::InputText("Código", &m_joinCode, ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
+    ImGui::BeginDisabled(!relayValid || m_joinCode.size() != static_cast<size_t>(net::kRelayCodeLength));
+    if (ImGui::Button("Unirse con código", ImVec2(-1, 0))) {
+        joinRelayRoom(m_joinCode);
+        setMenuOpen(false);
+    }
+    ImGui::EndDisabled();
+    ImGui::TextDisabled("El anfitrión publica la partida y comparte el código. No hace falta abrir puertos.");
 }
 
 void App::joinServer(const std::string& address, int port) {
@@ -574,6 +651,19 @@ int App::run() {
             }
             m_pendingScreenshot.clear();
         }
+        if (m_shotFbo) {
+            // Photo mode renders offscreen at a fixed size: mirror it into the window (letterboxed).
+            const glm::ivec2 window = m_window->framebufferSize();
+            const float scale = std::min(static_cast<float>(window.x) / static_cast<float>(framebuffer.x),
+                                         static_cast<float>(window.y) / static_cast<float>(framebuffer.y));
+            const int w = static_cast<int>(static_cast<float>(framebuffer.x) * scale);
+            const int h = static_cast<int>(static_cast<float>(framebuffer.y) * scale);
+            const int x = (window.x - w) / 2;
+            const int y = (window.y - h) / 2;
+            glClearNamedFramebufferfv(0, GL_COLOR, 0, std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}.data());
+            glBlitNamedFramebuffer(m_shotFbo, 0, 0, 0, framebuffer.x, framebuffer.y, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT,
+                                   GL_LINEAR);
+        }
         m_window->swapBuffers();
 
         if (!m_settings.vsync && m_settings.maxFps > 0) {
@@ -592,6 +682,7 @@ void App::updatePlaying(float frameDt) {
         for (const Player& p : m_sim->players()) humans += p.isBot ? 0 : 1;
         m_lan.announce(m_time, static_cast<uint16_t>(m_hostPort), m_playerName, m_world.map().name, humans,
                        m_weapons.rules().maxPlayers);
+        m_net.updateRelayInfo(m_playerName, m_world.map().name, humans, m_weapons.rules().maxPlayers);
     }
     if (m_net.isClient()) {
         updateNetworkClient();
@@ -1165,6 +1256,9 @@ void App::drawMenu() {
                 startHosting(std::clamp(m_hostPort, 1024, 65535));
                 setMenuOpen(false);
             }
+            if (ImGui::Button("Crear partida y publicarla por internet", ImVec2(-1, 0))) {
+                startHosting(std::clamp(m_hostPort, 1024, 65535), true);
+            }
             ImGui::SeparatorText("Partidas en la red local");
             m_lan.listen(m_time);
             if (m_lan.servers().empty()) {
@@ -1192,6 +1286,7 @@ void App::drawMenu() {
                 leaveNetwork();
             }
             ImGui::TextDisabled("Conexión directa por IP (abre el puerto UDP en tu router o usa una VPN LAN).");
+            drawInternetSection();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Partida")) {
