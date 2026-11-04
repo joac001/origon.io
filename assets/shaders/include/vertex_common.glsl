@@ -17,10 +17,14 @@ mat4 modelMatrix() { return uModel; }
 #ifdef SKINNED
 layout(location = 3) in uvec4 aJoints;
 layout(location = 4) in vec4 aWeights;
-uniform mat4 uBones[32];
+// All skin palettes of the frame live in one buffer; uBoneOffset selects this character's.
+layout(std430, binding = 1) readonly buffer BonePalettes {
+    mat4 uBones[];
+};
+uniform int uBoneOffset;
 mat4 skinMatrix() {
-    return uBones[aJoints.x] * aWeights.x + uBones[aJoints.y] * aWeights.y + uBones[aJoints.z] * aWeights.z +
-           uBones[aJoints.w] * aWeights.w;
+    return uBones[uBoneOffset + int(aJoints.x)] * aWeights.x + uBones[uBoneOffset + int(aJoints.y)] * aWeights.y +
+           uBones[uBoneOffset + int(aJoints.z)] * aWeights.z + uBones[uBoneOffset + int(aJoints.w)] * aWeights.w;
 }
 #else
 mat4 skinMatrix() { return mat4(1.0); }

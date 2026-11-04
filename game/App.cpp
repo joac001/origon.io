@@ -1115,6 +1115,7 @@ const std::vector<glm::mat4>& App::drawSoldierPose(const SkinnedModel::Pose& pos
         if (highlight) item.material.emissive = item.material.albedo * 0.35f;
         item.bones = skin.data();
         item.boneCount = static_cast<int>(skin.size());
+        item.shadowCascades = 2; // Characters are small: skip the far cascades.
         m_renderer.submit(item);
     }
     return m_soldierGlobals;
@@ -1126,6 +1127,7 @@ void App::submitModel(const Model& model, const glm::mat4& transform) {
         item.mesh = &part.mesh;
         item.material = part.material;
         item.model = transform;
+        item.shadowCascades = 2;
         m_renderer.submit(item);
     }
 }

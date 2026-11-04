@@ -352,6 +352,26 @@ Shader& Renderer::litVariant(const DrawItem& item) {
 }
 
 void Renderer::uploadInstances() {
+    // Skin palettes.
+    m_boneStaging.clear();
+    m_boneOffsets.clear();
+    for (const DrawItem& item : m_items) {
+        if (item.boneCount <= 0 || !item.bones || m_boneOffsets.contains(item.bones)) continue;
+        m_boneOffsets[item.bones] = static_cast<int>(m_boneStaging.size());
+        m_boneStaging.insert(m_boneStaging.end(), item.bones, item.bones + item.boneCount);
+    }
+    if (!m_boneStaging.empty()) {
+        const size_t bytes = m_boneStaging.size() * sizeof(glm::mat4);
+        if (bytes > m_boneCapacity) {
+            if (m_boneBuffer) glDeleteBuffers(1, &m_boneBuffer);
+            m_boneCapacity = std::max(bytes, m_boneCapacity * 2);
+            glCreateBuffers(1, &m_boneBuffer);
+            glNamedBufferData(m_boneBuffer, static_cast<GLsizeiptr>(m_boneCapacity), nullptr, GL_DYNAMIC_DRAW);
+        }
+        glNamedBufferSubData(m_boneBuffer, 0, static_cast<GLsizeiptr>(bytes), m_boneStaging.data());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_boneBuffer);
+    }
+
     m_instanceStaging.clear();
     m_itemInstanceOffsets.assign(m_items.size(), 0);
     for (size_t i = 0; i < m_items.size(); ++i) {
@@ -375,11 +395,17 @@ void Renderer::uploadInstances() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_instanceBuffer);
 }
 
-void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& viewProj, bool shadowPass, float time) {
+int Renderer::boneOffset(const DrawItem& item) const {
+    const auto it = m_boneOffsets.find(item.bones);
+    return it != m_boneOffsets.end() ? it->second : 0;
+}
+
+void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& viewProj, int cascade, float time) {
+    const bool shadowPass = cascade >= 0;
     Shader* current = nullptr;
     for (size_t i = 0; i < items.size(); ++i) {
         const DrawItem& item = items[i];
-        if (!item.mesh || (shadowPass && !item.castShadow)) {
+        if (!item.mesh || (shadowPass && (!item.castShadow || cascade >= item.shadowCascades))) {
             continue;
         }
         Shader& shader = item.boneCount > 0 ? (item.material.alphaTest ? m_depthSkinnedAlpha : m_depthSkinned)
@@ -402,7 +428,7 @@ void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& vi
             item.mesh->drawInstanced(item.instanceCount);
         } else {
             shader.set("uModel", item.model);
-            if (item.boneCount > 0) shader.setArray("uBones[0]", item.bones, std::min(item.boneCount, 32));
+            if (item.boneCount > 0) shader.set("uBoneOffset", boneOffset(item));
             if (item.material.alphaTest) glBindTextureUnit(2, item.material.albedoMap);
             item.mesh->draw();
         }
@@ -505,7 +531,7 @@ void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWo
             item.mesh->drawInstanced(item.instanceCount);
         } else {
             shader.set("uModel", toWorld * item.model);
-            if (item.boneCount > 0) shader.setArray("uBones[0]", item.bones, std::min(item.boneCount, 32));
+            if (item.boneCount > 0) shader.set("uBoneOffset", boneOffset(item));
             item.mesh->draw();
         }
         if (m.alphaTest) {
@@ -769,7 +795,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         for (int c = 0; c < m_cascadeCount; ++c) {
             glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFbos[static_cast<size_t>(c)]);
             glClear(GL_DEPTH_BUFFER_BIT);
-            drawDepth(m_items, m_cascadeViewProj[static_cast<size_t>(c)], true, environment.time);
+            drawDepth(m_items, m_cascadeViewProj[static_cast<size_t>(c)], c, environment.time);
         }
         glDisable(GL_POLYGON_OFFSET_FILL);
         m_stats.shadowCascades = m_cascadeCount;
@@ -782,7 +808,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glViewport(0, 0, m_sceneSize.x, m_sceneSize.y);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    drawDepth(m_items, viewProj, false, environment.time);
+    drawDepth(m_items, viewProj, -1, environment.time);
     if (m_targetSamples > 0) {
         glBlitNamedFramebuffer(m_msaaFbo, m_resolveFbo, 0, 0, m_sceneSize.x, m_sceneSize.y, 0, 0, m_sceneSize.x,
                                m_sceneSize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);

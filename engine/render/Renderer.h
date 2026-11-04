@@ -9,6 +9,7 @@
 #include <glm/vec4.hpp>
 
 #include <array>
+#include <unordered_map>
 #include <vector>
 
 namespace origon {
@@ -42,6 +43,8 @@ struct DrawItem {
     glm::mat4 model{1.0f};
     Material material;
     bool castShadow = true;
+    // Shadow cascades this item is drawn into (nearest first). Small detail can skip the far ones.
+    int shadowCascades = 4;
     // Instanced draw: per-instance model matrices (model is ignored). Must stay valid until render().
     const glm::mat4* instances = nullptr;
     int instanceCount = 0;
@@ -145,7 +148,8 @@ private:
     void destroyTargets();
     void computeCascades(const CameraView& camera, const Environment& environment);
     void drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWorld, const std::vector<int>& offsets);
-    void drawDepth(const std::vector<DrawItem>& items, const glm::mat4& viewProj, bool shadowPass, float time);
+    // cascade: shadow cascade index, or -1 for the camera depth prepass.
+    void drawDepth(const std::vector<DrawItem>& items, const glm::mat4& viewProj, int cascade, float time);
     void uploadInstances();
     Shader& litVariant(const DrawItem& item);
     void setLitFrameUniforms(Shader& shader, const CameraView& camera, const glm::mat4& viewProj, const Environment& environment,
@@ -227,6 +231,12 @@ private:
     size_t m_instanceCapacity = 0;
     std::vector<glm::mat4> m_instanceStaging;
     std::vector<int> m_itemInstanceOffsets;
+    // Skin palettes: one upload per frame, each distinct palette once (parts of a character share it).
+    unsigned m_boneBuffer = 0;
+    size_t m_boneCapacity = 0;
+    std::vector<glm::mat4> m_boneStaging;
+    std::unordered_map<const glm::mat4*, int> m_boneOffsets;
+    int boneOffset(const DrawItem& item) const;
     std::vector<int> m_noOffsets;
     float m_time = 0.0f;
     Shader m_skyShader;
