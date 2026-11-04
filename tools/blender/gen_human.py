@@ -23,7 +23,9 @@ import math
 import pathlib
 import sys
 
+import bmesh
 import bpy
+import mathutils.kdtree
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -277,6 +279,103 @@ def build_body(gender):
 CURL_SIGN = -1.0
 
 
+LODS = ((1, 0.22), (2, 0.07))  # (level, decimation ratio): drawn beyond ~10 m and ~30 m.
+TINY = ("x_eyes", "x_eyebrows", "x_eyelashes")
+
+
+def decimated_copy(source, name, ratio, rig):
+    """A collapsed copy of a skinned object (vertex groups and UVs are interpolated)."""
+    obj = bpy.data.objects.new(name, source.data.copy())
+    bpy.context.scene.collection.objects.link(obj)
+    for group in source.vertex_groups:
+        obj.vertex_groups.new(name=group.name)
+    modifier = obj.modifiers.new("decimate", "DECIMATE")
+    modifier.ratio = ratio
+    modifier.use_collapse_triangulate = True
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph), preserve_all_data_layers=True,
+                                           depsgraph=depsgraph)
+    obj.modifiers.clear()
+    obj.data = mesh
+    obj.parent = rig
+    obj.modifiers.new("rig", "ARMATURE").object = rig
+    return obj
+
+
+def make_lods(objects, rig):
+    """LOD1/LOD2 for every piece. The skin parts (split for clothing) merge into one body: at
+    distance nothing pokes through visibly. Eyes, brows and lashes have no LOD (hidden far away)."""
+    skin = [o for o in objects if o.name.startswith("x_skin_")]
+    merged = None
+    if skin:
+        merged = bpy.data.objects.new("x_skinall", bpy.data.meshes.new("x_skinall"))
+        bpy.context.scene.collection.objects.link(merged)
+        for group in skin[0].vertex_groups:
+            merged.vertex_groups.new(name=group.name)
+        bpy.ops.object.select_all(action="DESELECT")
+        copies = []
+        for o in skin:
+            c = bpy.data.objects.new(o.name + "_tmp", o.data.copy())
+            bpy.context.scene.collection.objects.link(c)
+            for group in o.vertex_groups:
+                c.vertex_groups.new(name=group.name)
+            copies.append(c)
+        for c in copies:
+            c.select_set(True)
+        bpy.context.view_layer.objects.active = copies[0]
+        bpy.ops.object.join()
+        merged = copies[0]
+        merged.name = "x_skinall"
+        # Weld the seams between the split parts so decimation does not open cracks.
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles(threshold=0.0001)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    out = []
+    sources = [o for o in objects if not o.name.startswith("x_skin_") and o.name not in TINY]
+    # Nearest original skin face -> its part, to split the decimated body like LOD0.
+    tree = None
+    if skin:
+        centers = [(poly.center.copy(), part.name) for part in skin for poly in part.data.polygons]
+        tree = mathutils.kdtree.KDTree(len(centers))
+        for i, (c, _) in enumerate(centers):
+            tree.insert(c, i)
+        tree.balance()
+    for level, ratio in LODS:
+        for o in sources:
+            # Small accessories are already light: keep more of them.
+            r = ratio if len(o.data.polygons) > 1500 else min(1.0, ratio * 2.5)
+            out.append(decimated_copy(o, f"{o.name}_LOD{level}", r, rig))
+        if merged:
+            body = decimated_copy(merged, "x_skin_tmp", ratio, rig)
+            owner = [centers[tree.find(poly.center)[1]][1] for poly in body.data.polygons]
+            for part in skin:
+                keep = {i for i, name in enumerate(owner) if name == part.name}
+                if not keep:
+                    continue
+                bm = bmesh.new()
+                bm.from_mesh(body.data)
+                bm.faces.ensure_lookup_table()
+                bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.index not in keep], context="FACES")
+                bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+                mesh = bpy.data.meshes.new(f"{part.name}_LOD{level}")
+                bm.to_mesh(mesh)
+                bm.free()
+                for material in body.data.materials:
+                    mesh.materials.append(material)
+                piece = bpy.data.objects.new(f"{part.name}_LOD{level}", mesh)
+                bpy.context.scene.collection.objects.link(piece)
+                for group in body.vertex_groups:
+                    piece.vertex_groups.new(name=group.name)
+                piece.parent = rig
+                piece.modifiers.new("rig", "ARMATURE").object = rig
+                out.append(piece)
+            bpy.data.objects.remove(body)
+    if merged:
+        bpy.data.objects.remove(merged)
+    return out
+
+
 def main():
     for gender in ("m", "f"):
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -307,6 +406,7 @@ def main():
             piece.weights = [{"head": 1.0} for _ in piece.verts]
             objects.append(piece.build(rig))
 
+        objects += make_lods(objects, rig)
         (gen_character.OUTPUT / f"soldier_{gender}.pieces.json").write_text(json.dumps({"hidden_by": hidden_by}, indent=1))
         gen_character.add_animations(rig)
         gen_character.export(rig, objects, f"soldier_{gender}.glb")

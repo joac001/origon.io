@@ -44,6 +44,7 @@ struct LaunchOptions {
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
     int lookGallery = -1;
     int pressPlayFrame = 0;
+    int forceLod = -1;         // Debug: draw characters at this LOD regardless of distance.
     int botCount = -1;         // >= 0: overrides the saved bot count for this run.
     float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
@@ -161,6 +162,8 @@ private:
     const SkinnedModel& soldierModel(const CharacterLook& look) const {
         return m_soldiers[look.female() && m_soldierFemale ? 1 : 0];
     }
+    glm::vec3 m_lodView{0.0f}; // Camera of the frame being built (character LOD selection).
+    float m_lodFov = 80.0f;
     std::vector<glm::mat4> m_soldierGlobals; // Scratch: joint globals of the last drawn soldier.
     std::vector<std::vector<glm::mat4>> m_skinBuffers;
     void submitSoldier(const Player& p, float alpha);

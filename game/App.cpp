@@ -698,6 +698,8 @@ int App::run() {
                 camera.view = glm::lookAt(camera.position, feet + glm::vec3(0.0f, 1.0f, 0.0f) - right * 0.55f, glm::vec3(0, 1, 0));
                 camera.fovYDegrees = 50.0f;
             }
+            m_lodView = camera.position;
+            m_lodFov = camera.fovYDegrees;
             m_world.submit(m_renderer, m_physics);
             submitPlayers(m_net.isClient() ? std::clamp(m_snapshotAge / (2.0f * kTickDt), 0.0f, 1.0f) : alpha,
                           m_options.fixedCamera || m_options.followPlayer >= 0);
@@ -1080,6 +1082,9 @@ const std::vector<glm::mat4>& App::drawSoldierPose(const SkinnedModel::Pose& pos
     std::vector<glm::mat4>& skin = m_skinBuffers.back();
     const size_t gender = look.female() && m_soldierFemale ? 1 : 0;
     const SkinnedModel& sk = m_soldiers[gender];
+    // Level of detail from the on-screen size: distance scaled by the zoom (scopes keep detail).
+    const float distance = glm::length(glm::vec3(model[3]) - m_lodView) * (m_lodFov / 80.0f);
+    const int lod = m_options.forceLod >= 0 ? m_options.forceLod : distance > 30.0f ? 2 : distance > 10.0f ? 1 : 0;
     std::vector<SoldierPiece>& pieces = m_soldierPieces[gender];
     sk.evaluate(pose, m_soldierGlobals, skin);
     if (pieces.size() != sk.parts().size()) {
@@ -1100,13 +1105,16 @@ const std::vector<glm::mat4>& App::drawSoldierPose(const SkinnedModel::Pose& pos
         pieces.clear();
         for (const SkinnedModel::Part& part : sk.parts()) {
             SoldierPiece piece = parseSoldierPiece(part.name);
-            if (auto it = hiddenBy.find(part.name); it != hiddenBy.end()) piece.hiddenBy = it->second;
+            // LOD pieces ("x_skin_03_LOD1") share the garment list of their LOD0 part.
+            const std::string base = part.name.substr(0, part.name.rfind("_LOD") == std::string::npos ? part.name.size()
+                                                                                                  : part.name.rfind("_LOD"));
+            if (auto it = hiddenBy.find(base); it != hiddenBy.end()) piece.hiddenBy = it->second;
             pieces.push_back(std::move(piece));
         }
     }
     for (size_t i = 0; i < sk.parts().size(); ++i) {
         const SkinnedModel::Part& part = sk.parts()[i];
-        if (!soldierPieceVisible(pieces[i], look)) continue;
+        if (!soldierPieceVisible(pieces[i], look, lod)) continue;
         DrawItem item;
         item.mesh = &part.mesh;
         item.model = model;

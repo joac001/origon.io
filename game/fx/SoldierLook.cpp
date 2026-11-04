@@ -28,8 +28,13 @@ glm::vec3 color(CharacterLook::Field field, const CharacterLook& look) {
 
 } // namespace
 
-SoldierPiece parseSoldierPiece(const std::string& nodeName) {
+SoldierPiece parseSoldierPiece(const std::string& fullName) {
     SoldierPiece piece;
+    std::string nodeName = fullName;
+    if (const size_t suffix = nodeName.rfind("_LOD"); suffix != std::string::npos && suffix + 4 < nodeName.size()) {
+        piece.lod = nodeName[suffix + 4] - '0';
+        nodeName = nodeName.substr(0, suffix);
+    }
     if (nodeName.size() < 3 || nodeName[1] != '_') {
         piece.slot = nodeName;
         return piece;
@@ -41,7 +46,8 @@ SoldierPiece parseSoldierPiece(const std::string& nodeName) {
     return piece;
 }
 
-bool soldierPieceVisible(const SoldierPiece& piece, const CharacterLook& look) {
+bool soldierPieceVisible(const SoldierPiece& piece, const CharacterLook& look, int lod) {
+    if (piece.lod != lod) return false;
     const std::string& slot = piece.slot;
     const std::string& v = piece.variant;
     if (slot == "skin") {

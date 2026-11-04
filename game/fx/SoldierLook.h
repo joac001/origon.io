@@ -17,10 +17,11 @@ struct SoldierPiece {
     std::string slot;
     std::string variant;
     std::vector<std::string> hiddenBy; // Skin parts: outfits/shoes that cover them (soldier_*.pieces.json).
+    int lod = 0;                       // "_LOD<n>" suffix of the node name.
 };
 
 SoldierPiece parseSoldierPiece(const std::string& nodeName);
-bool soldierPieceVisible(const SoldierPiece& piece, const CharacterLook& look);
+bool soldierPieceVisible(const SoldierPiece& piece, const CharacterLook& look, int lod = 0);
 // Recolors a piece material for the look (skin tone, hair, clothing colors, player armband).
 void applyLookMaterial(Material& material, const std::string& materialName, const CharacterLook& look,
                        const glm::vec3& playerColorLinear, class TextureCache& textures);
