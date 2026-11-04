@@ -54,7 +54,7 @@ glm::vec3 adsOffset(const glm::vec3& body) { return {0.0f, -0.085f - body.y * 0.
 
 App::App(const LaunchOptions& options) : m_options(options) {
     m_settings = GameSettings::load(settingsPath());
-    m_window = std::make_unique<Window>(WindowDesc{"Origon", 1600, 900, m_settings.vsync});
+    m_window = std::make_unique<Window>(WindowDesc{"Origon", 1600, 900, m_settings.vsync && options.benchSeconds <= 0.0f});
     m_input.attach(m_window->handle());
     initImGui();
 
@@ -74,6 +74,15 @@ App::App(const LaunchOptions& options) : m_options(options) {
     }
     m_soldierReady = m_soldiers[0].load("assets/models/characters/soldier_m.glb", &m_textures);
     m_soldierFemale = m_soldierReady && m_soldiers[1].load("assets/models/characters/soldier_f.glb", &m_textures);
+    // Skin textures are picked per look at draw time: load them now so a new face never stalls a frame.
+    for (const bool female : {false, true}) {
+        const LookCatalog skins = lookOptions(CharacterLook::SkinTone, female);
+        for (size_t i = 0; i < skins.count; ++i) {
+            m_textures.load(std::string("assets/textures/characters/skin_") + skins.options[i].id +
+                                (female ? "_female.jpg" : "_male.jpg"),
+                            true);
+        }
+    }
     m_effects.setSkinnedCorpses(m_soldierReady);
     m_world.setModelLibrary(&m_models);
     m_world.setTextureCache(&m_textures);
@@ -622,6 +631,7 @@ int App::run() {
             const auto hit = m_physics.rayCast(eye, viewDirection(m_viewYaw, m_viewPitch), 300.0f, true);
             frameSettings.focusDistance = hit ? std::max(hit->distance, 2.0f) : 60.0f;
         }
+        const auto tScene = Clock::now();
         m_renderer.beginFrame(frameSettings, framebuffer);
         CameraView camera;
         if (m_mode == Mode::Playing) {
@@ -646,11 +656,11 @@ int App::run() {
                 camera.fovYDegrees = 65.0f;
             }
             if (m_titleScreen) {
-                // Slow orbit above the map center.
-                const float angle = m_time * 0.05f;
+                // Very slow orbit above the map center, with a gentle height drift.
+                const float angle = m_time * 0.015f;
                 const float x = std::sin(angle) * 38.0f;
                 const float z = std::cos(angle) * 38.0f;
-                const glm::vec3 position(x, 9.0f + m_world.terrainHeight(x, z), z);
+                const glm::vec3 position(x, 9.0f + 0.6f * std::sin(m_time * 0.05f) + m_world.terrainHeight(x, z), z);
                 camera.position = position;
                 camera.view = glm::lookAt(position, glm::vec3(0.0f, m_world.terrainHeight(0.0f, 0.0f) + 2.0f, 0.0f), glm::vec3(0, 1, 0));
                 camera.fovYDegrees = 70.0f;
@@ -729,7 +739,9 @@ int App::run() {
         vegetation.density = m_settings.vegetationDensity;
         vegetation.distance = m_settings.vegetationDistance;
         m_world.submitVegetation(m_renderer, m_renderer.projection(camera) * camera.view, camera.position, vegetation);
+        const auto tRender = Clock::now();
         m_renderer.render(camera, environment);
+        const auto tUi = Clock::now();
 
         // --- UI -----------------------------------------------------------------------
         if (!m_options.hideUi) {
@@ -781,7 +793,16 @@ int App::run() {
             glBlitNamedFramebuffer(m_shotFbo, 0, 0, 0, framebuffer.x, framebuffer.y, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT,
                                    GL_LINEAR);
         }
+        const auto tSwap = Clock::now();
         m_window->swapBuffers();
+        const auto tEnd = Clock::now();
+        {
+            auto ms = [](auto a, auto b) { return std::chrono::duration<float, std::milli>(b - a).count(); };
+            const std::array<float, kCpuSections> sample{ms(frameStart, tScene), ms(tScene, tRender), ms(tRender, tUi),
+                                                         ms(tUi, tSwap), ms(tSwap, tEnd)};
+            for (size_t i = 0; i < sample.size(); ++i) m_cpuMs[i] = glm::mix(m_cpuMs[i], sample[i], 0.05f);
+            recordBench(dt, sample);
+        }
 
         if (!m_settings.vsync && m_settings.maxFps > 0) {
             std::this_thread::sleep_until(frameStart + std::chrono::duration<double>(1.0 / m_settings.maxFps));
@@ -1546,10 +1567,40 @@ void App::drawTitleScreen() {
 void App::drawStats(float) {
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     const RenderStats& stats = m_renderer.stats();
-    const std::string text = std::format("{:.0f} FPS  {:.2f} ms\nDraw calls: {}\nCascadas: {}", m_fpsSmoothed, m_frameMs,
-                                         stats.drawCalls, stats.shadowCascades);
-    dl->AddRectFilled(ImVec2(8, 8), ImVec2(190, 72), IM_COL32(0, 0, 0, 150), 4.0f);
+    std::string text = std::format("{:.0f} FPS  {:.2f} ms\nDraw calls: {}  Cascadas: {}\n\nCPU (ms)\n", m_fpsSmoothed, m_frameMs,
+                                   stats.drawCalls, stats.shadowCascades);
+    for (int i = 0; i < kCpuSections; ++i) text += std::format("  {:<10} {:5.2f}\n", kCpuSectionNames[i], m_cpuMs[static_cast<size_t>(i)]);
+    text += std::format("\nGPU {:.2f} ms\n", stats.gpuTotalMs);
+    for (size_t i = 0; i < stats.gpuMs.size(); ++i) text += std::format("  {:<10} {:5.2f}\n", kGpuSectionNames[i], stats.gpuMs[i]);
+    dl->AddRectFilled(ImVec2(8, 8), ImVec2(230, 330), IM_COL32(0, 0, 0, 160), 4.0f);
     dl->AddText(m_fontRegular, 15.0f, ImVec2(14, 12), IM_COL32(220, 230, 210, 255), text.c_str());
+}
+
+void App::recordBench(float dt, const std::array<float, kCpuSections>& cpu) {
+    if (m_options.benchSeconds <= 0.0f) return;
+    m_benchClock += dt;
+    if (m_benchClock < 2.0f) return; // Warm-up: shader compiles, first texture uploads.
+    m_benchFrames.push_back(dt * 1000.0f);
+    for (int i = 0; i < kCpuSections; ++i) m_benchCpu[static_cast<size_t>(i)] += cpu[static_cast<size_t>(i)];
+    const RenderStats& stats = m_renderer.stats();
+    for (size_t i = 0; i < stats.gpuMs.size(); ++i) m_benchGpu[i] += stats.gpuMs[i];
+    m_benchGpuTotal += stats.gpuTotalMs;
+    if (m_benchClock < 2.0f + m_options.benchSeconds) return;
+
+    std::vector<float> sorted = m_benchFrames;
+    std::sort(sorted.begin(), sorted.end());
+    const float n = static_cast<float>(sorted.size());
+    float sum = 0.0f;
+    for (float f : sorted) sum += f;
+    const float p99 = sorted[static_cast<size_t>(n * 0.99f)];
+    log::info("Bench: {} frames, avg {:.2f} ms ({:.0f} FPS), 1% worst {:.2f} ms, max {:.2f} ms, draw calls {}",
+              sorted.size(), sum / n, 1000.0f * n / sum, p99, sorted.back(), stats.drawCalls);
+    std::string cpuText, gpuText;
+    for (int i = 0; i < kCpuSections; ++i) cpuText += std::format(" {} {:.2f}", kCpuSectionNames[i], m_benchCpu[static_cast<size_t>(i)] / n);
+    for (size_t i = 0; i < stats.gpuMs.size(); ++i) gpuText += std::format(" {} {:.2f}", kGpuSectionNames[i], m_benchGpu[i] / n);
+    log::info("Bench CPU ms:{}", cpuText);
+    log::info("Bench GPU ms: total {:.2f} |{}", m_benchGpuTotal / n, gpuText);
+    m_window->requestClose();
 }
 
 } // namespace origon

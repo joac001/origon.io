@@ -96,9 +96,15 @@ struct RenderSettings {
     float bloomStrength = 0.06f;
 };
 
+// GPU time per render section (ms), measured with timestamp queries a few frames late.
+enum class GpuSection { Shadows, Prepass, Ssao, Opaque, Water, Post, Count };
+constexpr const char* kGpuSectionNames[] = {"Sombras", "Prepass", "SSAO", "Opacos", "Agua", "Post"};
+
 struct RenderStats {
     int drawCalls = 0;
     int shadowCascades = 0;
+    std::array<float, static_cast<size_t>(GpuSection::Count)> gpuMs{};
+    float gpuTotalMs = 0.0f;
 };
 
 class Renderer {
@@ -152,6 +158,14 @@ private:
 
     RenderSettings m_settings;
     RenderStats m_stats;
+    // Timestamp queries: kTimerFrames frames in flight, one query per section boundary.
+    static constexpr int kTimerFrames = 4;
+    static constexpr int kTimerMarks = static_cast<int>(GpuSection::Count) + 1;
+    unsigned m_timerQueries[kTimerFrames][kTimerMarks] = {};
+    bool m_timerIssued[kTimerFrames] = {};
+    int m_timerFrame = 0;
+    void markGpu(int boundary);
+    void collectGpuTimes();
     glm::ivec2 m_outputSize{0};
     glm::ivec2 m_sceneSize{0};
     int m_targetSamples = -1;

@@ -136,7 +136,12 @@ void Renderer::beginFrame(const RenderSettings& settings, glm::ivec2 framebuffer
     m_lights.clear();
     m_lines.clear();
     m_overlayLines.clear();
+    // GPU times arrive a few frames late: keep the last measurement.
+    const auto gpuMs = m_stats.gpuMs;
+    const float gpuTotal = m_stats.gpuTotalMs;
     m_stats = {};
+    m_stats.gpuMs = gpuMs;
+    m_stats.gpuTotalMs = gpuTotal;
     ensureTargets();
     ensureShadowMaps();
 }
@@ -717,7 +722,31 @@ void Renderer::renderWater(const CameraView& camera, const glm::mat4& viewProj, 
     glEnable(GL_CULL_FACE);
 }
 
+void Renderer::markGpu(int boundary) {
+    unsigned& query = m_timerQueries[m_timerFrame][boundary];
+    if (!query) glCreateQueries(GL_TIMESTAMP, 1, &query);
+    glQueryCounter(query, GL_TIMESTAMP);
+}
+
+void Renderer::collectGpuTimes() {
+    // The slot we are about to reuse was issued kTimerFrames frames ago: its results are ready.
+    if (!m_timerIssued[m_timerFrame]) return;
+    GLint available = 0;
+    glGetQueryObjectiv(m_timerQueries[m_timerFrame][kTimerMarks - 1], GL_QUERY_RESULT_AVAILABLE, &available);
+    if (!available) return;
+    GLuint64 stamps[kTimerMarks] = {};
+    for (int i = 0; i < kTimerMarks; ++i) glGetQueryObjectui64v(m_timerQueries[m_timerFrame][i], GL_QUERY_RESULT, &stamps[i]);
+    for (int i = 0; i + 1 < kTimerMarks; ++i) {
+        const float ms = static_cast<float>(stamps[i + 1] - stamps[i]) / 1.0e6f;
+        m_stats.gpuMs[static_cast<size_t>(i)] = ms;
+    }
+    m_stats.gpuTotalMs = static_cast<float>(stamps[kTimerMarks - 1] - stamps[0]) / 1.0e6f;
+}
+
 void Renderer::render(const CameraView& camera, const Environment& environment) {
+    m_timerFrame = (m_timerFrame + 1) % kTimerFrames;
+    collectGpuTimes();
+    markGpu(0);
     const glm::mat4 proj = projection(camera);
     const glm::mat4 viewProj = proj * camera.view;
     const bool shadowsOn = m_shadowSize > 0;
@@ -746,6 +775,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         m_stats.shadowCascades = m_cascadeCount;
     }
 
+    markGpu(1);
     // --- Depth prepass ---------------------------------------------------------------------
     const unsigned sceneFbo = m_targetSamples > 0 ? m_msaaFbo : m_resolveFbo;
     glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
@@ -758,6 +788,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
                                m_sceneSize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     }
 
+    markGpu(2);
     // --- SSAO from the prepass depth --------------------------------------------------------
     if (m_settings.ssao) {
         renderSsao(proj);
@@ -767,6 +798,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         glEnable(GL_CULL_FACE);
     }
 
+    markGpu(3);
     // --- Sky -------------------------------------------------------------------------------
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
@@ -795,7 +827,9 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glBindTextureUnit(9, m_resolveDepth);
 
     drawLit(m_items, glm::mat4(1.0f), m_itemInstanceOffsets);
+    markGpu(4);
     renderWater(camera, viewProj, environment, sceneFbo);
+    markGpu(5);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
     drawLines(m_lines, viewProj);
@@ -864,6 +898,8 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         glBindTextureUnit(unit, 0);
     }
     m_stats.drawCalls++;
+    markGpu(6);
+    m_timerIssued[m_timerFrame] = true;
 }
 
 } // namespace origon

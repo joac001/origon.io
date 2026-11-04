@@ -43,7 +43,8 @@ struct LaunchOptions {
     int followPlayer = -1;   // Third-person spectator camera behind this player.
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
     int lookGallery = -1;
-    int pressPlayFrame = 0;   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
+    int pressPlayFrame = 0;
+    float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
@@ -101,6 +102,16 @@ private:
     void drawInternetSection();
     void drawCharacterTab();
     void playFromTitle();
+    // CPU frame sections: update, scene building, renderer command submission, UI, swap.
+    static constexpr int kCpuSections = 5;
+    static constexpr const char* kCpuSectionNames[kCpuSections] = {"Lógica", "Escena", "Render", "UI", "Swap"};
+    std::array<float, kCpuSections> m_cpuMs{};
+    void recordBench(float dt, const std::array<float, kCpuSections>& cpu);
+    float m_benchClock = 0.0f;
+    std::vector<float> m_benchFrames;
+    std::array<float, kCpuSections> m_benchCpu{};
+    std::array<float, 6> m_benchGpu{};
+    float m_benchGpuTotal = 0.0f;
     void applyLook(const CharacterLook& look);
     // Character tab preview: a soldier in front of the camera while the tab is open.
     bool m_characterPreview = false;      // Tab drawn this frame.
