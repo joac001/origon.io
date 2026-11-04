@@ -826,7 +826,13 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glBindSampler(8, m_shadowRawSampler);
     glBindTextureUnit(9, m_resolveDepth);
 
+    // The prepass already wrote the final depth: test against it without writing, so fragments
+    // behind it are rejected before shading even for alpha-tested foliage (discard + depth writes
+    // would force late depth testing).
+    glDepthMask(GL_FALSE);
+    glDepthFunc(GL_LEQUAL);
     drawLit(m_items, glm::mat4(1.0f), m_itemInstanceOffsets);
+    glDepthMask(GL_TRUE);
     markGpu(4);
     renderWater(camera, viewProj, environment, sceneFbo);
     markGpu(5);
