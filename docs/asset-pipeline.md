@@ -38,7 +38,7 @@ One pipeline for the whole project. No manual modeling.
 |---|---|
 | `tools/blender/gen_vegetation.py` | `assets/models/vegetation/*.glb`: pine_a, pine_b, fir_a, redwood, maple, rock_a, rock_b, boulder, fern, grass, bush, log, stump (LOD0-2, `_COL` collision) |
 | `tools/blender/gen_weapons.py` | `assets/models/weapons/*.glb`: the 19 ladder weapons and the knife |
-| `tools/textures/gen_foliage.py` | `assets/textures/foliage/*.png`: needles, fern, leaves, grass cards |
+| `tools/textures/gen_foliage.py` | `assets/textures/foliage/*.png`: needles, fern, leaves, grass cards, composed from scanned CC0 ambientCG leaf atlases (LeafSet019, LeafSet026, LeafSet024, Foliage001) that `tools/fetch_assets.py` caches in `.cache/ambientcg/`. Without the cache it falls back to procedural drawings. |
 | `tools/fetch_assets.py` | `assets/textures/<id>/{albedo,normal,arm}.jpg` from Poly Haven (CC0) |
 | `tools/mapgen` (`origon_mapgen`) | `maps/bosque.json`, `maps/aserradero.json` |
 

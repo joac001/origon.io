@@ -54,5 +54,28 @@
       "id": "metal_plate",
       "use": "weapon metal"
     }
-  ]
+  ],
+  "atlases": {
+    "source": "ambientCG (https://ambientcg.com), CC0 license",
+    "resolution": "1K-PNG",
+    "note": "Scanned leaf atlases. Cached in .cache/ambientcg/<id>/ (not committed); tools/textures/gen_foliage.py composes the committed foliage cards from them.",
+    "items": [
+      {
+        "id": "LeafSet019",
+        "use": "conifer sprays: needle branch cards"
+      },
+      {
+        "id": "LeafSet026",
+        "use": "lobed leaflets: fern frond pinnae"
+      },
+      {
+        "id": "LeafSet024",
+        "use": "broad leaves: maple and bush cards"
+      },
+      {
+        "id": "Foliage001",
+        "use": "grass blades: ground cover cards"
+      }
+    ]
+  }
 }
