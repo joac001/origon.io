@@ -42,7 +42,7 @@ One pipeline for the whole project. No manual modeling.
 | `tools/textures/gen_foliage.py` | `assets/textures/foliage/*.png`: needles, fern, leaves, grass cards, composed from scanned CC0 ambientCG leaf atlases (LeafSet019, LeafSet026, LeafSet024, Foliage001) that `tools/fetch_assets.py` caches in `.cache/ambientcg/`. Without the cache it falls back to procedural drawings. |
 | `tools/sounds/build_sounds.py` | `assets/sounds/<name>_NN.flac` + `CREDITS.md` from `tools/sound_manifest.json`: downloads Freesound previews into `.cache/sounds/`, keeps only sounds whose page states CC0, cuts single hits by onset detection (or whole sequences, or seamless loops), loudness-normalizes per family and encodes FLAC with ffmpeg. The game loads every numbered file as a variant and falls back to synthesized sounds. |
 | `tools/fetch_assets.py` | `assets/textures/<id>/{albedo,normal,arm}.jpg` from Poly Haven (CC0) |
-| `tools/mapgen` (`origon_mapgen`) | `maps/bosque.json`, `maps/aserradero.json` |
+| `tools/mapgen` (`origon_mapgen`) | `maps/bosque.json`, `maps/aserradero.json`, or `procedural SEED`. The generators live in `game/world/MapGenerator.cpp`, so the game also builds procedural maps from a seed at runtime: terrain, a creek/lake/none, 4-6 structures (cabin, camp, watchtower, mill shed, bunkhouse, log yard, truck, ruins) on the flattest dry sites apart from each other, trails, a bridge or dock, fallen logs, vegetation density and lighting per seed, validated spawns. A portable RNG keeps seeds identical across compilers. |
 
 Material naming contract (models do not embed images): `bark_<id>`, `rock_<id>` and `pbr_<id>`
 use `assets/textures/<id>/`; `foliage_<name>` uses `assets/textures/foliage/<name>.png` with

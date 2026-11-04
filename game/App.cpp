@@ -1,5 +1,7 @@
 #include "App.h"
 
+#include "world/MapGenerator.h"
+
 #include "core/FileSystem.h"
 #include "core/Log.h"
 #include "fx/PlayerModel.h"
@@ -178,7 +180,16 @@ void App::buildWorld(const MapData& map) {
 }
 
 void App::loadMap(const std::string& fileName) {
-    auto map = MapData::load(fs::resolve("maps") / (fileName + ".json"));
+    std::optional<MapData> map;
+    if (fileName.rfind("procedural:", 0) == 0) {
+        // Generated in place from the seed; joining players receive it like any other map.
+        const auto seed = static_cast<uint32_t>(std::strtoul(fileName.c_str() + 11, nullptr, 10));
+        map = generateProceduralMap(seed);
+        m_proceduralSeed = static_cast<int>(seed);
+        log::info("Map: procedural seed {}", seed);
+    } else {
+        map = MapData::load(fs::resolve("maps") / (fileName + ".json"));
+    }
     if (!map) {
         log::warn("Map '{}' not found, using the default map", fileName);
         map = MapData::makeDefault();
@@ -1505,15 +1516,27 @@ void App::drawMenu() {
             ImGui::TextUnformatted("Modo: Gun Game (todos contra todos)");
             ImGui::SliderInt("Bots", &m_settings.botCount, 0, m_weapons.rules().maxPlayers - 1);
             ImGui::TextDisabled("Los bots se aplican al reiniciar la partida.");
-            if (ImGui::BeginCombo("Mapa", m_mapFile.c_str())) {
+            if (ImGui::BeginCombo("Mapa", mapLabel(m_mapFile).c_str())) {
                 for (const std::string& file : m_mapFiles) {
                     if (ImGui::Selectable(file.c_str(), file == m_mapFile)) {
                         loadMap(file);
                         setMenuOpen(false);
                     }
                 }
+                if (ImGui::Selectable("Procedural (nuevo al azar)")) {
+                    loadMap(randomProceduralMap());
+                    setMenuOpen(false);
+                }
                 ImGui::EndCombo();
             }
+            ImGui::SetNextItemWidth(160.0f);
+            ImGui::InputInt("Semilla", &m_proceduralSeed);
+            ImGui::SameLine();
+            if (ImGui::Button("Generar mapa procedural")) {
+                loadMap("procedural:" + std::to_string(std::max(0, m_proceduralSeed)));
+                setMenuOpen(false);
+            }
+            ImGui::TextDisabled("Cada semilla genera un mapa distinto: terreno, agua, estructuras y bosque.");
             if (ImGui::Button("Reiniciar con estos ajustes", ImVec2(-1, 0))) {
                 restartMatch();
                 setMenuOpen(false);
@@ -1572,6 +1595,16 @@ void App::updateAutoPreset() {
     m_settings.save(settingsPath());
 }
 
+std::string App::mapLabel(const std::string& file) {
+    if (file.rfind("procedural:", 0) == 0) return "Procedural #" + file.substr(11);
+    return file;
+}
+
+std::string App::randomProceduralMap() {
+    const auto seed = static_cast<uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count() % 1000000);
+    return "procedural:" + std::to_string(seed);
+}
+
 void App::playFromTitle() {
     m_titleScreen = false;
     m_sim->players()[0].isBot = false;
@@ -1612,10 +1645,11 @@ void App::drawTitleScreen() {
     ImGui::PopFont();
     ImGui::Spacing();
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::BeginCombo("##map", ("Mapa: " + m_mapFile).c_str())) {
+    if (ImGui::BeginCombo("##map", ("Mapa: " + mapLabel(m_mapFile)).c_str())) {
         for (const std::string& file : m_mapFiles) {
             if (ImGui::Selectable(file.c_str(), file == m_mapFile)) loadMap(file);
         }
+        if (ImGui::Selectable("Procedural (nuevo al azar)")) loadMap(randomProceduralMap());
         ImGui::EndCombo();
     }
     ImGui::End();

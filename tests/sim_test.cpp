@@ -5,6 +5,7 @@
 #include "sim/Simulation.h"
 #include "sim/Weapons.h"
 #include "world/MapData.h"
+#include "world/MapGenerator.h"
 #include "world/World.h"
 
 #include <cstdio>
@@ -114,6 +115,46 @@ void testFullMatch(const WeaponDatabase& weapons) {
     check(positionsValid, "living players stay inside the map");
 }
 
+// Procedural maps: deterministic per seed, valid spawns on dry ground, playable headless.
+void testProceduralMaps(const WeaponDatabase& weapons) {
+    for (uint32_t seed : {1u, 7u, 42u, 1234u}) {
+        const MapData a = generateProceduralMap(seed);
+        const MapData b = generateProceduralMap(seed);
+        check(a.toJson() == b.toJson(), "procedural map is deterministic");
+        check(a.spawns.size() == 12, "procedural map has 12 spawns");
+        check(a.blocks.size() > 20, "procedural map has structures");
+        bool dry = true;
+        for (const SpawnData& spawn : a.spawns) {
+            if (a.terrain.waterEnabled && a.terrain.heightAt(spawn.position.x, spawn.position.z) < a.terrain.waterLevel + 0.3f) dry = false;
+        }
+        check(dry, "procedural spawns are above water");
+    }
+    check(generateProceduralMap(1).toJson() != generateProceduralMap(2).toJson(), "different seeds give different maps");
+
+    const MapData map = generateProceduralMap(7);
+    PhysicsWorld physics;
+    ModelLibrary library(nullptr);
+    World world;
+    world.setHeadless(true);
+    world.setModelLibrary(&library);
+    world.build(map, physics);
+    Simulation sim(physics, weapons);
+    sim.startMatch(world.map(), 9);
+    sim.players()[0].isBot = true;
+    std::vector<PlayerCommand> commands;
+    int kills = 0, tick = 0;
+    const int maxTicks = static_cast<int>(weapons.rules().timeLimitSeconds * kTickRate) + 300;
+    for (; tick < maxTicks && sim.gunGame().phase() == GunGame::Phase::Playing; ++tick) {
+        sim.computeBotCommands(commands);
+        sim.tick(commands);
+        for (const GameEvent& e : sim.takeEvents()) {
+            if (e.type == GameEvent::Type::Kill) ++kills;
+        }
+    }
+    std::printf("       procedural #7 match: %.1f s, %d kills\n", static_cast<float>(tick) / kTickRate, kills);
+    check(kills > 20, "bots fight on a procedural map");
+}
+
 // Full bot match on a generated outdoor map: terrain, vegetation collision and structures.
 void testOutdoorMatch(const WeaponDatabase& weapons, const char* name) {
     auto map = MapData::load(fs::resolve("maps") / (std::string(name) + ".json"));
@@ -164,6 +205,7 @@ int main() {
     testFullMatch(weapons);
     testOutdoorMatch(weapons, "bosque");
     testOutdoorMatch(weapons, "aserradero");
+    testProceduralMaps(weapons);
     std::printf("%s (%d failures)\n", g_failures == 0 ? "ALL PASSED" : "FAILED", g_failures);
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

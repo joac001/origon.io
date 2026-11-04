@@ -104,6 +104,9 @@ private:
     void drawInternetSection();
     void drawCharacterTab();
     void playFromTitle();
+    static std::string mapLabel(const std::string& file);
+    static std::string randomProceduralMap();
+    int m_proceduralSeed = 1;
     void applyGraphicsPreset(int level); // 0 Batata, 1 Media, 2 Alta, 3 Ultra.
     void updateAutoPreset();
     bool m_autoPresetPending = false;    // No settings file yet: pick a preset from measured GPU time.
