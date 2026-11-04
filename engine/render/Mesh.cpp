@@ -32,6 +32,32 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& ind
     m_indexCount = static_cast<int>(indices.size());
 }
 
+Mesh::Mesh(const std::vector<SkinnedVertex>& vertices, const std::vector<uint32_t>& indices) {
+    glCreateBuffers(1, &m_vbo);
+    glNamedBufferStorage(m_vbo, static_cast<GLsizeiptr>(vertices.size() * sizeof(SkinnedVertex)), vertices.data(), 0);
+    glCreateBuffers(1, &m_ibo);
+    glNamedBufferStorage(m_ibo, static_cast<GLsizeiptr>(indices.size() * sizeof(uint32_t)), indices.data(), 0);
+    glCreateVertexArrays(1, &m_vao);
+    glVertexArrayVertexBuffer(m_vao, 0, m_vbo, 0, sizeof(SkinnedVertex));
+    glVertexArrayElementBuffer(m_vao, m_ibo);
+    glEnableVertexArrayAttrib(m_vao, 0);
+    glVertexArrayAttribFormat(m_vao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(SkinnedVertex, position));
+    glVertexArrayAttribBinding(m_vao, 0, 0);
+    glEnableVertexArrayAttrib(m_vao, 1);
+    glVertexArrayAttribFormat(m_vao, 1, 3, GL_FLOAT, GL_FALSE, offsetof(SkinnedVertex, normal));
+    glVertexArrayAttribBinding(m_vao, 1, 0);
+    glEnableVertexArrayAttrib(m_vao, 2);
+    glVertexArrayAttribFormat(m_vao, 2, 2, GL_FLOAT, GL_FALSE, offsetof(SkinnedVertex, uv));
+    glVertexArrayAttribBinding(m_vao, 2, 0);
+    glEnableVertexArrayAttrib(m_vao, 3);
+    glVertexArrayAttribIFormat(m_vao, 3, 4, GL_UNSIGNED_SHORT, offsetof(SkinnedVertex, joints));
+    glVertexArrayAttribBinding(m_vao, 3, 0);
+    glEnableVertexArrayAttrib(m_vao, 4);
+    glVertexArrayAttribFormat(m_vao, 4, 4, GL_FLOAT, GL_FALSE, offsetof(SkinnedVertex, weights));
+    glVertexArrayAttribBinding(m_vao, 4, 0);
+    m_indexCount = static_cast<int>(indices.size());
+}
+
 Mesh::~Mesh() { release(); }
 
 Mesh::Mesh(Mesh&& other) noexcept

@@ -8,6 +8,7 @@
 #include "net/NetSession.h"
 #include "physics/PhysicsWorld.h"
 #include "render/Renderer.h"
+#include "render/SkinnedModel.h"
 #include "render/Texture.h"
 #include "world/Vegetation.h"
 #include "sim/Simulation.h"
@@ -33,6 +34,7 @@ struct LaunchOptions {
     bool autoplay = false; // The local player is driven by the bot AI (spectator/demo).
     bool hideUi = false;
     bool forceTitle = false; // Show the title screen even in capture mode.
+    int followPlayer = -1;   // Third-person spectator camera behind this player.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
     glm::vec3 cameraPosition{0.0f};
@@ -119,6 +121,10 @@ private:
     float m_roll = 0.0f;
     glm::vec2 m_sway{0.0f};
     std::vector<float> m_walkPhase;
+    SkinnedModel m_soldier;
+    bool m_soldierReady = false;
+    std::vector<std::vector<glm::mat4>> m_skinBuffers;
+    void submitSoldier(const Player& p, float alpha);
     CameraView m_lastCamera;
 
     ImFont* m_fontRegular = nullptr;

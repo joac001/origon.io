@@ -170,6 +170,10 @@ void Shader::set(const char* name, const glm::vec4& value) {
     glProgramUniform4fv(m_program, location(name), 1, glm::value_ptr(value));
 }
 
+void Shader::setArray(const char* name, const glm::mat4* values, int count) {
+    glProgramUniformMatrix4fv(m_program, location(name), count, GL_FALSE, glm::value_ptr(values[0]));
+}
+
 void Shader::set(const char* name, const glm::mat4& value) {
     glProgramUniformMatrix4fv(m_program, location(name), 1, GL_FALSE, glm::value_ptr(value));
 }

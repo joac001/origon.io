@@ -160,7 +160,8 @@ void Effects::submit(Renderer& renderer, const PhysicsWorld& physics) const {
     for (const Particle& p : m_particles) {
         const float fade = std::clamp(p.life / p.maxLife, 0.0f, 1.0f);
         DrawItem item;
-        item.mesh = &renderer.cube();
+        // Sparks are small cubes; smoke, dust and chips are rounded puffs.
+        item.mesh = p.emissive ? &renderer.cube() : &renderer.sphere();
         item.model = glm::translate(glm::mat4(1.0f), p.position) * glm::scale(glm::mat4(1.0f), glm::vec3(p.size * (p.emissive ? 1.0f : std::sqrt(fade))));
         item.castShadow = false;
         if (p.emissive) {

@@ -10,7 +10,8 @@ add_library(origon_engine STATIC
     audio/Synth.cpp
     render/Screenshot.cpp
     render/Texture.cpp
-    render/Model.cpp)
+    render/Model.cpp
+    render/SkinnedModel.cpp)
 
 target_include_directories(origon_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

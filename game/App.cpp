@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cmath>
 #include <ctime>
 #include <format>
@@ -64,6 +65,7 @@ App::App(const LaunchOptions& options) : m_options(options) {
         m_audio.setVolume(m_settings.masterVolume);
         m_audio.setAmbienceEnabled(m_settings.ambience);
     }
+    m_soldierReady = m_soldier.load("assets/models/characters/soldier.glb");
     m_world.setModelLibrary(&m_models);
     m_world.setTextureCache(&m_textures);
     m_sim = std::make_unique<Simulation>(m_physics, m_weapons);
@@ -459,6 +461,22 @@ int App::run() {
             updateCameraFeel(dt);
             camera = playingCamera(alpha);
             m_lastCamera = camera;
+            if (m_options.followPlayer >= 0 && m_options.followPlayer < static_cast<int>(m_sim->players().size())) {
+                const Player& target = m_sim->players()[static_cast<size_t>(m_options.followPlayer)];
+                const glm::vec3 feet = glm::mix(target.previousPosition, target.position, alpha);
+                const glm::vec3 pivot = feet + glm::vec3(0.0f, 1.7f, 0.0f);
+                glm::vec3 offset = -viewDirection(target.yaw + 0.5f, 0.0f) * 3.2f + glm::vec3(0.0f, 0.3f, 0.0f);
+                // Keep the spectator camera out of trees and walls.
+                for (float side : {0.5f, -0.5f, 1.4f, -1.4f}) {
+                    const glm::vec3 candidate = -viewDirection(target.yaw + side, 0.0f) * 3.2f + glm::vec3(0.0f, 0.3f, 0.0f);
+                    auto hit = m_physics.rayCast(pivot, glm::normalize(candidate), glm::length(candidate), true);
+                    offset = hit ? glm::normalize(candidate) * std::max(hit->distance - 0.3f, 1.6f) : candidate;
+                    if (!hit || hit->distance > 2.0f) break;
+                }
+                camera.position = pivot + offset;
+                camera.view = glm::lookAt(camera.position, feet + glm::vec3(0.0f, 1.2f, 0.0f), glm::vec3(0, 1, 0));
+                camera.fovYDegrees = 65.0f;
+            }
             if (m_titleScreen) {
                 // Slow orbit above the map center.
                 const float angle = m_time * 0.05f;
@@ -477,7 +495,8 @@ int App::run() {
                 camera.fovYDegrees = m_settings.fov;
             }
             m_world.submit(m_renderer, m_physics);
-            submitPlayers(m_net.isClient() ? std::clamp(m_snapshotAge / (2.0f * kTickDt), 0.0f, 1.0f) : alpha, m_options.fixedCamera);
+            submitPlayers(m_net.isClient() ? std::clamp(m_snapshotAge / (2.0f * kTickDt), 0.0f, 1.0f) : alpha,
+                          m_options.fixedCamera || m_options.followPlayer >= 0);
             m_effects.submit(m_renderer, m_physics);
             if (!m_titleScreen) submitViewModel(dt);
             if (m_audioReady) {
@@ -657,7 +676,8 @@ void App::updatePlaying(float frameDt) {
     m_walkPhase.resize(m_sim->players().size(), 0.0f);
     for (const Player& p : m_sim->players()) {
         const float speed = glm::length(glm::vec2(p.velocity.x, p.velocity.z));
-        m_walkPhase[static_cast<size_t>(p.id)] += speed * frameDt * 2.3f;
+        // Walk/run cycle advances with ground speed (the run clip matches ~6.5 m/s).
+        m_walkPhase[static_cast<size_t>(p.id)] += speed * frameDt * (m_soldierReady ? 1.0f / 6.5f : 2.3f);
     }
 }
 
@@ -742,9 +762,78 @@ glm::vec3 App::localMuzzle() const {
     return glm::vec3(glm::inverse(m_lastCamera.view) * glm::vec4(offset, 1.0f));
 }
 
+void App::submitSoldier(const Player& p, float alpha) {
+    const glm::vec3 feet = glm::mix(p.previousPosition, p.position, alpha);
+    const float speed = glm::length(glm::vec2(p.velocity.x, p.velocity.z));
+    const float crouch = std::clamp((kEyeHeight - p.eyeHeight) / (kEyeHeight - kCrouchEyeHeight), 0.0f, 1.0f);
+    const float cycle = m_walkPhase[static_cast<size_t>(p.id)];
+
+    static const int idleClip = m_soldier.findClip("idle");
+    static const int runClip = m_soldier.findClip("run");
+    static const int crouchClip = m_soldier.findClip("crouch");
+    static const int spine = m_soldier.findJoint("spine");
+    static const int chest = m_soldier.findJoint("chest");
+    static const int hand = m_soldier.findJoint("hand.R");
+
+    SkinnedModel::Pose pose = m_soldier.restPose();
+    m_soldier.sample(idleClip, m_time + static_cast<float>(p.id) * 0.37f, pose);
+    if (p.onGround && speed > 0.3f) {
+        SkinnedModel::Pose run = m_soldier.restPose();
+        m_soldier.sample(runClip, cycle * m_soldier.clipDuration(runClip), run);
+        SkinnedModel::blend(pose, run, std::clamp(speed / 3.5f, 0.0f, 1.0f));
+    }
+    if (crouch > 0.01f) {
+        SkinnedModel::Pose crouched = m_soldier.restPose();
+        m_soldier.sample(crouchClip, 0.0f, crouched);
+        SkinnedModel::blend(pose, crouched, crouch);
+    }
+    // Aim: bend the spine and chest toward the view pitch (positive pitch leans back = looks up).
+    m_soldier.rotateJoint(pose, spine, glm::vec3(1, 0, 0), p.pitch * 0.45f);
+    m_soldier.rotateJoint(pose, chest, glm::vec3(1, 0, 0), p.pitch * 0.45f);
+
+    std::vector<glm::mat4> globals;
+    m_skinBuffers.emplace_back();
+    std::vector<glm::mat4>& skin = m_skinBuffers.back();
+    m_soldier.evaluate(pose, globals, skin);
+
+    const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), p.yaw, glm::vec3(0, 1, 0));
+    const glm::vec3 tint = World::toLinear(p.color);
+    for (const SkinnedModel::Part& part : m_soldier.parts()) {
+        DrawItem item;
+        item.mesh = &part.mesh;
+        item.model = model;
+        item.material = part.material;
+        if (part.tint) item.material.albedo = glm::mix(part.material.albedo, tint, 0.45f);
+        if (p.spawnProtection > 0.0f) item.material.emissive = item.material.albedo * 0.35f;
+        item.bones = skin.data();
+        item.boneCount = static_cast<int>(skin.size());
+        m_renderer.submit(item);
+    }
+    // Weapon in the right hand, aligned with the aim direction.
+    if (const Model* gun = m_models.getWeapon(m_sim->weaponFor(p).id); gun && hand >= 0) {
+        const glm::vec3 handPosition(globals[static_cast<size_t>(hand)][3]);
+        const glm::mat4 gunMatrix = model * glm::translate(glm::mat4(1.0f), handPosition) *
+                                    glm::rotate(glm::mat4(1.0f), p.pitch, glm::vec3(1, 0, 0)) *
+                                    glm::translate(glm::mat4(1.0f), glm::vec3(-0.02f, -0.02f, 0.03f));
+        for (const ModelPart& part : gun->lod(0)) {
+            DrawItem item;
+            item.mesh = &part.mesh;
+            item.material = part.material;
+            item.model = gunMatrix;
+            m_renderer.submit(item);
+        }
+    }
+}
+
 void App::submitPlayers(float alpha, bool includeLocal) {
+    m_skinBuffers.clear();
+    m_skinBuffers.reserve(m_sim->players().size());
     for (const Player& p : m_sim->players()) {
         if ((p.id == m_sim->localPlayerId() && !includeLocal) || !p.alive) continue;
+        if (m_soldierReady) {
+            submitSoldier(p, alpha);
+            continue;
+        }
         PlayerPose pose;
         pose.feet = glm::mix(p.previousPosition, p.position, alpha);
         pose.rotation = glm::angleAxis(p.yaw, glm::vec3(0, 1, 0));

@@ -80,6 +80,8 @@ bool Renderer::init() {
     ok &= m_litShader.loadFile("assets/shaders/lit.glsl");
     ok &= m_litInstanced.loadFile("assets/shaders/lit.glsl", "#define INSTANCED\n");
     ok &= m_litFoliage.loadFile("assets/shaders/lit.glsl", "#define INSTANCED\n#define FOLIAGE\n");
+    ok &= m_litSkinned.loadFile("assets/shaders/lit.glsl", "#define SKINNED\n");
+    ok &= m_depthSkinned.loadFile("assets/shaders/depth.glsl", "#define SKINNED\n");
     ok &= m_depthShader.loadFile("assets/shaders/depth.glsl");
     ok &= m_depthInstanced.loadFile("assets/shaders/depth.glsl", "#define INSTANCED\n");
     ok &= m_depthFoliage.loadFile("assets/shaders/depth.glsl", "#define INSTANCED\n#define FOLIAGE\n");
@@ -333,6 +335,9 @@ void Renderer::computeCascades(const CameraView& camera, const Environment& envi
 // --- Passes ---------------------------------------------------------------------------------
 
 Shader& Renderer::litVariant(const DrawItem& item) {
+    if (item.boneCount > 0) {
+        return m_litSkinned;
+    }
     if (item.instanceCount > 0) {
         return item.material.alphaTest ? m_litFoliage : m_litInstanced;
     }
@@ -370,7 +375,9 @@ void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& vi
         if (!item.mesh || (shadowPass && !item.castShadow)) {
             continue;
         }
-        Shader& shader = item.instanceCount > 0 ? (item.material.alphaTest ? m_depthFoliage : m_depthInstanced) : m_depthShader;
+        Shader& shader = item.boneCount > 0 ? m_depthSkinned
+                         : item.instanceCount > 0 ? (item.material.alphaTest ? m_depthFoliage : m_depthInstanced)
+                                                  : m_depthShader;
         if (&shader != current) {
             current = &shader;
             shader.bind();
@@ -388,6 +395,7 @@ void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& vi
             item.mesh->drawInstanced(item.instanceCount);
         } else {
             shader.set("uModel", item.model);
+            if (item.boneCount > 0) shader.setArray("uBones[0]", item.bones, std::min(item.boneCount, 32));
             item.mesh->draw();
         }
         if (twoSided) glEnable(GL_CULL_FACE);
@@ -489,6 +497,7 @@ void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWo
             item.mesh->drawInstanced(item.instanceCount);
         } else {
             shader.set("uModel", toWorld * item.model);
+            if (item.boneCount > 0) shader.setArray("uBones[0]", item.bones, std::min(item.boneCount, 32));
             item.mesh->draw();
         }
         if (m.alphaTest) {
@@ -774,6 +783,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     setLitFrameUniforms(m_litShader, camera, viewProj, environment, shadowsOn);
     setLitFrameUniforms(m_litInstanced, camera, viewProj, environment, shadowsOn);
     setLitFrameUniforms(m_litFoliage, camera, viewProj, environment, shadowsOn);
+    setLitFrameUniforms(m_litSkinned, camera, viewProj, environment, shadowsOn);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
     glBindTextureUnit(8, shadowsOn ? m_shadowArray : 0);

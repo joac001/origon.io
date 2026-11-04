@@ -31,6 +31,7 @@ public:
     void set(const char* name, const glm::vec3& value);
     void set(const char* name, const glm::vec4& value);
     void set(const char* name, const glm::mat4& value);
+    void setArray(const char* name, const glm::mat4* values, int count);
 
 private:
     int location(const char* name);

@@ -14,6 +14,18 @@ uniform mat4 uModel;
 mat4 modelMatrix() { return uModel; }
 #endif
 
+#ifdef SKINNED
+layout(location = 3) in uvec4 aJoints;
+layout(location = 4) in vec4 aWeights;
+uniform mat4 uBones[32];
+mat4 skinMatrix() {
+    return uBones[aJoints.x] * aWeights.x + uBones[aJoints.y] * aWeights.y + uBones[aJoints.z] * aWeights.z +
+           uBones[aJoints.w] * aWeights.w;
+}
+#else
+mat4 skinMatrix() { return mat4(1.0); }
+#endif
+
 uniform mat4 uViewProj;
 uniform float uTime;
 uniform float uWindStrength;

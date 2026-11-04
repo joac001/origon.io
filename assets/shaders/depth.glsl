@@ -6,7 +6,7 @@ out vec2 vUv;
 invariant gl_Position;
 
 void main() {
-    mat4 model = modelMatrix();
+    mat4 model = modelMatrix() * skinMatrix();
     vec4 world = model * vec4(aPosition, 1.0);
     world.xyz = applyWind(world.xyz, aPosition, model);
     vUv = aUv;

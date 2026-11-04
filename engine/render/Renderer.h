@@ -45,6 +45,9 @@ struct DrawItem {
     // Instanced draw: per-instance model matrices (model is ignored). Must stay valid until render().
     const glm::mat4* instances = nullptr;
     int instanceCount = 0;
+    // Skinned draw: joint matrices (model space). Must stay valid until render().
+    const glm::mat4* bones = nullptr;
+    int boneCount = 0;
 };
 
 struct PointLight {
@@ -199,6 +202,8 @@ private:
     Shader m_litShader;
     Shader m_litInstanced;
     Shader m_litFoliage;
+    Shader m_litSkinned;
+    Shader m_depthSkinned;
     Shader m_depthShader;
     Shader m_depthInstanced;
     Shader m_depthFoliage;

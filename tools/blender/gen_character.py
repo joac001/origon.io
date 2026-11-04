@@ -1,0 +1,227 @@
+"""Rigged WWII soldier for Origon, generated headless in Blender.
+
+Run:
+    blender --background --factory-startup --python tools/blender/gen_character.py
+
+Writes assets/models/characters/soldier.glb: one skinned mesh (rigid weights per body part),
+an armature, and NLA tracks exported as animations: idle, run, crouch.
+The character faces Blender +Y (engine -Z), feet at the origin, holding a rifle pose.
+The material named "tint" is recolored per player by the engine.
+"""
+import math
+import pathlib
+
+import bmesh
+import bpy
+from mathutils import Vector
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+OUTPUT = ROOT / "assets" / "models" / "characters"
+FPS = 30
+
+# name: (head, tail, parent)
+BONES = {
+    "hips": ((0, 0, 0.92), (0, 0, 1.05), None),
+    "spine": ((0, 0, 1.05), (0, 0, 1.28), "hips"),
+    "chest": ((0, 0, 1.28), (0, 0, 1.48), "spine"),
+    "neck": ((0, 0, 1.48), (0, 0, 1.58), "chest"),
+    "head": ((0, 0, 1.58), (0, 0, 1.82), "neck"),
+    "upperarm.R": ((0.21, 0, 1.44), (0.22, 0.16, 1.22), "chest"),
+    "forearm.R": ((0.22, 0.16, 1.22), (0.1, 0.36, 1.27), "upperarm.R"),
+    "hand.R": ((0.1, 0.36, 1.27), (0.07, 0.44, 1.27), "forearm.R"),
+    "upperarm.L": ((-0.21, 0, 1.44), (-0.2, 0.2, 1.25), "chest"),
+    "forearm.L": ((-0.2, 0.2, 1.25), (-0.02, 0.52, 1.3), "upperarm.L"),
+    "hand.L": ((-0.02, 0.52, 1.3), (0.0, 0.6, 1.3), "forearm.L"),
+    "thigh.R": ((0.11, 0, 0.92), (0.11, 0.02, 0.5), "hips"),
+    "shin.R": ((0.11, 0.02, 0.5), (0.11, 0, 0.09), "thigh.R"),
+    "foot.R": ((0.11, 0, 0.09), (0.11, 0.17, 0.03), "shin.R"),
+    "thigh.L": ((-0.11, 0, 0.92), (-0.11, 0.02, 0.5), "hips"),
+    "shin.L": ((-0.11, 0.02, 0.5), (-0.11, 0, 0.09), "thigh.L"),
+    "foot.L": ((-0.11, 0, 0.09), (-0.11, 0.17, 0.03), "shin.L"),
+}
+
+COLORS = {
+    "tint": ((0.32, 0.36, 0.22), 0.85),
+    "skin": ((0.62, 0.42, 0.3), 0.6),
+    "gear": ((0.12, 0.1, 0.07), 0.7),
+    "helmet": ((0.16, 0.2, 0.12), 0.55),
+    "trousers": ((0.18, 0.19, 0.12), 0.9),
+}
+
+
+def material(name):
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    color, roughness = COLORS[name]
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (*color, 1.0)
+    bsdf.inputs["Roughness"].default_value = roughness
+    return mat
+
+
+def make_armature():
+    data = bpy.data.armatures.new("soldier_rig")
+    rig = bpy.data.objects.new("soldier_rig", data)
+    bpy.context.scene.collection.objects.link(rig)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="EDIT")
+    for name, (head, tail, parent) in BONES.items():
+        bone = data.edit_bones.new(name)
+        bone.head = Vector(head)
+        bone.tail = Vector(tail)
+        bone.roll = 0.0
+        if parent:
+            bone.parent = data.edit_bones[parent]
+            bone.use_connect = False
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return rig
+
+
+class Body:
+    def __init__(self):
+        self.bm = bmesh.new()
+        self.deform = self.bm.verts.layers.deform.verify()
+        self.groups = list(BONES)
+        self.materials = []
+
+    def part(self, bone, start, end, width, depth, mat, pad=0.0):
+        """Box from start to end (long axis), width along the side axis, depth across."""
+        start, end = Vector(start), Vector(end)
+        axis = end - start
+        length = axis.length
+        axis.normalize()
+        helper = Vector((0, 0, 1)) if abs(axis.z) < 0.9 else Vector((0, 1, 0))
+        side = axis.cross(helper).normalized()
+        front = side.cross(axis).normalized()
+        if mat not in self.materials:
+            self.materials.append(mat)
+        slot = self.materials.index(mat)
+        group = self.groups.index(bone)
+        verts = []
+        for t in (-pad, length + pad):
+            for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                p = start + axis * t + side * sx * width * 0.5 + front * sz * depth * 0.5
+                v = self.bm.verts.new(p)
+                v[self.deform][group] = 1.0
+                verts.append(v)
+        for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+            face = self.bm.faces.new([verts[i] for i in f])
+            face.material_index = slot
+
+    def finish(self, rig):
+        bmesh.ops.recalc_face_normals(self.bm, faces=self.bm.faces)
+        mesh = bpy.data.meshes.new("soldier_LOD0")
+        self.bm.to_mesh(mesh)
+        self.bm.free()
+        for name in self.materials:
+            mesh.materials.append(material(name))
+        obj = bpy.data.objects.new("soldier_LOD0", mesh)
+        bpy.context.scene.collection.objects.link(obj)
+        for name in self.groups:
+            obj.vertex_groups.new(name=name)
+        obj.parent = rig
+        modifier = obj.modifiers.new("rig", "ARMATURE")
+        modifier.object = rig
+        return obj
+
+
+def build_body():
+    b = Body()
+    b.part("hips", (0, 0, 0.86), (0, 0, 1.06), 0.36, 0.22, "trousers")
+    b.part("spine", (0, 0, 1.04), (0, 0, 1.28), 0.38, 0.22, "tint")
+    b.part("chest", (0, 0, 1.26), (0, 0, 1.5), 0.44, 0.25, "tint")
+    b.part("chest", (0, 0.11, 1.12), (0, 0.11, 1.24), 0.36, 0.06, "gear")  # Ammo pouches.
+    b.part("chest", (0, -0.15, 1.18), (0, -0.15, 1.42), 0.28, 0.1, "gear")  # Backpack.
+    b.part("neck", (0, 0, 1.47), (0, 0, 1.6), 0.1, 0.1, "skin")
+    b.part("head", (0, 0.01, 1.58), (0, 0.01, 1.8), 0.19, 0.21, "skin")
+    b.part("head", (0, 0.0, 1.75), (0, 0.0, 1.84), 0.29, 0.31, "helmet")
+    for side in ("R", "L"):
+        h, t, _ = BONES[f"upperarm.{side}"]
+        b.part(f"upperarm.{side}", h, t, 0.11, 0.11, "tint", pad=0.03)
+        h, t, _ = BONES[f"forearm.{side}"]
+        b.part(f"forearm.{side}", h, t, 0.095, 0.095, "tint", pad=0.02)
+        h, t, _ = BONES[f"hand.{side}"]
+        b.part(f"hand.{side}", h, t, 0.08, 0.06, "skin", pad=0.02)
+        h, t, _ = BONES[f"thigh.{side}"]
+        b.part(f"thigh.{side}", h, t, 0.16, 0.17, "trousers", pad=0.03)
+        h, t, _ = BONES[f"shin.{side}"]
+        b.part(f"shin.{side}", h, t, 0.13, 0.14, "trousers", pad=0.02)
+        h, t, _ = BONES[f"foot.{side}"]
+        b.part(f"foot.{side}", (h[0], h[1] - 0.04, 0.05), (t[0], t[1] + 0.03, 0.05), 0.12, 0.1, "gear")
+    return b
+
+
+def key(rig, frame, rotations, hips_drop=0.0):
+    """rotations: bone -> (x, y, z) degrees (pose space, XYZ euler)."""
+    for name in BONES:
+        pb = rig.pose.bones[name]
+        pb.rotation_mode = "XYZ"
+        r = rotations.get(name, (0, 0, 0))
+        pb.rotation_euler = tuple(math.radians(a) for a in r)
+        pb.keyframe_insert("rotation_euler", frame=frame)
+    hips = rig.pose.bones["hips"]
+    hips.location = (0.0, hips_drop, 0.0)  # Hips bone points up: local Y is world up.
+    hips.keyframe_insert("location", frame=frame)
+
+
+def make_action(rig, name, frames):
+    action = bpy.data.actions.new(name)
+    rig.animation_data_create()
+    rig.animation_data.action = action
+    for frame, rotations, drop in frames:
+        key(rig, frame, rotations, drop)
+    track = rig.animation_data.nla_tracks.new()
+    track.name = name
+    track.strips.new(name, int(frames[0][0]), action)
+    rig.animation_data.action = None
+
+
+def main():
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.context.scene.render.fps = FPS
+    rig = make_armature()
+    body = build_body().finish(rig)
+
+    # Idle: breathing.
+    make_action(rig, "idle", [
+        (1, {"chest": (2, 0, 0)}, 0.0),
+        (31, {"chest": (-1, 0, 0)}, -0.005),
+        (61, {"chest": (2, 0, 0)}, 0.0),
+    ])
+    # Run: 24-frame cycle (0.8 s), legs swing, knees bend, slight torso counter-rotation.
+    def run_pose(phase):
+        s = math.sin(phase)
+        c = math.cos(phase)
+        return {
+            "thigh.R": (-40 * s, 0, 0), "thigh.L": (40 * s, 0, 0),
+            "shin.R": (max(0.0, 70 * -c) + 10, 0, 0), "shin.L": (max(0.0, 70 * c) + 10, 0, 0),
+            "foot.R": (-15 * s, 0, 0), "foot.L": (15 * s, 0, 0),
+            "spine": (-8, 0, 6 * s), "chest": (0, 0, -4 * s),
+        }, -0.04 * abs(c)
+    frames = []
+    for i in range(5):
+        phase = 2 * math.pi * i / 4
+        rotations, drop = run_pose(phase)
+        frames.append((1 + i * 6, rotations, drop))
+    make_action(rig, "run", frames)
+    # Crouch: hips down, knees bent.
+    crouch = {"thigh.R": (75, 0, 0), "thigh.L": (65, 0, 6), "shin.R": (-115, 0, 0), "shin.L": (-110, 0, 0),
+              "foot.R": (35, 0, 0), "foot.L": (35, 0, 0), "spine": (12, 0, 0)}
+    make_action(rig, "crouch", [(1, crouch, -0.4), (31, crouch, -0.41)])
+
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.export_scene.gltf(filepath=str(OUTPUT / "soldier.glb"), export_format="GLB", use_selection=True,
+                              export_yup=True, export_skins=True, export_animations=True,
+                              export_animation_mode="NLA_TRACKS", export_materials="EXPORT",
+                              export_image_format="NONE", export_apply=False)
+    print(f"[origon] soldier: {len(body.data.polygons)} faces, {len(BONES)} bones")
+
+
+if __name__ == "__main__":
+    main()

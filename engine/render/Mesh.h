@@ -14,11 +14,21 @@ struct Vertex {
     glm::vec2 uv;
 };
 
+// Vertex of a skinned mesh: up to four joints per vertex.
+struct SkinnedVertex {
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 uv;
+    uint16_t joints[4];
+    float weights[4];
+};
+
 // Static GPU mesh (immutable buffers, DSA vertex array).
 class Mesh {
 public:
     Mesh() = default;
     Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+    Mesh(const std::vector<SkinnedVertex>& vertices, const std::vector<uint32_t>& indices);
     ~Mesh();
     Mesh(const Mesh&) = delete;
     Mesh& operator=(const Mesh&) = delete;
