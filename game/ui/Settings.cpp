@@ -39,6 +39,13 @@ GameSettings GameSettings::load(const std::filesystem::path& path) {
         settings.vegetationDensity = std::clamp(j.value("vegetation_density", settings.vegetationDensity), 0.2f, 1.0f);
         settings.vegetationDistance = std::clamp(j.value("vegetation_distance", settings.vegetationDistance), 30.0f, 150.0f);
         settings.relayAddress = j.value("relay_address", settings.relayAddress);
+        if (j.contains("character") && j["character"].is_array()) {
+            const auto& values = j["character"];
+            for (size_t i = 0; i < settings.look.values.size() && i < values.size(); ++i) {
+                settings.look.values[i] = static_cast<uint8_t>(std::clamp(values[i].get<int>(), 0, 255));
+            }
+            settings.look.sanitize();
+        }
         settings.vsync = j.value("vsync", settings.vsync);
         settings.maxFps = std::max(0, j.value("max_fps", settings.maxFps));
         settings.fov = std::clamp(j.value("fov", settings.fov), 60.0f, 110.0f);
@@ -70,6 +77,7 @@ bool GameSettings::save(const std::filesystem::path& path) const {
         {"vegetation_density", vegetationDensity},
         {"vegetation_distance", vegetationDistance},
         {"relay_address", relayAddress},
+        {"character", look.values},
         {"vsync", vsync},
         {"max_fps", maxFps},
         {"fov", fov},

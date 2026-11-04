@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sim/CharacterLook.h"
+
 #include "physics/PhysicsWorld.h"
 #include "sim/Weapons.h"
 
@@ -57,6 +59,7 @@ struct Player {
     std::string name;
     bool isBot = false;
     glm::vec3 color{0.8f};
+    CharacterLook look; // Cosmetic only.
 
     // Physical state.
     std::unique_ptr<Character> character;

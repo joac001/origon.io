@@ -122,6 +122,7 @@ void Simulation::startMatch(const MapData& map, int botCount) {
         p.isBot = i != 0;
         p.name = p.isBot ? std::string("Bot ") + kBotNames[(i - 1) % std::size(kBotNames)] : "Jugador";
         p.color = kPlayerColors[i % std::size(kPlayerColors)];
+        p.look = p.isBot ? CharacterLook::random(static_cast<uint32_t>(i)) : m_localLook;
         p.character = m_physics.createCharacter({}, glm::vec3(0.0f, -500.0f - 5.0f * i, 0.0f));
     }
     for (Player& p : m_players) {
@@ -129,11 +130,12 @@ void Simulation::startMatch(const MapData& map, int botCount) {
     }
 }
 
-int Simulation::addRemotePlayer(const std::string& name) {
+int Simulation::addRemotePlayer(const std::string& name, const CharacterLook& look) {
     for (Player& p : m_players) {
         if (p.isBot && p.id != m_localId) {
             p.isBot = false;
             p.name = name;
+            p.look = look;
             p.bot = BotState{};
             return p.id;
         }
@@ -144,6 +146,7 @@ int Simulation::addRemotePlayer(const std::string& name) {
     Player p;
     p.id = static_cast<int>(m_players.size());
     p.name = name;
+    p.look = look;
     p.color = kPlayerColors[static_cast<size_t>(p.id) % std::size(kPlayerColors)];
     p.character = m_physics.createCharacter({}, glm::vec3(0.0f, -500.0f - 5.0f * static_cast<float>(p.id), 0.0f));
     m_players.push_back(std::move(p));
@@ -158,6 +161,7 @@ void Simulation::removeRemotePlayer(int id) {
     Player& p = m_players[static_cast<size_t>(id)];
     p.isBot = true;
     p.name = std::string("Bot ") + kBotNames[static_cast<size_t>(id - 1) % std::size(kBotNames)];
+    p.look = CharacterLook::random(static_cast<uint32_t>(id));
     p.bot = BotState{};
 }
 

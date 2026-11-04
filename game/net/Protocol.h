@@ -14,20 +14,27 @@
 namespace origon::net {
 
 constexpr uint16_t kDefaultPort = 27015;
-constexpr uint32_t kProtocolVersion = 3;
+constexpr uint32_t kProtocolVersion = 4;
 constexpr int kChannelReliable = 0;
 constexpr int kChannelUnreliable = 1;
 constexpr int kChannelCount = 2;
 
 enum class MessageType : uint8_t {
-    Hello = 1,      // C->S: version, name
+    Hello = 1,      // C->S: version, name, look
     Welcome,        // S->C: player id, map JSON
-    PlayerInfo,     // S->C: id, name, color, isBot
+    PlayerInfo,     // S->C: id, name, isBot, look
     Command,        // C->S: client tick, PlayerCommand
     Snapshot,       // S->C: match and player state, prop transforms
     Events,         // S->C: gameplay events
     Reject,         // S->C: reason
+    Look,           // C->S: new look (cosmetic, changed from the menu during a match)
 };
+
+// Cosmetic look: one byte per field (sanitized on read).
+class Writer;
+class Reader;
+void writeLook(Writer& w, const CharacterLook& look);
+CharacterLook readLook(Reader& r);
 
 // Little-endian binary writer/reader.
 class Writer {

@@ -27,6 +27,7 @@ public:
         glm::vec3 color;
         int weaponTier;
         bool forward;      // Falls on the face (shot from behind).
+        CharacterLook look;
     };
     // When enabled, kills spawn Corpse records instead of physics box dummies.
     void setSkinnedCorpses(bool enabled) { m_skinnedCorpses = enabled; }

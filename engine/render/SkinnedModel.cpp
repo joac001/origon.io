@@ -120,6 +120,7 @@ bool SkinnedModel::load(const std::filesystem::path& path) {
             }
             Part part;
             part.mesh = Mesh(vertices, indices);
+            part.name = node.name ? node.name : "";
             if (prim.material) {
                 if (prim.material->has_pbr_metallic_roughness) {
                     const float* c = prim.material->pbr_metallic_roughness.base_color_factor;
@@ -127,7 +128,8 @@ bool SkinnedModel::load(const std::filesystem::path& path) {
                     part.material.roughness = prim.material->pbr_metallic_roughness.roughness_factor;
                     part.material.metallic = prim.material->pbr_metallic_roughness.metallic_factor;
                 }
-                part.tint = prim.material->name && std::string(prim.material->name) == "tint";
+                part.materialName = prim.material->name ? prim.material->name : "";
+                part.tint = part.materialName == "tint";
             }
             m_parts.push_back(std::move(part));
         }

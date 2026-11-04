@@ -5,6 +5,7 @@
 #include "core/Window.h"
 #include "editor/MapEditor.h"
 #include "fx/Effects.h"
+#include "fx/SoldierLook.h"
 #include "net/LanDiscovery.h"
 #include "net/RelayBrowser.h"
 #include "net/RelayProtocol.h"
@@ -39,6 +40,7 @@ struct LaunchOptions {
     bool forceTitle = false; // Show the title screen even in capture mode.
     int followPlayer = -1;   // Third-person spectator camera behind this player.
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
+    int lookGallery = -1;     // Debug: five random looks (from this seed) standing close to the fixed camera.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
@@ -94,6 +96,12 @@ private:
     void joinServer(const std::string& address, int port);
     void joinRelayRoom(const std::string& code);
     void drawInternetSection();
+    void drawCharacterTab();
+    void applyLook(const CharacterLook& look);
+    // Character tab preview: a soldier in front of the camera while the tab is open.
+    bool m_characterPreview = false;      // Tab drawn this frame.
+    bool m_characterPreviewShown = false; // Tab drawn last frame (drives the camera).
+    float m_previewTurn = 0.0f;
     void leaveNetwork();
 
     LaunchOptions m_options;
@@ -136,11 +144,13 @@ private:
     std::vector<glm::mat4> m_soldierGlobals; // Scratch: joint globals of the last drawn soldier.
     std::vector<std::vector<glm::mat4>> m_skinBuffers;
     void submitSoldier(const Player& p, float alpha);
-    const std::vector<glm::mat4>& drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model, const glm::vec3& tint,
-                                                    bool highlight);
+    const std::vector<glm::mat4>& drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model,
+                                                    const CharacterLook& look, const glm::vec3& tint, bool highlight);
+    std::vector<SoldierPiece> m_soldierPieces; // Parsed piece names, parallel to m_soldier.parts().
     void submitModel(const Model& model, const glm::mat4& transform);
     void submitCorpses();
     void submitPoseGallery(const glm::vec3& eye, float yaw);
+    void submitLookGallery(const glm::vec3& eye, float yaw, int seed);
     CameraView m_lastCamera;
 
     ImFont* m_fontRegular = nullptr;

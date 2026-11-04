@@ -74,6 +74,7 @@ App::App(const LaunchOptions& options) : m_options(options) {
     m_world.setModelLibrary(&m_models);
     m_world.setTextureCache(&m_textures);
     m_sim = std::make_unique<Simulation>(m_physics, m_weapons);
+    m_sim->setLocalLook(m_settings.look);
     m_hud.setFonts(m_fontRegular, m_fontBold);
     m_mapFiles = listMaps();
     loadMap(options.map);
@@ -209,7 +210,89 @@ void App::joinRelayRoom(const std::string& code) {
     m_titleScreen = false;
     leaveNetwork();
     m_clientReady = false;
+    m_net.setLocalLook(m_settings.look);
     m_net.connectViaRelay(relayHost, relayPort, code, m_playerName);
+}
+
+void App::applyLook(const CharacterLook& look) {
+    m_settings.look = look;
+    m_settings.look.sanitize();
+    m_settings.save(settingsPath());
+    m_sim->setLocalLook(m_settings.look);
+    if (m_net.isServer()) m_net.broadcastPlayerInfo(*m_sim);
+    m_net.sendLook(m_settings.look);
+}
+
+void App::drawCharacterTab() {
+    m_characterPreview = true;
+    CharacterLook look = m_settings.look;
+    bool changed = false;
+    ImGui::TextDisabled("Solo cambia el aspecto: todos los personajes tienen el mismo tamaño y las mismas zonas de impacto.");
+    auto field = [&](CharacterLook::Field f) {
+        const LookCatalog options = lookOptions(f);
+        size_t colorCount = 0;
+        const LookColor* colors = lookColors(f, colorCount);
+        const size_t count = colors ? colorCount : options.count;
+        const size_t current = look[f];
+        const char* preview = colors ? colors[current].label : options.options[current].label;
+        ImGui::PushID(static_cast<int>(f));
+        if (ImGui::ArrowButton("##prev", ImGuiDir_Left)) {
+            look[f] = static_cast<uint8_t>((current + count - 1) % count);
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::ArrowButton("##next", ImGuiDir_Right)) {
+            look[f] = static_cast<uint8_t>((current + 1) % count);
+            changed = true;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(260.0f);
+        if (ImGui::BeginCombo(lookFieldLabel(f), preview)) {
+            for (size_t i = 0; i < count; ++i) {
+                if (colors) {
+                    const glm::vec3 c = colors[i].srgb;
+                    ImGui::ColorButton("##swatch", ImVec4(c.r, c.g, c.b, 1.0f), ImGuiColorEditFlags_NoTooltip, ImVec2(14, 14));
+                    ImGui::SameLine();
+                }
+                const char* label = colors ? colors[i].label : options.options[i].label;
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::Selectable(label, i == current)) {
+                    look[f] = static_cast<uint8_t>(i);
+                    changed = true;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::PopID();
+    };
+    ImGui::SeparatorText("Cuerpo");
+    field(CharacterLook::Body);
+    field(CharacterLook::SkinTone);
+    field(CharacterLook::Hair);
+    field(CharacterLook::HairColor);
+    if (!look.female()) field(CharacterLook::FacialHair);
+    ImGui::SeparatorText("Accesorios");
+    field(CharacterLook::Headwear);
+    field(CharacterLook::Eyewear);
+    ImGui::SeparatorText("Ropa");
+    field(CharacterLook::Top);
+    field(CharacterLook::TopColor);
+    field(CharacterLook::Bottom);
+    field(CharacterLook::BottomColor);
+    field(CharacterLook::Boots);
+    field(CharacterLook::Gear);
+    ImGui::Spacing();
+    if (ImGui::Button("Aleatorio", ImVec2(180, 0))) {
+        look = CharacterLook::random(static_cast<uint32_t>(m_time * 1000.0));
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Restablecer", ImVec2(180, 0))) {
+        look = CharacterLook{};
+        changed = true;
+    }
+    if (changed) applyLook(look);
 }
 
 void App::drawInternetSection() {
@@ -270,6 +353,7 @@ void App::joinServer(const std::string& address, int port) {
     m_titleScreen = false;
     leaveNetwork();
     m_clientReady = false;
+    m_net.setLocalLook(m_settings.look);
     m_net.connect(address, static_cast<uint16_t>(port), m_playerName);
 }
 
@@ -416,6 +500,7 @@ void App::updateNetworkClient() {
             Player& p = m_sim->mutablePlayers()[static_cast<size_t>(info.id)];
             p.name = info.name;
             p.isBot = info.isBot;
+            p.look = info.look;
         }
     }
     if (update.snapshot) applySnapshot(*update.snapshot);
@@ -575,14 +660,44 @@ int App::run() {
                                           glm::vec3(0, 1, 0));
                 camera.fovYDegrees = m_settings.fov;
             }
+            // Character tab: look at a preview soldier standing in front of the camera, right of the menu.
+            const bool preview = m_characterPreviewShown && m_menuOpen && !m_titleScreen;
+            Player previewSoldier;
+            if (preview) {
+                const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
+                const glm::vec3 forward = viewDirection(me.yaw, 0.0f);
+                const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
+                glm::vec3 feet = me.position + forward * 2.6f + right * 0.85f;
+                if (auto ground = m_physics.rayCast(feet + glm::vec3(0, 2.0f, 0), glm::vec3(0, -1, 0), 6.0f)) feet.y = ground->position.y;
+                m_previewTurn += dt * 0.5f;
+                previewSoldier.id = me.id;
+                previewSoldier.tier = me.tier;
+                previewSoldier.color = me.color;
+                previewSoldier.alive = true;
+                previewSoldier.position = previewSoldier.previousPosition = feet;
+                previewSoldier.velocity = glm::vec3(0.0f);
+                previewSoldier.onGround = true;
+                previewSoldier.eyeHeight = kEyeHeight;
+                previewSoldier.yaw = me.yaw + glm::pi<float>() + 0.5f * std::sin(m_previewTurn);
+                previewSoldier.pitch = 0.0f;
+                previewSoldier.reloadTimer = previewSoldier.meleeAnimation = previewSoldier.spawnProtection = 0.0f;
+                previewSoldier.look = m_settings.look;
+                camera.position = me.position + glm::vec3(0.0f, 1.45f, 0.0f);
+                camera.view = glm::lookAt(camera.position, feet + glm::vec3(0.0f, 1.0f, 0.0f) - right * 0.55f, glm::vec3(0, 1, 0));
+                camera.fovYDegrees = 50.0f;
+            }
             m_world.submit(m_renderer, m_physics);
             submitPlayers(m_net.isClient() ? std::clamp(m_snapshotAge / (2.0f * kTickDt), 0.0f, 1.0f) : alpha,
                           m_options.fixedCamera || m_options.followPlayer >= 0);
+            if (preview) submitSoldier(previewSoldier, 1.0f);
             m_effects.submit(m_renderer, m_physics);
             if (m_options.poseGallery && m_options.fixedCamera) {
                 submitPoseGallery(m_options.cameraPosition, glm::radians(m_options.cameraYaw));
             }
-            if (!m_titleScreen) submitViewModel(dt);
+            if (m_options.lookGallery >= 0 && m_options.fixedCamera) {
+                submitLookGallery(m_options.cameraPosition, glm::radians(m_options.cameraYaw), m_options.lookGallery);
+            }
+            if (!m_titleScreen && !preview) submitViewModel(dt);
             if (m_audioReady) {
                 const glm::mat4 invView = glm::inverse(camera.view);
                 m_audio.update(dt, *m_sim, camera.position, -glm::vec3(invView[2]));
@@ -924,7 +1039,7 @@ void App::submitSoldier(const Player& p, float alpha) {
 
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), p.yaw, glm::vec3(0, 1, 0));
     const glm::vec3 tint = World::toLinear(p.color);
-    const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, tint, p.spawnProtection > 0.0f);
+    const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, p.look, tint, p.spawnProtection > 0.0f);
     // Weapon in the right hand, aligned with the aim direction.
     if (const Model* gun = m_models.getWeapon(weapon.id); gun && rig.hand >= 0) {
         const glm::vec3 handPosition(globals[static_cast<size_t>(rig.hand)][3]);
@@ -936,16 +1051,22 @@ void App::submitSoldier(const Player& p, float alpha) {
 }
 
 const std::vector<glm::mat4>& App::drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model,
-                                                   const glm::vec3& tint, bool highlight) {
+                                                   const CharacterLook& look, const glm::vec3& tint, bool highlight) {
     m_skinBuffers.emplace_back();
     std::vector<glm::mat4>& skin = m_skinBuffers.back();
     m_soldier.evaluate(pose, m_soldierGlobals, skin);
-    for (const SkinnedModel::Part& part : m_soldier.parts()) {
+    if (m_soldierPieces.size() != m_soldier.parts().size()) {
+        m_soldierPieces.clear();
+        for (const SkinnedModel::Part& part : m_soldier.parts()) m_soldierPieces.push_back(parseSoldierPiece(part.name));
+    }
+    for (size_t i = 0; i < m_soldier.parts().size(); ++i) {
+        const SkinnedModel::Part& part = m_soldier.parts()[i];
+        if (!soldierPieceVisible(m_soldierPieces[i], look)) continue;
         DrawItem item;
         item.mesh = &part.mesh;
         item.model = model;
         item.material = part.material;
-        if (part.tint) item.material.albedo = glm::mix(part.material.albedo, tint, 0.45f);
+        applyLookMaterial(item.material, part.materialName, look, tint);
         if (highlight) item.material.emissive = item.material.albedo * 0.35f;
         item.bones = skin.data();
         item.boneCount = static_cast<int>(skin.size());
@@ -973,7 +1094,7 @@ void App::submitCorpses() {
         SkinnedModel::Pose pose = m_soldier.restPose();
         m_soldier.sample(clip, std::min(c.age, duration * 0.999f), pose);
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), c.feet) * glm::rotate(glm::mat4(1.0f), c.yaw, glm::vec3(0, 1, 0));
-        drawSoldierPose(pose, model, World::toLinear(c.color) * 0.8f, false);
+        drawSoldierPose(pose, model, c.look, World::toLinear(c.color) * 0.8f, false);
         // The weapon drops beside the body, lying on its side.
         const Model* gun = m_models.getWeapon(m_sim->gunGame().weaponForTier(c.weaponTier).id);
         if (gun && c.age > 0.35f) {
@@ -1009,7 +1130,23 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
         // Face the camera, turned a quarter so profiles read.
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) *
                                 glm::rotate(glm::mat4(1.0f), yaw + glm::pi<float>() * 0.7f, glm::vec3(0, 1, 0));
-        drawSoldierPose(pose, model, glm::vec3(0.3f, 0.35f, 0.2f), false);
+        drawSoldierPose(pose, model, CharacterLook::random(static_cast<uint32_t>(i)), glm::vec3(0.6f, 0.1f, 0.08f), false);
+    }
+}
+
+void App::submitLookGallery(const glm::vec3& eye, float yaw, int seed) {
+    if (!m_soldierReady) return;
+    const glm::vec3 forward = viewDirection(yaw, 0.0f);
+    const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
+    const int idle = m_soldier.findClip("idle");
+    for (int i = 0; i < 5; ++i) {
+        SkinnedModel::Pose pose = m_soldier.restPose();
+        m_soldier.sample(idle, 0.0f, pose);
+        glm::vec3 feet = eye + forward * 2.8f + right * ((static_cast<float>(i) - 2.0f) * 0.8f);
+        feet.y = m_world.terrainHeight(feet.x, feet.z);
+        const float turn = glm::pi<float>() + (static_cast<float>(i) - 2.0f) * 0.25f;
+        const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), yaw + turn, glm::vec3(0, 1, 0));
+        drawSoldierPose(pose, model, CharacterLook::random(static_cast<uint32_t>(seed * 5 + i)), glm::vec3(0.6f, 0.1f, 0.08f), false);
     }
 }
 
@@ -1155,7 +1292,11 @@ void App::submitViewModel(float) {
 void App::drawMenu() {
     const ImVec2 screen = ImGui::GetIO().DisplaySize;
     ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), screen, IM_COL32(0, 0, 0, 120));
-    ImGui::SetNextWindowPos(ImVec2(screen.x * 0.5f, screen.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    m_characterPreviewShown = m_characterPreview;
+    m_characterPreview = false;
+    // With the character preview the menu moves left so the soldier is visible on the right.
+    const float menuX = m_characterPreviewShown && !m_titleScreen ? std::min(screen.x * 0.5f, 40.0f + 290.0f) : screen.x * 0.5f;
+    ImGui::SetNextWindowPos(ImVec2(menuX, screen.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(580, 580), ImGuiCond_Always);
     ImGui::Begin("Pausa", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
@@ -1238,6 +1379,10 @@ void App::drawMenu() {
             ImGui::TextUnformatted("R: recargar             V: cuchillo          Tab: tabla");
             ImGui::TextUnformatted("Esc: menú               F1: editor           F3: rendimiento");
             ImGui::TextUnformatted("F12: captura            K: suicidio (prueba)");
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Personaje")) {
+            drawCharacterTab();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Multijugador", nullptr, forcedTab == 1 ? ImGuiTabItemFlags_SetSelected : 0)) {

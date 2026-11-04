@@ -25,6 +25,8 @@ public:
         Mesh mesh;
         Material material;
         bool tint = false; // Material named "tint": recolored per player.
+        std::string name;         // glTF node name (character piece, e.g. "m_top_jacket").
+        std::string materialName; // glTF material name (e.g. "skin", "hair", "top").
     };
 
     bool load(const std::filesystem::path& path);

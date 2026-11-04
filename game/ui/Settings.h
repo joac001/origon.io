@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render/Renderer.h"
+#include "sim/CharacterLook.h"
 
 #include <filesystem>
 #include <string>
@@ -24,6 +25,7 @@ struct GameSettings {
     float vegetationDistance = 90.0f;
     // Relay (servidor intermedio) for internet games: "host:port".
     std::string relayAddress = "127.0.0.1:27030";
+    CharacterLook look; // The player's appearance (cosmetic).
 
     static GameSettings load(const std::filesystem::path& path);
     bool save(const std::filesystem::path& path) const;

@@ -314,6 +314,7 @@ void NetSession::handleClientMessage(ClientKey key, Reader& reader, Simulation& 
     if (type == MessageType::Hello && client.playerId < 0) {
         const auto version = reader.get<uint32_t>();
         const std::string name = reader.getString().substr(0, 24);
+        const CharacterLook look = readLook(reader);
         if (version != kProtocolVersion) {
             Writer w;
             w.put(static_cast<uint8_t>(MessageType::Reject));
@@ -322,7 +323,7 @@ void NetSession::handleClientMessage(ClientKey key, Reader& reader, Simulation& 
             kick(client);
             return;
         }
-        const int id = sim.addRemotePlayer(name.empty() ? "Jugador" : name);
+        const int id = sim.addRemotePlayer(name.empty() ? "Jugador" : name, look);
         if (id < 0) {
             Writer w;
             w.put(static_cast<uint8_t>(MessageType::Reject));
@@ -333,6 +334,7 @@ void NetSession::handleClientMessage(ClientKey key, Reader& reader, Simulation& 
         }
         client.playerId = id;
         client.name = name.empty() ? "Jugador" : name;
+        client.look = look;
         Writer w;
         w.put(static_cast<uint8_t>(MessageType::Welcome));
         w.put(static_cast<uint8_t>(id));
@@ -340,6 +342,13 @@ void NetSession::handleClientMessage(ClientKey key, Reader& reader, Simulation& 
         send(client, w, true);
         rosterChanged = true;
         log::info("Server: '{}' joined as player {}{}", name, id, client.peer ? "" : " (via relay)");
+    } else if (type == MessageType::Look && client.playerId >= 0) {
+        const CharacterLook look = readLook(reader);
+        if (reader.ok() && client.playerId < static_cast<int>(sim.players().size())) {
+            client.look = look;
+            sim.mutablePlayers()[static_cast<size_t>(client.playerId)].look = look;
+            rosterChanged = true;
+        }
     } else if (type == MessageType::Command && client.playerId >= 0) {
         uint32_t tick = 0;
         const PlayerCommand command = readCommand(reader, tick);
@@ -400,7 +409,7 @@ void NetSession::serverRematch(Simulation& sim, const MapData& map) {
     const std::string mapJson = map.toJson();
     for (auto& [key, client] : m_clients) {
         if (client.playerId < 0) continue;
-        client.playerId = sim.addRemotePlayer(client.name);
+        client.playerId = sim.addRemotePlayer(client.name, client.look);
         client.command = PlayerCommand{};
         client.lastTick = 0;
         Writer w;
@@ -421,6 +430,7 @@ void NetSession::broadcastPlayerInfo(const Simulation& sim) {
         w.put(static_cast<uint8_t>(p.id));
         w.putString(p.name);
         w.put(static_cast<uint8_t>(p.isBot ? 1 : 0));
+        writeLook(w, p.look);
     }
     broadcast(w, true);
 }
@@ -444,6 +454,7 @@ NetSession::ClientUpdate NetSession::clientPoll() {
                 w.put(static_cast<uint8_t>(MessageType::Hello));
                 w.put(kProtocolVersion);
                 w.putString(m_name);
+                writeLook(w, m_look);
                 m_status = "Conectado. Recibiendo mapa...";
             }
             send(m_server, w, true);
@@ -460,6 +471,7 @@ NetSession::ClientUpdate NetSession::clientPoll() {
                     w.put(static_cast<uint8_t>(MessageType::Hello));
                     w.put(kProtocolVersion);
                     w.putString(m_name);
+                    writeLook(w, m_look);
                     send(m_server, w, true);
                     m_status = "Partida encontrada. Recibiendo mapa...";
                 } else if (relayType == RelayMessage::Error) {
@@ -487,6 +499,7 @@ NetSession::ClientUpdate NetSession::clientPoll() {
                     info.id = reader.get<uint8_t>();
                     info.name = reader.getString();
                     info.isBot = reader.get<uint8_t>() != 0;
+                    info.look = readLook(reader);
                     update.playerInfo.push_back(info);
                 }
             } else if (type == MessageType::Reject) {
@@ -505,6 +518,15 @@ NetSession::ClientUpdate NetSession::clientPoll() {
         }
     }
     return update;
+}
+
+void NetSession::sendLook(const CharacterLook& look) {
+    m_look = look;
+    if (m_role != Role::Client || !m_welcomed) return;
+    Writer w;
+    w.put(static_cast<uint8_t>(MessageType::Look));
+    writeLook(w, look);
+    send(m_server, w, true);
 }
 
 void NetSession::sendCommand(uint32_t tick, const PlayerCommand& command) {

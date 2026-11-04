@@ -21,6 +21,7 @@ struct PlayerInfo {
     int id = 0;
     std::string name;
     bool isBot = false;
+    CharacterLook look;
 };
 
 // Listen server or client over ENet. The server owns the authoritative Simulation;
@@ -39,6 +40,8 @@ public:
     // Client: join a room on a relay (servidor intermedio) by its code.
     bool connectViaRelay(const std::string& address, uint16_t port, const std::string& code, const std::string& name);
     void shutdown();
+    // Client: appearance sent in Hello.
+    void setLocalLook(const CharacterLook& look) { m_look = look; }
 
     // Server: also accept players through a relay. The room code arrives asynchronously (relayCode()).
     bool publishToRelay(const std::string& address, uint16_t port);
@@ -83,6 +86,7 @@ public:
     };
     ClientUpdate clientPoll();
     void sendCommand(uint32_t tick, const PlayerCommand& command);
+    void sendLook(const CharacterLook& look);
 
 private:
     struct RemoteClient {
@@ -91,6 +95,7 @@ private:
         float relayRttMs = 0.0f;   // Client <-> relay (relayed clients).
         int playerId = -1;
         std::string name;
+        CharacterLook look;
         PlayerCommand command;
         uint32_t lastTick = 0;
     };
@@ -112,6 +117,7 @@ private:
     _ENetHost* m_host = nullptr;
     _ENetPeer* m_server = nullptr; // Client side.
     std::string m_name;
+    CharacterLook m_look;
     std::string m_status;
     bool m_welcomed = false;
     std::map<ClientKey, RemoteClient> m_clients;

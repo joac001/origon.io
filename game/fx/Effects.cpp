@@ -125,7 +125,7 @@ void Effects::onEvents(const std::vector<GameEvent>& events, const Simulation& s
                 const glm::vec3 facing(-std::sin(victim.yaw), 0.0f, -std::cos(victim.yaw));
                 const bool forward = glm::dot(facing, awayDir) > 0.2f;
                 const glm::vec3 slide = glm::vec3(victim.velocity.x, 0.0f, victim.velocity.z) * 0.6f + awayDir * 1.2f;
-                m_corpses.push_back({victim.position, slide, 0.0f, victim.yaw, 0.0f, victim.color, victim.tier, forward});
+                m_corpses.push_back({victim.position, slide, 0.0f, victim.yaw, 0.0f, victim.color, victim.tier, forward, victim.look});
                 if (m_corpses.size() > 12) m_corpses.erase(m_corpses.begin());
                 break;
             }

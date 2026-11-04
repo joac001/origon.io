@@ -3,19 +3,23 @@
 Run:
     blender --background --factory-startup --python tools/blender/gen_character.py
 
-Writes assets/models/characters/soldier.glb: one skinned mesh (rigid weights per body part),
-an armature, and NLA tracks exported as animations: idle, run, crouch, reload, knife,
+Writes assets/models/characters/soldier.glb: an armature, the skinned body, clothing and accessory
+pieces from character_parts.py (male and female variants), and NLA tracks exported as animations: idle, run, crouch, reload, knife,
 death (falls backward) and death_forward. Reload and knife only key the upper body; the engine
 blends them over the locomotion pose.
 The character faces Blender +Y (engine -Z), feet at the origin, holding a rifle pose.
-The material named "tint" is recolored per player by the engine.
+The engine picks the visible pieces and recolors materials from each player's look.
 """
 import math
 import pathlib
 
-import bmesh
+import sys
+
 import bpy
 from mathutils import Vector
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import character_parts  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "assets" / "models" / "characters"
@@ -42,27 +46,6 @@ BONES = {
     "foot.L": ((-0.11, 0, 0.09), (-0.11, 0.17, 0.03), "shin.L"),
 }
 
-COLORS = {
-    "tint": ((0.32, 0.36, 0.22), 0.85),
-    "skin": ((0.62, 0.42, 0.3), 0.6),
-    "gear": ((0.12, 0.1, 0.07), 0.7),
-    "helmet": ((0.16, 0.2, 0.12), 0.55),
-    "trousers": ((0.18, 0.19, 0.12), 0.9),
-}
-
-
-def material(name):
-    if name in bpy.data.materials:
-        return bpy.data.materials[name]
-    color, roughness = COLORS[name]
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (*color, 1.0)
-    bsdf.inputs["Roughness"].default_value = roughness
-    return mat
-
-
 def make_armature():
     data = bpy.data.armatures.new("soldier_rig")
     rig = bpy.data.objects.new("soldier_rig", data)
@@ -79,80 +62,6 @@ def make_armature():
             bone.use_connect = False
     bpy.ops.object.mode_set(mode="OBJECT")
     return rig
-
-
-class Body:
-    def __init__(self):
-        self.bm = bmesh.new()
-        self.deform = self.bm.verts.layers.deform.verify()
-        self.groups = list(BONES)
-        self.materials = []
-
-    def part(self, bone, start, end, width, depth, mat, pad=0.0):
-        """Box from start to end (long axis), width along the side axis, depth across."""
-        start, end = Vector(start), Vector(end)
-        axis = end - start
-        length = axis.length
-        axis.normalize()
-        helper = Vector((0, 0, 1)) if abs(axis.z) < 0.9 else Vector((0, 1, 0))
-        side = axis.cross(helper).normalized()
-        front = side.cross(axis).normalized()
-        if mat not in self.materials:
-            self.materials.append(mat)
-        slot = self.materials.index(mat)
-        group = self.groups.index(bone)
-        verts = []
-        for t in (-pad, length + pad):
-            for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
-                p = start + axis * t + side * sx * width * 0.5 + front * sz * depth * 0.5
-                v = self.bm.verts.new(p)
-                v[self.deform][group] = 1.0
-                verts.append(v)
-        for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
-            face = self.bm.faces.new([verts[i] for i in f])
-            face.material_index = slot
-
-    def finish(self, rig):
-        bmesh.ops.recalc_face_normals(self.bm, faces=self.bm.faces)
-        mesh = bpy.data.meshes.new("soldier_LOD0")
-        self.bm.to_mesh(mesh)
-        self.bm.free()
-        for name in self.materials:
-            mesh.materials.append(material(name))
-        obj = bpy.data.objects.new("soldier_LOD0", mesh)
-        bpy.context.scene.collection.objects.link(obj)
-        for name in self.groups:
-            obj.vertex_groups.new(name=name)
-        obj.parent = rig
-        modifier = obj.modifiers.new("rig", "ARMATURE")
-        modifier.object = rig
-        return obj
-
-
-def build_body():
-    b = Body()
-    b.part("hips", (0, 0, 0.86), (0, 0, 1.06), 0.36, 0.22, "trousers")
-    b.part("spine", (0, 0, 1.04), (0, 0, 1.28), 0.38, 0.22, "tint")
-    b.part("chest", (0, 0, 1.26), (0, 0, 1.5), 0.44, 0.25, "tint")
-    b.part("chest", (0, 0.11, 1.12), (0, 0.11, 1.24), 0.36, 0.06, "gear")  # Ammo pouches.
-    b.part("chest", (0, -0.15, 1.18), (0, -0.15, 1.42), 0.28, 0.1, "gear")  # Backpack.
-    b.part("neck", (0, 0, 1.47), (0, 0, 1.6), 0.1, 0.1, "skin")
-    b.part("head", (0, 0.01, 1.58), (0, 0.01, 1.8), 0.19, 0.21, "skin")
-    b.part("head", (0, 0.0, 1.75), (0, 0.0, 1.84), 0.29, 0.31, "helmet")
-    for side in ("R", "L"):
-        h, t, _ = BONES[f"upperarm.{side}"]
-        b.part(f"upperarm.{side}", h, t, 0.11, 0.11, "tint", pad=0.03)
-        h, t, _ = BONES[f"forearm.{side}"]
-        b.part(f"forearm.{side}", h, t, 0.095, 0.095, "tint", pad=0.02)
-        h, t, _ = BONES[f"hand.{side}"]
-        b.part(f"hand.{side}", h, t, 0.08, 0.06, "skin", pad=0.02)
-        h, t, _ = BONES[f"thigh.{side}"]
-        b.part(f"thigh.{side}", h, t, 0.16, 0.17, "trousers", pad=0.03)
-        h, t, _ = BONES[f"shin.{side}"]
-        b.part(f"shin.{side}", h, t, 0.13, 0.14, "trousers", pad=0.02)
-        h, t, _ = BONES[f"foot.{side}"]
-        b.part(f"foot.{side}", (h[0], h[1] - 0.04, 0.05), (t[0], t[1] + 0.03, 0.05), 0.12, 0.1, "gear")
-    return b
 
 
 UPPER_BODY = ("spine", "chest", "neck", "head", "upperarm.R", "forearm.R", "hand.R", "upperarm.L", "forearm.L",
@@ -191,7 +100,8 @@ def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.context.scene.render.fps = FPS
     rig = make_armature()
-    body = build_body().finish(rig)
+    rig_bones = {name: (head, tail) for name, (head, tail, _) in BONES.items()}
+    objects = [piece.build(rig) for piece in character_parts.build_pieces(rig_bones)]
 
     # Idle: breathing.
     make_action(rig, "idle", [
@@ -268,13 +178,16 @@ def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     rig.select_set(True)
-    body.select_set(True)
+    for obj in objects:
+        obj.select_set(True)
     bpy.context.view_layer.objects.active = rig
     bpy.ops.export_scene.gltf(filepath=str(OUTPUT / "soldier.glb"), export_format="GLB", use_selection=True,
                               export_yup=True, export_skins=True, export_animations=True,
                               export_animation_mode="NLA_TRACKS", export_materials="EXPORT",
                               export_image_format="NONE", export_apply=False)
-    print(f"[origon] soldier: {len(body.data.polygons)} faces, {len(BONES)} bones")
+    for obj in objects:
+        print(f"[origon]   {obj.name}: {len(obj.data.vertices)} verts, {len(obj.data.polygons)} faces")
+    print(f"[origon] soldier: {len(objects)} pieces, {len(BONES)} bones")
 
 
 if __name__ == "__main__":

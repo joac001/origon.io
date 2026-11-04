@@ -5,6 +5,17 @@
 
 namespace origon::net {
 
+void writeLook(Writer& w, const CharacterLook& look) {
+    for (uint8_t v : look.values) w.put(v);
+}
+
+CharacterLook readLook(Reader& r) {
+    CharacterLook look;
+    for (uint8_t& v : look.values) v = r.get<uint8_t>();
+    look.sanitize();
+    return look;
+}
+
 void writeCommand(Writer& w, uint32_t tick, const PlayerCommand& command) {
     w.put(static_cast<uint8_t>(MessageType::Command));
     w.put(tick);

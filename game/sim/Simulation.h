@@ -36,7 +36,12 @@ public:
 
     // --- Networking (listen server) ---
     // Server: a joining human takes over a bot slot (or a new slot). Returns the player id, -1 if full.
-    int addRemotePlayer(const std::string& name);
+    int addRemotePlayer(const std::string& name, const CharacterLook& look = {});
+    // Look of the local player in matches started by startMatch (cosmetic).
+    void setLocalLook(const CharacterLook& look) {
+        m_localLook = look;
+        if (m_localId >= 0 && m_localId < static_cast<int>(m_players.size())) m_players[static_cast<size_t>(m_localId)].look = look;
+    }
     // Server: the slot goes back to a bot.
     void removeRemotePlayer(int id);
     // Client: replica of the server state. Creates players (and their controllers) as needed.
@@ -78,6 +83,7 @@ private:
     std::vector<GameEvent> m_events;
     std::mt19937 m_rng{1337};
     int m_localId = 0;
+    CharacterLook m_localLook;
 
     // Per-tick history of hit volumes for lag compensation.
     static constexpr int kHistoryTicks = 32;
