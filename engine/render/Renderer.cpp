@@ -259,6 +259,7 @@ void Renderer::ensureShadowMaps() {
     for (unsigned& fbo : m_shadowFbos) deleteFbo(fbo);
     deleteTexture(m_shadowArray);
     m_shadowSize = config.size;
+    m_cascadeValid = {};
     m_cascadeCount = config.cascades;
     if (config.size == 0) {
         return;
@@ -331,11 +332,14 @@ void Renderer::computeCascades(const CameraView& camera, const Environment& envi
                                                lightCenter.y + radius, -lightCenter.z - depthRange,
                                                -lightCenter.z + radius + 20.0f);
         const auto index = static_cast<size_t>(c);
+        m_cascadeRefresh[index] = c < 2 || !m_cascadeValid[index] || (m_shadowFrame % 2u) == (static_cast<unsigned>(c) % 2u);
+        sliceNear = sliceFar;
+        if (!m_cascadeRefresh[index]) continue; // Far cascade drawn last frame: keep its matrix.
         m_cascadeViewProj[index] = lightProj * lightView;
         m_cascadeSplits[index] = sliceFar;
         m_cascadeTexel[index] = texel;
         m_cascadeDepthRange[index] = depthRange + radius + 20.0f;
-        sliceNear = sliceFar;
+        m_cascadeValid[index] = true;
     }
 }
 
@@ -792,7 +796,10 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         glViewport(0, 0, m_shadowSize, m_shadowSize);
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(1.5f, 2.0f);
+        ++m_shadowFrame;
         for (int c = 0; c < m_cascadeCount; ++c) {
+            // The two far cascades alternate frames: half the cost, invisible at that distance.
+            if (!m_cascadeRefresh[static_cast<size_t>(c)]) continue;
             glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFbos[static_cast<size_t>(c)]);
             glClear(GL_DEPTH_BUFFER_BIT);
             drawDepth(m_items, m_cascadeViewProj[static_cast<size_t>(c)], c, environment.time);

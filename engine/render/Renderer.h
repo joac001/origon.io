@@ -209,6 +209,9 @@ private:
     std::array<float, kMaxCascades> m_cascadeSplits{};
     std::array<float, kMaxCascades> m_cascadeTexel{};
     std::array<float, kMaxCascades> m_cascadeDepthRange{};
+    std::array<bool, kMaxCascades> m_cascadeRefresh{};
+    std::array<bool, kMaxCascades> m_cascadeValid{}; // Reset when the shadow maps are recreated.
+    unsigned m_shadowFrame = 0;
     unsigned m_shadowRawSampler = 0; // Same shadow texture, no depth compare (PCSS blocker search).
 
     unsigned m_outputFbo = 0;
