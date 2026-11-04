@@ -17,6 +17,7 @@ class TextureCache;
 struct ModelPart {
     Mesh mesh;
     Material material;
+    std::string materialName;
 };
 
 // A model from the asset pipeline: nodes named <name>_LOD0..2 and an optional <name>_COL.
@@ -30,6 +31,7 @@ public:
     bool load(const std::filesystem::path& path, TextureCache* textures);
 
     const std::vector<ModelPart>& lod(int level) const;
+    std::vector<ModelPart>& mutableLod(int level) { return m_lods[static_cast<size_t>(level)]; }
     int lodCount() const { return m_lodCount; }
     // Collision triangles (from _COL, else empty).
     const std::vector<glm::vec3>& collisionVertices() const { return m_collisionVertices; }

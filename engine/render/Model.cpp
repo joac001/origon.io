@@ -93,6 +93,7 @@ bool Model::load(const std::filesystem::path& path, TextureCache* textures) {
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
         Material material;
+        std::string materialName;
     };
     std::array<std::map<const cgltf_material*, Batch>, kLodCount> batches;
     glm::vec3 minBounds(1e9f), maxBounds(-1e9f);
@@ -150,6 +151,7 @@ bool Model::load(const std::filesystem::path& path, TextureCache* textures) {
             if (batch.vertices.empty()) {
                 bool foliage = false;
                 batch.material = resolveMaterial(prim.material, textures, foliage);
+                batch.materialName = prim.material && prim.material->name ? prim.material->name : "";
                 m_hasFoliage |= foliage;
             }
             const auto base = static_cast<uint32_t>(batch.vertices.size());
@@ -182,7 +184,7 @@ bool Model::load(const std::filesystem::path& path, TextureCache* textures) {
     m_lodCount = 0;
     for (int lod = 0; lod < kLodCount; ++lod) {
         for (auto& [key, batch] : batches[static_cast<size_t>(lod)]) {
-            m_lods[static_cast<size_t>(lod)].push_back({textures ? Mesh(batch.vertices, batch.indices) : Mesh(), batch.material});
+            m_lods[static_cast<size_t>(lod)].push_back({textures ? Mesh(batch.vertices, batch.indices) : Mesh(), batch.material, batch.materialName});
         }
         if (!m_lods[static_cast<size_t>(lod)].empty()) m_lodCount = lod + 1;
     }

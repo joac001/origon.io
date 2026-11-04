@@ -2,6 +2,7 @@
 
 #include "core/Log.h"
 #include "render/Model.h"
+#include "render/Texture.h"
 #include "world/MapData.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -68,6 +69,27 @@ Model* ModelLibrary::getWeapon(const std::string& id) {
     if (!model->load(std::filesystem::path("assets/models/weapons") / (id + ".glb"), m_textures)) {
         m_models.emplace(key, nullptr);
         return nullptr;
+    }
+    // Scanned wood and steel, mapped in object space (the models have no UVs).
+    if (m_textures) {
+        auto set = [&](Material& m, const char* id) {
+            const std::filesystem::path folder = std::filesystem::path("assets/textures") / id;
+            m.albedoMap = m_textures->load(folder / "albedo.jpg", true).id;
+            m.normalMap = m_textures->load(folder / "normal.jpg", false).id;
+            m.armMap = m_textures->load(folder / "arm.jpg", false).id;
+            m.shading = 4;
+        };
+        for (ModelPart& part : model->mutableLod(0)) {
+            const std::string& n = part.materialName;
+            if (n == "wood" || n == "darkwood" || n == "bakelite") {
+                set(part.material, "american_walnut_veneer");
+                part.material.albedo *= n == "wood" ? 3.0f : 1.8f;
+            } else if (n == "metal" || n == "steel") {
+                set(part.material, "metal_plate");
+                part.material.albedo = glm::vec3(n == "metal" ? 0.55f : 0.75f);
+                part.material.metallic = 1.0f;
+            }
+        }
     }
     Model* raw = model.get();
     m_models.emplace(key, std::move(model));

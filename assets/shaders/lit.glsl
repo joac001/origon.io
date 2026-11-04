@@ -6,6 +6,8 @@
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec2 vUv;
+out vec3 vLocalPos;
+out vec3 vLocalNormal;
 invariant gl_Position;
 
 void main() {
@@ -15,6 +17,8 @@ void main() {
     vWorldPos = world.xyz;
     vNormal = normalize(transpose(inverse(mat3(model))) * aNormal);
     vUv = aUv;
+    vLocalPos = aPosition;
+    vLocalNormal = aNormal;
     gl_Position = uViewProj * world;
 }
 
@@ -26,6 +30,8 @@ const float PI = 3.14159265359;
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUv;
+in vec3 vLocalPos;
+in vec3 vLocalNormal;
 out vec4 fragColor;
 
 uniform int uShading;
@@ -394,7 +400,17 @@ void main() {
             terrainMaterial(n, albedo, roughness);
         }
     }
-    if (uShading == 3) {
+    if (uShading == 4) {
+        // Object-space triplanar (weapons): texture follows the model, 15 cm tiles.
+        vec3 ln = normalize(vLocalNormal);
+        vec3 blend = pow(abs(ln), vec3(4.0));
+        blend /= (blend.x + blend.y + blend.z);
+        vec3 q = vLocalPos / 0.15;
+        albedo *= texture(uAlbedoMap, q.zy).rgb * blend.x + texture(uAlbedoMap, q.xz).rgb * blend.y + texture(uAlbedoMap, q.xy).rgb * blend.z;
+        vec3 arm = texture(uArmMap, q.zy).rgb * blend.x + texture(uArmMap, q.xz).rgb * blend.y + texture(uArmMap, q.xy).rgb * blend.z;
+        roughness = clamp(arm.g * 0.9, 0.08, 1.0);
+        occlusion = arm.r;
+    } else if (uShading == 3) {
         // Triplanar textured block (map geometry): world-space mapping, 1.5 m tiles.
         vec3 blend = pow(abs(n), vec3(4.0));
         blend /= (blend.x + blend.y + blend.z);
@@ -422,11 +438,11 @@ void main() {
         discard;
     }
 #endif
-    if (uHasNormalMap == 1 && uShading != 3) {
+    if (uHasNormalMap == 1 && uShading < 3) {
         vec3 mapped = texture(uNormalMap, uv).xyz * 2.0 - 1.0;
         n = normalize(cotangentFrame(n, vWorldPos, uv) * mapped);
     }
-    if (uHasArmMap == 1 && uShading != 3) {
+    if (uHasArmMap == 1 && uShading < 3) {
         vec3 arm = texture(uArmMap, uv).rgb;
         occlusion = arm.r;
         roughness = clamp(arm.g * uRoughness / 0.8, 0.05, 1.0);
