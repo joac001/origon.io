@@ -39,6 +39,10 @@ public:
     // Overwrites the joints animated by the clip (time wraps around the clip duration).
     void sample(int clip, float time, Pose& pose) const;
     static void blend(Pose& a, const Pose& b, float weight);
+    // Per-joint weights (see jointMask): blends only the masked part of the skeleton.
+    static void blend(Pose& a, const Pose& b, float weight, const std::vector<float>& mask);
+    // 1 for the joint and all its descendants, 0 elsewhere.
+    std::vector<float> jointMask(int root) const;
     // Adds a rotation (axis in model space) to one joint's local rotation, given the pose's globals.
     void rotateJoint(Pose& pose, int joint, const glm::vec3& modelAxis, float angle) const;
     // Model-space joint matrices (globals) and skinning matrices (global * inverse bind).

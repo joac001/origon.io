@@ -4,7 +4,9 @@ Run:
     blender --background --factory-startup --python tools/blender/gen_character.py
 
 Writes assets/models/characters/soldier.glb: one skinned mesh (rigid weights per body part),
-an armature, and NLA tracks exported as animations: idle, run, crouch.
+an armature, and NLA tracks exported as animations: idle, run, crouch, reload, knife,
+death (falls backward) and death_forward. Reload and knife only key the upper body; the engine
+blends them over the locomotion pose.
 The character faces Blender +Y (engine -Z), feet at the origin, holding a rifle pose.
 The material named "tint" is recolored per player by the engine.
 """
@@ -153,25 +155,32 @@ def build_body():
     return b
 
 
-def key(rig, frame, rotations, hips_drop=0.0):
+UPPER_BODY = ("spine", "chest", "neck", "head", "upperarm.R", "forearm.R", "hand.R", "upperarm.L", "forearm.L",
+              "hand.L")
+
+
+def key(rig, frame, rotations, hips_drop=0.0, bones=None, hips_back=0.0):
     """rotations: bone -> (x, y, z) degrees (pose space, XYZ euler)."""
-    for name in BONES:
+    for name in bones or BONES:
         pb = rig.pose.bones[name]
         pb.rotation_mode = "XYZ"
         r = rotations.get(name, (0, 0, 0))
         pb.rotation_euler = tuple(math.radians(a) for a in r)
         pb.keyframe_insert("rotation_euler", frame=frame)
+    if bones:
+        return
     hips = rig.pose.bones["hips"]
-    hips.location = (0.0, hips_drop, 0.0)  # Hips bone points up: local Y is world up.
+    # Hips bone points up: local Y is world up, local Z is world back.
+    hips.location = (0.0, hips_drop, hips_back)
     hips.keyframe_insert("location", frame=frame)
 
 
-def make_action(rig, name, frames):
+def make_action(rig, name, frames, bones=None):
     action = bpy.data.actions.new(name)
     rig.animation_data_create()
     rig.animation_data.action = action
-    for frame, rotations, drop in frames:
-        key(rig, frame, rotations, drop)
+    for frame, rotations, drop, *extra in frames:
+        key(rig, frame, rotations, drop, bones, extra[0] if extra else 0.0)
     track = rig.animation_data.nla_tracks.new()
     track.name = name
     track.strips.new(name, int(frames[0][0]), action)
@@ -210,6 +219,51 @@ def main():
     crouch = {"thigh.R": (75, 0, 0), "thigh.L": (65, 0, 6), "shin.R": (-115, 0, 0), "shin.L": (-110, 0, 0),
               "foot.R": (35, 0, 0), "foot.L": (35, 0, 0), "spine": (12, 0, 0)}
     make_action(rig, "crouch", [(1, crouch, -0.4), (31, crouch, -0.41)])
+
+    # Reload (1 s, the engine scales it to the weapon's reload time): left hand drops to the belt
+    # pouch, brings a magazine back to the gun, then the right hand works the action.
+    hold = {}
+    pouch = {"upperarm.L": (-45, 0, 8), "forearm.L": (-35, 0, 0), "chest": (6, -8, 0), "head": (12, 0, 0)}
+    insert = {"upperarm.L": (-12, 0, 0), "forearm.L": (-10, 0, 0), "chest": (4, -5, 0), "head": (14, 0, 0)}
+    charge = {"forearm.R": (8, 0, -25), "upperarm.R": (0, 0, -12), "chest": (2, 6, 0), "head": (8, 0, 0)}
+    make_action(rig, "reload", [
+        (1, hold, 0.0), (6, insert, 0.0), (11, pouch, 0.0), (17, pouch, 0.0), (22, insert, 0.0), (25, charge, 0.0),
+        (31, hold, 0.0),
+    ], bones=UPPER_BODY)
+    # Knife / butt stroke (0.3 s): wind up high on the right, slash across to the left.
+    windup = {"upperarm.R": (55, 0, -35), "forearm.R": (35, 0, 0), "chest": (0, -14, 0), "spine": (-4, -6, 0)}
+    slash = {"upperarm.R": (-15, 0, 45), "forearm.R": (-10, 0, 25), "chest": (-8, 18, 0), "spine": (-8, 8, 0),
+             "upperarm.L": (-25, 0, 20)}
+    make_action(rig, "knife", [(1, hold, 0.0), (3, windup, 0.0), (6, slash, 0.0), (10, hold, 0.0)],
+                bones=UPPER_BODY)
+
+    # Deaths (1 s, the last frame holds): knees buckle, the body hits the ground and settles.
+    buckle = {"thigh.R": (40, 0, 0), "thigh.L": (25, 0, 4), "shin.R": (-60, 0, 0), "shin.L": (-45, 0, 0),
+              "head": (-15, 0, 0), "upperarm.R": (30, 0, -20), "upperarm.L": (30, 0, 20)}
+    fall_back = dict(buckle, hips=(25, 0, 0), spine=(10, 0, 0))
+    ground_back = {"hips": (88, 0, 4), "spine": (-6, 0, 0), "chest": (-4, 0, 0), "head": (-20, 0, 25),
+                   "thigh.R": (-8, 0, -6), "thigh.L": (12, 0, 8), "shin.R": (-12, 0, 0), "shin.L": (-35, 0, 0),
+                   "foot.R": (-50, 0, 0), "foot.L": (-40, 0, 0),
+                   "upperarm.R": (70, 0, -70), "forearm.R": (-20, 0, -30),
+                   "upperarm.L": (40, 0, 60), "forearm.L": (-50, 0, 20)}
+    settle_back = dict(ground_back, hips=(91, 0, 4), head=(-12, 0, 30))
+    make_action(rig, "death", [
+        (1, hold, 0.0), (7, buckle, -0.25), (13, fall_back, -0.5, 0.1),
+        (19, ground_back, -0.74, 0.25), (23, dict(ground_back, hips=(84, 0, 4)), -0.71, 0.25),
+        (31, settle_back, -0.74, 0.25),
+    ])
+    fall_forward = dict(buckle, hips=(-30, 0, 0), spine=(-15, 0, 0))
+    ground_forward = {"hips": (-88, 0, -5), "spine": (4, 0, 0), "head": (20, 0, -30),
+                      "thigh.R": (6, 0, 4), "thigh.L": (-10, 0, -6), "shin.R": (-10, 0, 0), "shin.L": (-40, 0, 0),
+                      "foot.R": (30, 0, 0), "foot.L": (40, 0, 0),
+                      "upperarm.R": (-60, 0, -30), "forearm.R": (-30, 0, 0),
+                      "upperarm.L": (70, 0, 40), "forearm.L": (-40, 0, 30)}
+    settle_forward = dict(ground_forward, hips=(-90, 0, -5))
+    make_action(rig, "death_forward", [
+        (1, hold, 0.0), (7, buckle, -0.25), (13, fall_forward, -0.5, -0.1),
+        (19, ground_forward, -0.76, -0.25), (23, dict(ground_forward, hips=(-84, 0, -5)), -0.73, -0.25),
+        (31, settle_forward, -0.76, -0.25),
+    ])
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")

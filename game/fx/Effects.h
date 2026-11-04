@@ -17,6 +17,22 @@ class Simulation;
 // which characters and bullets ignore.
 class Effects {
 public:
+    // A dead player lying where they fell (drawn by the app with the skinned soldier).
+    struct Corpse {
+        glm::vec3 feet;
+        glm::vec3 slide;   // Horizontal knockback, decays quickly.
+        float fallSpeed;
+        float yaw;
+        float age;
+        glm::vec3 color;
+        int weaponTier;
+        bool forward;      // Falls on the face (shot from behind).
+    };
+    // When enabled, kills spawn Corpse records instead of physics box dummies.
+    void setSkinnedCorpses(bool enabled) { m_skinnedCorpses = enabled; }
+    const std::vector<Corpse>& corpses() const { return m_corpses; }
+    static constexpr float kCorpseLifetime = 8.0f;
+
     // Removes all effects. Call before the physics world is rebuilt (bodies are destroyed there).
     void clear();
     void onEvents(const std::vector<GameEvent>& events, const Simulation& sim, PhysicsWorld& physics,
@@ -64,6 +80,8 @@ private:
     std::vector<Tracer> m_tracers;
     std::vector<Flash> m_flashes;
     std::vector<Debris> m_debris;
+    std::vector<Corpse> m_corpses;
+    bool m_skinnedCorpses = false;
     std::mt19937 m_rng{99};
     const Simulation* m_sim = nullptr;
 };

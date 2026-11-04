@@ -229,6 +229,31 @@ void SkinnedModel::blend(Pose& a, const Pose& b, float weight) {
     }
 }
 
+void SkinnedModel::blend(Pose& a, const Pose& b, float weight, const std::vector<float>& mask) {
+    weight = std::clamp(weight, 0.0f, 1.0f);
+    for (size_t i = 0; i < a.rotation.size() && i < mask.size(); ++i) {
+        const float w = weight * mask[i];
+        if (w <= 0.0f) continue;
+        a.translation[i] = glm::mix(a.translation[i], b.translation[i], w);
+        a.rotation[i] = glm::slerp(a.rotation[i], b.rotation[i], w);
+        a.scale[i] = glm::mix(a.scale[i], b.scale[i], w);
+    }
+}
+
+std::vector<float> SkinnedModel::jointMask(int root) const {
+    std::vector<float> mask(m_joints.size(), 0.0f);
+    if (root < 0) return mask;
+    for (size_t i = 0; i < m_joints.size(); ++i) {
+        for (int j = static_cast<int>(i); j >= 0; j = m_joints[static_cast<size_t>(j)].parent) {
+            if (j == root) {
+                mask[i] = 1.0f;
+                break;
+            }
+        }
+    }
+    return mask;
+}
+
 void SkinnedModel::rotateJoint(Pose& pose, int joint, const glm::vec3& modelAxis, float angle) const {
     if (joint < 0) return;
     std::vector<glm::mat4> globals, skin;

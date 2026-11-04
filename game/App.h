@@ -36,6 +36,7 @@ struct LaunchOptions {
     bool hideUi = false;
     bool forceTitle = false; // Show the title screen even in capture mode.
     int followPlayer = -1;   // Third-person spectator camera behind this player.
+    bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
@@ -125,8 +126,14 @@ private:
     std::vector<float> m_walkPhase;
     SkinnedModel m_soldier;
     bool m_soldierReady = false;
+    std::vector<glm::mat4> m_soldierGlobals; // Scratch: joint globals of the last drawn soldier.
     std::vector<std::vector<glm::mat4>> m_skinBuffers;
     void submitSoldier(const Player& p, float alpha);
+    const std::vector<glm::mat4>& drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model, const glm::vec3& tint,
+                                                    bool highlight);
+    void submitModel(const Model& model, const glm::mat4& transform);
+    void submitCorpses();
+    void submitPoseGallery(const glm::vec3& eye, float yaw);
     CameraView m_lastCamera;
 
     ImFont* m_fontRegular = nullptr;

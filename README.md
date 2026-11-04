@@ -99,7 +99,7 @@ See `docs/asset-pipeline.md`.
 ## Command line
 
 `origon [--map NAME] [--editor] [--host [PORT]] [--connect HOST[:PORT]] [--name NAME]`
-`[--autoplay] [--hide-ui] [--title] [--follow PLAYER] [--camera X Y Z YAW PITCH] [--shot-size WxH] [--screenshot FILE] [--screenshot-frame N]`
+`[--autoplay] [--hide-ui] [--title] [--follow PLAYER] [--pose-gallery] [--camera X Y Z YAW PITCH] [--shot-size WxH] [--screenshot FILE] [--screenshot-frame N]`
 
 ## Layout
 

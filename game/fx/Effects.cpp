@@ -41,6 +41,7 @@ void Effects::clear() {
     m_particles.clear();
     m_tracers.clear();
     m_flashes.clear();
+    m_corpses.clear();
     m_debris.clear(); // Bodies are destroyed by PhysicsWorld::clearBodies().
 }
 
@@ -112,11 +113,21 @@ void Effects::onEvents(const std::vector<GameEvent>& events, const Simulation& s
                 break; // No corpse for the first-person view.
             }
             glm::vec3 push = victim.velocity;
+            glm::vec3 awayDir(0.0f);
             if (e.a >= 0 && e.a != e.b) {
                 const glm::vec3 away = victim.position - players[static_cast<size_t>(e.a)].position;
-                if (glm::length(away) > 0.01f) {
-                    push += glm::normalize(glm::vec3(away.x, 0.0f, away.z)) * 3.5f + glm::vec3(0, 1.0f, 0);
+                if (glm::length(glm::vec2(away.x, away.z)) > 0.01f) {
+                    awayDir = glm::normalize(glm::vec3(away.x, 0.0f, away.z));
+                    push += awayDir * 3.5f + glm::vec3(0, 1.0f, 0);
                 }
+            }
+            if (m_skinnedCorpses) {
+                const glm::vec3 facing(-std::sin(victim.yaw), 0.0f, -std::cos(victim.yaw));
+                const bool forward = glm::dot(facing, awayDir) > 0.2f;
+                const glm::vec3 slide = glm::vec3(victim.velocity.x, 0.0f, victim.velocity.z) * 0.6f + awayDir * 1.2f;
+                m_corpses.push_back({victim.position, slide, 0.0f, victim.yaw, 0.0f, victim.color, victim.tier, forward});
+                if (m_corpses.size() > 12) m_corpses.erase(m_corpses.begin());
+                break;
             }
             const glm::vec3 half(0.24f, 0.86f, 0.16f);
             const glm::quat rotation = glm::angleAxis(victim.yaw, glm::vec3(0, 1, 0));
@@ -154,6 +165,33 @@ void Effects::update(float dt, PhysicsWorld& physics) {
         }
     }
     std::erase_if(m_debris, [](const Debris& d) { return d.life <= 0.0f; });
+
+    for (Corpse& c : m_corpses) {
+        c.age += dt;
+        if (c.age > kCorpseLifetime - 1.0f) {
+            c.feet.y -= dt * 0.6f; // Sink out of sight before removal.
+            continue;
+        }
+        const glm::vec3 step = c.slide * dt;
+        c.slide *= std::max(0.0f, 1.0f - 6.0f * dt);
+        // Stop sliding into walls and trees.
+        const float length = glm::length(step);
+        if (length > 1e-4f &&
+            !physics.rayCast(c.feet + glm::vec3(0, 0.5f, 0), step / length, length + 0.3f).has_value()) {
+            c.feet += step;
+        }
+        // Settle onto the ground below (terrain, rocks, bridges).
+        const auto ground = physics.rayCast(c.feet + glm::vec3(0, 0.6f, 0), glm::vec3(0, -1, 0), 50.0f);
+        const float groundY = ground ? ground->position.y : c.feet.y;
+        if (c.feet.y > groundY + 0.01f) {
+            c.fallSpeed += 18.0f * dt;
+            c.feet.y = std::max(groundY, c.feet.y - c.fallSpeed * dt);
+        } else {
+            c.feet.y = groundY;
+            c.fallSpeed = 0.0f;
+        }
+    }
+    std::erase_if(m_corpses, [](const Corpse& c) { return c.age >= kCorpseLifetime; });
 }
 
 void Effects::submit(Renderer& renderer, const PhysicsWorld& physics) const {

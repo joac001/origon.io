@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
         else if (arg == "--hide-ui") options.hideUi = true;
         else if (arg == "--title") options.forceTitle = true;
         else if (arg == "--follow") options.followPlayer = std::atoi(next().c_str());
+        else if (arg == "--pose-gallery") options.poseGallery = true;
         else if (arg == "--dump-sounds") options.dumpSounds = next();
         else if (arg == "--screenshot") options.screenshotPath = next();
         else if (arg == "--screenshot-frame") options.screenshotFrame = std::atoi(next().c_str());
