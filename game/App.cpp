@@ -579,6 +579,7 @@ int App::run() {
     while (!m_window->shouldClose()) {
         const auto frameStart = Clock::now();
         float dt = std::chrono::duration<float>(frameStart - last).count();
+        if (!m_options.recordFolder.empty()) dt = 1.0f / 60.0f; // Recording: real-time playback at 60 fps.
         last = frameStart;
         dt = std::min(dt, 0.1f);
         m_time += dt;
@@ -793,6 +794,17 @@ int App::run() {
         glBindFramebuffer(GL_FRAMEBUFFER, m_shotFbo);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // --record: every frame after warm-up to numbered PNGs (turn into a video with ffmpeg).
+        if (!m_options.recordFolder.empty() && m_frameCount > 60) {
+            const int index = m_frameCount - 60;
+            if (index <= m_options.recordFrames) {
+                std::filesystem::create_directories(m_options.recordFolder);
+                saveScreenshot(std::filesystem::path(m_options.recordFolder) / std::format("frame_{:05d}.png", index), framebuffer.x,
+                               framebuffer.y, m_shotFbo);
+            } else {
+                m_window->requestClose();
+            }
+        }
         if (!m_pendingScreenshot.empty()) {
             saveScreenshot(m_pendingScreenshot, framebuffer.x, framebuffer.y, m_shotFbo);
             log::info("Perf: {:.2f} ms/frame ({:.0f} FPS), {} draw calls, {} vegetation instances", m_frameMs, m_fpsSmoothed,
@@ -934,13 +946,54 @@ void App::updatePlaying(float frameDt) {
     const float adsTarget = me.alive && me.aiming ? 1.0f : 0.0f;
     m_adsBlend += (adsTarget - m_adsBlend) * std::min(1.0f, frameDt * 14.0f);
 
-    // Walk animation phases for third-person models.
+    // Locomotion state for third-person models.
     m_walkPhase.resize(m_sim->players().size(), 0.0f);
+    m_locomotion.resize(m_sim->players().size());
     for (const Player& p : m_sim->players()) {
-        const float speed = glm::length(glm::vec2(p.velocity.x, p.velocity.z));
-        // Walk/run cycle advances with ground speed (the run clip matches ~6.5 m/s).
-        m_walkPhase[static_cast<size_t>(p.id)] += speed * frameDt * (m_soldierReady ? 1.0f / 6.5f : 2.3f);
+        const glm::vec2 velocity(p.velocity.x, p.velocity.z);
+        const float speed = glm::length(velocity);
+        m_walkPhase[static_cast<size_t>(p.id)] += speed * frameDt * 2.3f; // Cube-model fallback.
+        updateLocomotion(m_locomotion[static_cast<size_t>(p.id)], p, frameDt);
     }
+}
+
+void App::updateLocomotion(Locomotion& l, const Player& p, float dt) {
+    const glm::vec2 velocity(p.velocity.x, p.velocity.z);
+    const float speed = glm::length(velocity);
+    const float rate = 1.0f - std::exp(-dt * 10.0f);
+    l.speed += (speed - l.speed) * rate;
+    const bool moving = p.onGround && l.speed > 0.35f;
+
+    // Legs turn toward the direction of travel (up to 70 degrees), the torso keeps aiming;
+    // moving backwards plays the cycle in reverse.
+    float targetYaw = 0.0f;
+    if (speed > 0.35f) {
+        const glm::vec2 forward(-std::sin(p.yaw), -std::cos(p.yaw));
+        const glm::vec2 right(std::cos(p.yaw), -std::sin(p.yaw));
+        const float angle = std::atan2(glm::dot(velocity, right), glm::dot(velocity, forward));
+        const float limit = glm::radians(70.0f);
+        if (std::abs(angle) <= glm::radians(110.0f)) {
+            l.direction = 1.0f;
+            targetYaw = std::clamp(angle, -limit, limit);
+        } else {
+            l.direction = -1.0f;
+            float back = angle - std::copysign(glm::pi<float>(), angle);
+            targetYaw = std::clamp(back, -limit, limit);
+        }
+    }
+    l.legYaw += (targetYaw - l.legYaw) * (1.0f - std::exp(-dt * 8.0f));
+
+    // Stride per cycle (two steps) grows with speed, so feet do not slide.
+    const float crouch = std::clamp((kEyeHeight - p.eyeHeight) / (kEyeHeight - kCrouchEyeHeight), 0.0f, 1.0f);
+    const float standingStride = l.speed < 4.6f ? glm::mix(1.5f, 3.3f, glm::smoothstep(1.5f, 4.6f, l.speed))
+                                                 : glm::mix(3.3f, 3.9f, glm::smoothstep(4.6f, 6.8f, l.speed));
+    const float stride = glm::mix(standingStride, 1.3f, crouch);
+    if (moving) l.phase = std::fmod(l.phase + l.direction * l.speed * dt / stride + 1.0f, 1.0f);
+
+    const float approach = 1.0f - std::exp(-dt * 9.0f);
+    l.moveWeight += ((moving ? glm::smoothstep(0.35f, 1.4f, l.speed) : 0.0f) - l.moveWeight) * approach;
+    l.runWeight += (glm::smoothstep(2.6f, 4.2f, l.speed) - l.runWeight) * approach;
+    l.airWeight += ((p.onGround ? 0.0f : 1.0f) - l.airWeight) * (1.0f - std::exp(-dt * 12.0f));
 }
 
 PlayerCommand App::buildLocalCommand() const {
@@ -1027,14 +1080,16 @@ glm::vec3 App::localMuzzle() const {
 namespace {
 
 struct SoldierRig {
-    int idle = -1, run = -1, crouch = -1, reload = -1, knife = -1, death = -1, deathForward = -1;
-    int spine = -1, chest = -1, hand = -1;
+    int idle = -1, walk = -1, run = -1, crouch = -1, crouchWalk = -1, jump = -1, reload = -1, knife = -1, death = -1,
+        deathForward = -1;
+    int hips = -1, spine = -1, chest = -1, hand = -1;
     std::vector<float> upperBody;
 
     explicit SoldierRig(const SkinnedModel& m)
-        : idle(m.findClip("idle")), run(m.findClip("run")), crouch(m.findClip("crouch")), reload(m.findClip("reload")),
+        : idle(m.findClip("idle")), walk(m.findClip("walk")), run(m.findClip("run")), crouch(m.findClip("crouch")),
+          crouchWalk(m.findClip("crouch_walk")), jump(m.findClip("jump")), reload(m.findClip("reload")),
           knife(m.findClip("knife")), death(m.findClip("death")), deathForward(m.findClip("death_forward")),
-          spine(m.findJoint("spine")), chest(m.findJoint("chest")), hand(m.findJoint("hand.R")),
+          hips(m.findJoint("hips")), spine(m.findJoint("spine")), chest(m.findJoint("chest")), hand(m.findJoint("hand.R")),
           upperBody(m.jointMask(m.findJoint("spine"))) {}
 };
 
@@ -1051,21 +1106,35 @@ void App::submitSoldier(const Player& p, float alpha) {
     const glm::vec3 feet = glm::mix(p.previousPosition, p.position, alpha);
     const float speed = glm::length(glm::vec2(p.velocity.x, p.velocity.z));
     const float crouch = std::clamp((kEyeHeight - p.eyeHeight) / (kEyeHeight - kCrouchEyeHeight), 0.0f, 1.0f);
-    const float cycle = m_walkPhase[static_cast<size_t>(p.id)];
     const WeaponDef& weapon = m_sim->weaponFor(p);
+    Locomotion fallback;
+    const Locomotion& l = static_cast<size_t>(p.id) < m_locomotion.size() ? m_locomotion[static_cast<size_t>(p.id)] : fallback;
+    (void)speed;
 
+    auto clipAt = [&](int clip, float phase) {
+        SkinnedModel::Pose out = sk.restPose();
+        sk.sample(clip, phase * sk.clipDuration(clip) * 0.999f, out);
+        return out;
+    };
+    // Standing: idle -> walk -> run (all cycles share the phase: 0 = right heel strike).
     SkinnedModel::Pose pose = sk.restPose();
     sk.sample(rig.idle, m_time + static_cast<float>(p.id) * 0.37f, pose);
-    if (p.onGround && speed > 0.3f) {
-        SkinnedModel::Pose run = sk.restPose();
-        sk.sample(rig.run, cycle * sk.clipDuration(rig.run), run);
-        SkinnedModel::blend(pose, run, std::clamp(speed / 3.5f, 0.0f, 1.0f));
+    if (l.moveWeight > 0.01f) {
+        SkinnedModel::Pose move = clipAt(rig.walk >= 0 ? rig.walk : rig.run, l.phase);
+        if (rig.walk >= 0 && l.runWeight > 0.01f) SkinnedModel::blend(move, clipAt(rig.run, l.phase), l.runWeight);
+        SkinnedModel::blend(pose, move, l.moveWeight);
     }
+    // Crouched: crouch pose -> crouch walk.
     if (crouch > 0.01f) {
         SkinnedModel::Pose crouched = sk.restPose();
         sk.sample(rig.crouch, 0.0f, crouched);
+        if (rig.crouchWalk >= 0 && l.moveWeight > 0.01f) {
+            SkinnedModel::blend(crouched, clipAt(rig.crouchWalk, l.phase), l.moveWeight);
+        }
         SkinnedModel::blend(pose, crouched, crouch);
     }
+    // In the air: tucked legs.
+    if (rig.jump >= 0 && l.airWeight > 0.01f) SkinnedModel::blend(pose, clipAt(rig.jump, 0.0f), l.airWeight * 0.9f);
     // Upper-body actions layered over locomotion.
     if (p.reloadTimer > 0.0f && weapon.reloadSeconds > 0.0f && rig.reload >= 0) {
         const float progress = std::clamp(1.0f - p.reloadTimer / weapon.reloadSeconds, 0.0f, 0.999f);
@@ -1078,6 +1147,12 @@ void App::submitSoldier(const Player& p, float alpha) {
         SkinnedModel::Pose knife = sk.restPose();
         sk.sample(rig.knife, progress * sk.clipDuration(rig.knife), knife);
         SkinnedModel::blend(pose, knife, clipEnvelope(progress, 0.1f), rig.upperBody);
+    }
+    // Legs face the direction of travel; spine and chest turn back so the upper body keeps aiming.
+    if (std::abs(l.legYaw) > 1e-3f) {
+        sk.rotateJoint(pose, rig.hips, glm::vec3(0, 1, 0), -l.legYaw);
+        sk.rotateJoint(pose, rig.spine, glm::vec3(0, 1, 0), l.legYaw * 0.5f);
+        sk.rotateJoint(pose, rig.chest, glm::vec3(0, 1, 0), l.legYaw * 0.5f);
     }
     // Aim: bend the spine and chest toward the view pitch (positive pitch leans back = looks up).
     sk.rotateJoint(pose, rig.spine, glm::vec3(1, 0, 0), p.pitch * 0.45f);
@@ -1190,9 +1265,9 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
         const char* clip;
         float progress; // 0..1 of the clip.
     };
-    static const Entry entries[] = {{"idle", 0.0f},  {"run", 0.25f},   {"crouch", 0.0f},         {"reload", 0.35f},
-                                    {"reload", 0.75f}, {"knife", 0.2f}, {"knife", 0.5f},          {"death", 0.45f},
-                                    {"death", 0.999f}, {"death_forward", 0.999f}};
+    static const Entry entries[] = {{"walk", 0.0f},  {"walk", 0.125f}, {"walk", 0.25f},  {"walk", 0.375f},
+                                    {"walk", 0.5f},  {"run", 0.0f},    {"run", 0.125f},  {"run", 0.25f},
+                                    {"run", 0.375f}, {"crouch_walk", 0.0f}, {"crouch_walk", 0.25f}, {"jump", 0.0f}};
     const glm::vec3 forward = viewDirection(yaw, 0.0f);
     const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
     const int count = static_cast<int>(std::size(entries));
@@ -1203,11 +1278,11 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
         const int clip = sk.findClip(e.clip);
         SkinnedModel::Pose pose = sk.restPose();
         sk.sample(clip, e.progress * sk.clipDuration(clip), pose);
-        glm::vec3 feet = eye + forward * 7.0f + right * ((static_cast<float>(i) - (count - 1) * 0.5f) * 1.3f);
+        glm::vec3 feet = eye + forward * 7.0f + right * ((static_cast<float>(i) - (count - 1) * 0.5f) * 1.05f);
         feet.y = m_world.terrainHeight(feet.x, feet.z);
-        // Face the camera, turned a quarter so profiles read.
+        // Profile view (facing right on screen) so gait poses read.
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) *
-                                glm::rotate(glm::mat4(1.0f), yaw + glm::pi<float>() * 0.7f, glm::vec3(0, 1, 0));
+                                glm::rotate(glm::mat4(1.0f), yaw - glm::half_pi<float>(), glm::vec3(0, 1, 0));
         drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
     }
 }

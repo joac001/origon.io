@@ -102,25 +102,90 @@ def add_animations(rig):
         (31, {"chest": (-1, 0, 0)}, -0.005),
         (61, {"chest": (2, 0, 0)}, 0.0),
     ])
-    # Run: 24-frame cycle (0.8 s), legs swing, knees bend, slight torso counter-rotation.
-    def run_pose(phase):
-        s = math.sin(phase)
-        c = math.cos(phase)
-        return {
-            "thigh.R": (-40 * s, 0, 0), "thigh.L": (40 * s, 0, 0),
-            "shin.R": (max(0.0, 70 * -c) + 10, 0, 0), "shin.L": (max(0.0, 70 * c) + 10, 0, 0),
-            "foot.R": (-15 * s, 0, 0), "foot.L": (15 * s, 0, 0),
-            "spine": (-8, 0, 6 * s), "chest": (0, 0, -4 * s),
-        }, -0.04 * abs(c)
-    frames = []
-    for i in range(5):
-        phase = 2 * math.pi * i / 4
-        rotations, drop = run_pose(phase)
-        frames.append((1 + i * 6, rotations, drop))
-    make_action(rig, "run", frames)
-    # Crouch: hips down, knees bent.
+    # Locomotion cycles from gait curves. Joint conventions on this rig: thigh +X flexes the hip
+    # (knee forward), shin -X bends the knee, foot +X lifts the toes, spine -X leans forward,
+    # hips Y twists the pelvis. Phase 0 = right heel strike, 0.5 = left heel strike.
+    def bump(p, center, width):
+        d = (p - center + 0.5) % 1.0 - 0.5
+        return math.exp(-(d / width) ** 2)
+
+    def curve(p, keys):
+        """Periodic piecewise-linear curve through (phase, value) keys."""
+        keys = sorted(keys)
+        for (p0, v0), (p1, v1) in zip(keys, keys[1:] + [(keys[0][0] + 1.0, keys[0][1])]):
+            q = p if p >= p0 else p + 1.0
+            if p0 <= q <= p1:
+                t = (q - p0) / (p1 - p0)
+                t = t * t * (3 - 2 * t)  # Smooth between keys.
+                return v0 + (v1 - v0) * t
+        return keys[0][1]
+
+    def gait(p, hip_amp, hip_bias, knee_stance, knee_swing, swing_center, swing_width, ankle_keys):
+        pose = {}
+        for side, offset in (("R", 0.0), ("L", 0.5)):
+            q = (p + offset) % 1.0
+            hip = hip_amp * math.cos(2 * math.pi * q) + hip_bias
+            knee = 6 + knee_stance * bump(q, 0.12, 0.08) + knee_swing * bump(q, swing_center, swing_width)
+            ankle = curve(q, ankle_keys)
+            pose[f"thigh.{side}"] = (hip, 0, 0)
+            pose[f"shin.{side}"] = (-knee, 0, 0)
+            pose[f"foot.{side}"] = (ankle, 0, 0)
+        return pose
+
+    def cycle(name, frames_per_cycle, pose_at, keys=16):
+        out = []
+        for i in range(keys + 1):
+            p = (i % keys) / keys
+            rotations, drop, back = pose_at(p)
+            out.append((1 + frames_per_cycle * i / keys, rotations, drop, back))
+        make_action(rig, name, out)
+
+    walk_ankle = [(0.0, 4), (0.08, -6), (0.4, 8), (0.6, -16), (0.75, 6)]
+    run_ankle = [(0.0, 6), (0.12, 12), (0.35, -24), (0.55, 4), (0.85, 10)]
+
+    def walk(p):
+        pose = gait(p, 21, 3, 12, 56, 0.72, 0.11, walk_ankle)
+        c = math.cos(2 * math.pi * p)
+        pose["hips"] = (0, 5 * c, 0)
+        pose["spine"] = (-3, -3 * c, 0)
+        pose["chest"] = (1.0 * math.cos(4 * math.pi * p), -2 * c, 0)
+        return pose, -0.025 * (0.5 + 0.5 * math.cos(4 * math.pi * p)), 0.0
+
+    def run(p):
+        pose = gait(p, 36, 8, 30, 95, 0.68, 0.14, run_ankle)
+        c = math.cos(2 * math.pi * p)
+        pose["hips"] = (0, 7 * c, 0)
+        pose["spine"] = (-12, -5 * c, 0)
+        pose["chest"] = (-2 + 2.0 * math.cos(4 * math.pi * p), -4 * c, 0)
+        pose["neck"] = (6, 0, 0)  # Keep the eyes level while leaning.
+        return pose, -0.035 - 0.035 * (0.5 + 0.5 * math.cos(4 * math.pi * p)), 0.02
+
     crouch = {"thigh.R": (75, 0, 0), "thigh.L": (65, 0, 6), "shin.R": (-115, 0, 0), "shin.L": (-110, 0, 0),
               "foot.R": (35, 0, 0), "foot.L": (35, 0, 0), "spine": (12, 0, 0)}
+
+    def crouch_walk(p):
+        pose = {}
+        for side, offset in (("R", 0.0), ("L", 0.5)):
+            q = (p + offset) % 1.0
+            swing = bump(q, 0.7, 0.13)
+            hip = 68 + 16 * math.cos(2 * math.pi * q) + 10 * swing
+            knee = 108 + 18 * swing - 6 * bump(q, 0.15, 0.1)
+            pose[f"thigh.{side}"] = (hip, 0, 0)
+            pose[f"shin.{side}"] = (-knee, 0, 0)
+            pose[f"foot.{side}"] = (36 + curve(q, [(0.0, 2), (0.45, 8), (0.62, -10), (0.8, 4)]), 0, 0)
+        c = math.cos(2 * math.pi * p)
+        pose["hips"] = (0, 4 * c, 0)
+        pose["spine"] = (8, -3 * c, 0)
+        return pose, -0.4 - 0.015 * (0.5 + 0.5 * math.cos(4 * math.pi * p)), 0.0
+
+    cycle("walk", 30, walk)        # 1.0 s per cycle (two steps).
+    cycle("run", 21, run)          # 0.7 s.
+    cycle("crouch_walk", 36, crouch_walk)
+    # Airborne: knees tucked, one leg ahead.
+    air = {"thigh.R": (48, 0, 0), "thigh.L": (22, 0, 0), "shin.R": (-75, 0, 0), "shin.L": (-58, 0, 0),
+           "foot.R": (12, 0, 0), "foot.L": (-6, 0, 0), "spine": (-6, 0, 0)}
+    make_action(rig, "jump", [(1, air, -0.04), (11, air, -0.05)])
+    # Crouch: hips down, knees bent.
     make_action(rig, "crouch", [(1, crouch, -0.4), (31, crouch, -0.41)])
 
     # Reload (1 s, the engine scales it to the weapon's reload time): left hand drops to the belt

@@ -29,6 +29,10 @@ int main(int argc, char** argv) {
         else if (arg == "--title") options.forceTitle = true;
         else if (arg == "--follow") options.followPlayer = std::atoi(next().c_str());
         else if (arg == "--pose-gallery") options.poseGallery = true;
+        else if (arg == "--record") {
+            options.recordFolder = next();
+            options.recordFrames = std::atoi(next().c_str());
+        }
         else if (arg == "--force-lod") options.forceLod = std::atoi(next().c_str());
         else if (arg == "--bots") options.botCount = std::atoi(next().c_str());
         else if (arg == "--bench") options.benchSeconds = std::stof(next());

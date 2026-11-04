@@ -44,7 +44,9 @@ struct LaunchOptions {
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
     int lookGallery = -1;
     int pressPlayFrame = 0;
-    int forceLod = -1;         // Debug: draw characters at this LOD regardless of distance.
+    int forceLod = -1;
+    std::string recordFolder;  // Debug: save frames to PNGs (fixed 60 Hz simulation step per frame).
+    int recordFrames = 0;         // Debug: draw characters at this LOD regardless of distance.
     int botCount = -1;         // >= 0: overrides the saved bot count for this run.
     float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
@@ -162,7 +164,17 @@ private:
     float m_landVelocity = 0.0f;
     float m_roll = 0.0f;
     glm::vec2 m_sway{0.0f};
-    std::vector<float> m_walkPhase;
+    std::vector<float> m_walkPhase; // Cube-model fallback only.
+    // Per-player locomotion animation state (third-person soldiers).
+    struct Locomotion {
+        float phase = 0.0f;      // Gait cycle 0..1 (0 = right heel strike).
+        float direction = 1.0f;  // -1: walking backwards (cycle plays in reverse).
+        float legYaw = 0.0f;     // Lower body turned toward the direction of travel (radians).
+        float speed = 0.0f;      // Smoothed ground speed.
+        float moveWeight = 0.0f, runWeight = 0.0f, airWeight = 0.0f;
+    };
+    std::vector<Locomotion> m_locomotion;
+    void updateLocomotion(Locomotion& l, const Player& p, float dt);
     std::array<SkinnedModel, 2> m_soldiers; // Male, female (tools/blender/gen_human.py).
     bool m_soldierReady = false;
     bool m_soldierFemale = false;
