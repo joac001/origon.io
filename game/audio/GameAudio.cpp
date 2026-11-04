@@ -108,8 +108,45 @@ void GameAudio::build() {
     // Recorded CC0 sounds replace the synthesized ones where they exist (same WeaponCategory order).
     const char* shotNames[] = {"pistol", "smg", "rifle", "lmg", "semi", "bolt", "sniper", "shotgun"};
     const SoundId synthShots[] = {m_shotPistol, m_shotSmg, m_shotRifle, m_shotLmg, m_shotSemi, m_shotBolt, m_shotSniper, m_shotShotgun};
+    // Recorded report layered over a synthesized tail per class: the recording gives the real
+    // crack, the tail gives each weapon class its own length, body and outdoor echo.
+    struct Layer {
+        float attack;  // Seconds of the recording kept.
+        float tailGain;
+        GunshotParams tail;
+    };
+    const Layer layers[] = {
+        {0.22f, 0.45f, {.thumpFrequency = 95, .thumpGain = 0.3f, .tailCutoff = 1300, .tailDecay = 0.16f, .tailGain = 0.3f, .echoDelay = 0.09f, .echoGain = 0.2f, .duration = 0.7f}},
+        {0.12f, 0.4f, {.thumpFrequency = 85, .thumpGain = 0.35f, .tailCutoff = 1100, .tailDecay = 0.12f, .tailGain = 0.3f, .echoDelay = 0.08f, .echoGain = 0.15f, .duration = 0.45f}},
+        {0.16f, 0.5f, {.thumpFrequency = 70, .thumpGain = 0.45f, .tailCutoff = 950, .tailDecay = 0.2f, .tailGain = 0.35f, .echoDelay = 0.1f, .echoGain = 0.22f, .duration = 0.7f}},
+        {0.16f, 0.55f, {.thumpFrequency = 58, .thumpGain = 0.6f, .tailCutoff = 800, .tailDecay = 0.22f, .tailGain = 0.38f, .echoDelay = 0.1f, .echoGain = 0.22f, .duration = 0.7f}},
+        {0.28f, 0.6f, {.thumpFrequency = 62, .thumpGain = 0.6f, .tailCutoff = 850, .tailDecay = 0.4f, .tailGain = 0.4f, .echoDelay = 0.14f, .echoGain = 0.3f, .duration = 1.4f}},
+        {0.32f, 0.7f, {.thumpFrequency = 52, .thumpGain = 0.7f, .tailCutoff = 750, .tailDecay = 0.6f, .tailGain = 0.45f, .echoDelay = 0.17f, .echoGain = 0.35f, .duration = 2.0f}},
+        {0.35f, 0.75f, {.thumpFrequency = 46, .thumpGain = 0.8f, .tailCutoff = 680, .tailDecay = 0.75f, .tailGain = 0.5f, .echoDelay = 0.21f, .echoGain = 0.38f, .duration = 2.4f}},
+        {0.3f, 0.65f, {.thumpFrequency = 45, .thumpGain = 0.8f, .tailCutoff = 650, .tailDecay = 0.5f, .tailGain = 0.5f, .echoDelay = 0.15f, .echoGain = 0.3f, .duration = 1.6f}},
+    };
     for (size_t i = 0; i < std::size(shotNames); ++i) {
-        std::vector<SoundId> set = loadRecorded(std::string("shot_") + shotNames[i], 1.0f);
+        std::vector<SoundId> set;
+        for (int v = 1; v < 100; ++v) {
+            const std::filesystem::path path = fs::resolve(std::format("assets/sounds/shot_{}_{:02d}.flac", shotNames[i], v));
+            if (!std::filesystem::exists(path)) break;
+            Buffer recorded;
+            if (!AudioSystem::decodeFile(path.string(), recorded)) continue;
+            const Layer& layer = layers[i];
+            // Keep the attack of the recording with a short fade.
+            const size_t keep = std::min(recorded.size(), static_cast<size_t>(layer.attack * AudioSystem::kSampleRate));
+            const size_t fade = std::min(keep, static_cast<size_t>(0.04f * AudioSystem::kSampleRate));
+            recorded.resize(keep);
+            for (size_t k = 0; k < fade; ++k) recorded[keep - 1 - k] *= static_cast<float>(k) / static_cast<float>(fade);
+            GunshotParams tailParams = layer.tail;
+            tailParams.crackGain = 0.0f;
+            tailParams.seed = static_cast<uint32_t>(200 + i * 10 + static_cast<size_t>(v));
+            Buffer mixed = gunshot(tailParams);
+            for (float& sample : mixed) sample *= layer.tailGain;
+            mixInto(mixed, recorded, 0.0f, 1.0f);
+            normalize(mixed, 0.95f);
+            set.push_back(add(std::format("shot_{}_{:02d}", shotNames[i], v), std::move(mixed)));
+        }
         if (set.empty()) set.push_back(synthShots[i]);
         m_shotSets.push_back(std::move(set));
     }

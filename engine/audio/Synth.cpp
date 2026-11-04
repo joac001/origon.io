@@ -68,7 +68,7 @@ Buffer gunshot(const GunshotParams& p) {
         const float t = static_cast<float>(i) / kRate;
         const float noise = rng.next();
         const float cutoff = p.crackCutoff * std::exp(-t / (p.crackDecay * 4.0f)) + 250.0f;
-        const float crack = crack2.process(crack1.process(noise, cutoff), cutoff * 1.5f) * std::exp(-t / p.crackDecay) * 2.2f;
+        const float crack = crack2.process(crack1.process(noise, cutoff), cutoff * 1.5f) * std::exp(-t / p.crackDecay) * 2.2f * p.crackGain;
         const float frequency = p.thumpFrequency * (1.0f + 2.5f * std::exp(-t / 0.012f));
         phase += kTwoPi * frequency / kRate;
         const float thump = std::sin(phase) * std::exp(-t / p.thumpDecay) * p.thumpGain;

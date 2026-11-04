@@ -66,28 +66,31 @@ def envelope(samples, window):
     return [max(abs(s) for s in samples[i:i + window]) for i in range(0, len(samples), window)]
 
 
+def transients(env, peak):
+    """Indices (5 ms windows) where the level jumps: above 30% of the peak and 2.2x the quietest
+    of the previous 15 ms. Catches every shot of a burst, where the level never falls to silence."""
+    hits, last = [], -100
+    for i in range(3, len(env)):
+        before = min(env[max(0, i - 3):i])
+        if env[i] > 0.3 * peak and env[i] > 2.2 * before and i - last > 8:
+            hits.append(i)
+            last = i
+    if not hits and env:
+        hits = [max(range(len(env)), key=lambda i: env[i])]
+    return hits
+
+
 def find_events(samples, max_seconds):
-    """Onsets: the envelope rises above 30% of the peak after a quiet gap. Each event ends at
-    the next onset or once it stays 45 dB below its own peak."""
+    """One clip per hit: from the transient to the next one (so a burst gives single shots), or until
+    the sound stays 45 dB below its own peak, capped at max_seconds."""
     window = RATE // 200  # 5 ms
     env = envelope(samples, window)
     if not env:
         return []
-    peak = max(env)
-    events, quiet, armed = [], 0, True
-    for i, e in enumerate(env):
-        if e < peak * 0.1:
-            quiet += 1
-            if quiet >= 6:
-                armed = True
-        else:
-            quiet = 0
-        if armed and e >= peak * 0.3:
-            events.append(i)
-            armed = False
+    events = transients(env, max(env))
     out = []
     for k, start in enumerate(events):
-        stop_limit = events[k + 1] - 2 if k + 1 < len(events) else len(env)
+        stop_limit = events[k + 1] - 1 if k + 1 < len(events) else len(env)
         stop_limit = min(stop_limit, start + int(max_seconds * 200))
         local_peak = max(env[start:stop_limit] or [0.0])
         end = stop_limit

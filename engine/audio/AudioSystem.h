@@ -38,6 +38,8 @@ public:
     SoundId add(const std::string& name, std::vector<float> samples);
     // Decodes an audio file (WAV, MP3, FLAC) to mono at kSampleRate. Returns kInvalidSound on failure.
     SoundId addFile(const std::string& name, const std::string& path, float gain = 1.0f);
+    // Decodes a file to mono float samples at kSampleRate (for layering before add()).
+    static bool decodeFile(const std::string& path, std::vector<float>& samples);
     SoundId find(const std::string& name) const;
     // Writes every sound as 16-bit PCM WAV into a folder (sound design review).
     void dumpWav(const std::string& folder) const;

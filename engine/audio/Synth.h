@@ -12,6 +12,7 @@ using Buffer = std::vector<float>;
 struct GunshotParams {
     float crackCutoff = 6000.0f; // Initial brightness of the crack (Hz).
     float crackDecay = 0.025f;   // Seconds.
+    float crackGain = 1.0f;      // 0: tail and thump only (layered under a recorded report).
     float thumpFrequency = 70.0f;
     float thumpDecay = 0.08f;
     float thumpGain = 0.8f;

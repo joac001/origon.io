@@ -5,28 +5,35 @@ Built by tools/sounds/build_sounds.py from tools/sound_manifest.json.
 
 | Use | Sound | Author | License |
 |---|---|---|---|
-| shot_pistol | [9mm pistol shot by michorvath](https://freesound.org/people/michorvath/sounds/427592/) | michorvath | CC0 |
-| shot_pistol | [handgun-one-shot.wav by DeltaCode](https://freesound.org/people/DeltaCode/sounds/668348/) | DeltaCode | CC0 |
+| shot_pistol | [Single Gunshot 5.2.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/386845/) | morganpurkis | CC0 |
+| shot_pistol | [Single Gunshot 4.2.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/384687/) | morganpurkis | CC0 |
 | shot_pistol | [Pistol Shot by LeMudCrab](https://freesound.org/people/LeMudCrab/sounds/163456/) | LeMudCrab | CC0 |
+| shot_pistol | [handgun-one-shot.wav by DeltaCode](https://freesound.org/people/DeltaCode/sounds/668348/) | DeltaCode | CC0 |
 | shot_smg | [Thompson SMG Shot by wadaltmon](https://freesound.org/people/wadaltmon/sounds/258198/) | wadaltmon | CC0 |
-| shot_smg | [Submachine Gun.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/390663/) | morganpurkis | CC0 |
-| shot_smg | [FNP90 burst.mp3 by CraftyIndividual](https://freesound.org/people/CraftyIndividual/sounds/418431/) | CraftyIndividual | CC0 |
+| shot_smg | [Machine Gun Single Shot by qubodup](https://freesound.org/people/qubodup/sounds/854347/) | qubodup | CC0 |
+| shot_smg | [mp40 Near and far.wav by rakurka](https://freesound.org/people/rakurka/sounds/187534/) | rakurka | CC0 |
+| shot_smg | [Machine Gun 001 - single shot.ogg by pgi](https://freesound.org/people/pgi/sounds/212601/) | pgi | CC0 |
+| shot_rifle | [ak 47 - single shot.mp3 by ninebilly](https://freesound.org/people/ninebilly/sounds/520934/) | ninebilly | CC0 |
 | shot_rifle | [An automatic rifle being shot once // punchy sounding by serøutōnin--deprivəd](https://freesound.org/people/ser%C3%B8ut%C5%8Dnin--depriv%C9%99d/sounds/855654/) | serøutōnin--deprivəd | CC0 |
-| shot_rifle | [Assault Rifle (Single Burst) by Keatonmcq](https://freesound.org/people/Keatonmcq/sounds/160590/) | Keatonmcq | CC0 |
-| shot_rifle | [ak 47 - burst.mp3 by ninebilly](https://freesound.org/people/ninebilly/sounds/520935/) | ninebilly | CC0 |
-| shot_lmg | [Machine Gun Burst by qubodup](https://freesound.org/people/qubodup/sounds/482121/) | qubodup | CC0 |
+| shot_rifle | [Single Gunshot 4.3.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/390970/) | morganpurkis | CC0 |
+| shot_lmg | [M240 Machine Gun Single Shot by qubodup](https://freesound.org/people/qubodup/sounds/854641/) | qubodup | CC0 |
+| shot_lmg | [Machine Gun 002 - single shot.ogg by pgi](https://freesound.org/people/pgi/sounds/212607/) | pgi | CC0 |
 | shot_lmg | [Clean Machine Gun Burst by qubodup](https://freesound.org/people/qubodup/sounds/482122/) | qubodup | CC0 |
 | shot_semi | [Rifle Shot (M1 Garand) by Rijam](https://freesound.org/people/Rijam/sounds/385785/) | Rijam | CC0 |
 | shot_semi | [Rifle Gun Shot 01.wav by LilMati](https://freesound.org/people/LilMati/sounds/433858/) | LilMati | CC0 |
 | shot_semi | [Centerfire Rifle Gun Shot 02.wav by LilMati](https://freesound.org/people/LilMati/sounds/483536/) | LilMati | CC0 |
+| shot_semi | [Single Gunshot 5.3.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/391180/) | morganpurkis | CC0 |
 | shot_bolt | [gun lee enfield 303 rifle fire shot.wav by kyles](https://freesound.org/people/kyles/sounds/450854/) | kyles | CC0 |
 | shot_bolt | [Rifle gunshot, one shot by felix.blume](https://freesound.org/people/felix.blume/sounds/710084/) | felix.blume | CC0 |
 | shot_bolt | [Centerfire Rifle Gun Shot 01.wav by LilMati](https://freesound.org/people/LilMati/sounds/411567/) | LilMati | CC0 |
+| shot_bolt | [Single Gunshot 6.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/388054/) | morganpurkis | CC0 |
 | shot_sniper | [Sniper Shot in Field 3 (M2010 Enhanced Sniper Rifle ESR) by qubodup](https://freesound.org/people/qubodup/sounds/855608/) | qubodup | CC0 |
-| shot_sniper | [Sniper Rifle Instant Kill Shots 02 by LilMati](https://freesound.org/people/LilMati/sounds/524738/) | LilMati | CC0 |
+| shot_sniper | [50 cal shot.wav by ajhartman42295](https://freesound.org/people/ajhartman42295/sounds/668071/) | ajhartman42295 | CC0 |
+| shot_sniper | [Single Gunshot 6.2 HP.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/392226/) | morganpurkis | CC0 |
 | shot_shotgun | [Shotgun Shot 01.wav by LilMati](https://freesound.org/people/LilMati/sounds/405504/) | LilMati | CC0 |
-| shot_shotgun | [Shotgun Shot 02.wav by LilMati](https://freesound.org/people/LilMati/sounds/408099/) | LilMati | CC0 |
 | shot_shotgun | [Shotgun Shot 03.wav by LilMati](https://freesound.org/people/LilMati/sounds/473846/) | LilMati | CC0 |
+| shot_shotgun | [Shotgun Shot by LeMudCrab](https://freesound.org/people/LeMudCrab/sounds/163455/) | LeMudCrab | CC0 |
+| shot_shotgun | [Shotgun Shot 02.wav by LilMati](https://freesound.org/people/LilMati/sounds/408099/) | LilMati | CC0 |
 | shot_far | [Distant Gunshot 4 (Mono).wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/384714/) | morganpurkis | CC0 |
 | shot_far | [Distant Gunshot 3.wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/384715/) | morganpurkis | CC0 |
 | shot_far | [Distant Gunshot 2 (Mono).wav by morganpurkis](https://freesound.org/people/morganpurkis/sounds/384716/) | morganpurkis | CC0 |

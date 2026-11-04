@@ -3,144 +3,179 @@
  "note": "mode: 'events' cuts up to 'count' separate hits (onset to decay), 'first' keeps the first hit, 'whole' keeps a full sequence from the first onset up to 'max' seconds, 'loop' makes a seamless loop of 'length' seconds starting at 'start'. Output: assets/sounds/<name>_NN.flac (48 kHz mono 16-bit).",
  "sounds": [
   {
-   "id": 427592,
-   "name": "shot_pistol",
-   "mode": "events",
-   "count": 2,
-   "max": 1.2
-  },
-  {
-   "id": 668348,
+   "id": 386845,
    "name": "shot_pistol",
    "mode": "first",
-   "max": 1.0
+   "max": 0.6
+  },
+  {
+   "id": 384687,
+   "name": "shot_pistol",
+   "mode": "first",
+   "max": 0.8
   },
   {
    "id": 163456,
    "name": "shot_pistol",
    "mode": "first",
-   "max": 1.0
+   "max": 0.6
+  },
+  {
+   "id": 668348,
+   "name": "shot_pistol",
+   "mode": "first",
+   "max": 0.6
   },
   {
    "id": 258198,
    "name": "shot_smg",
    "mode": "first",
-   "max": 0.6
+   "max": 0.4
   },
   {
-   "id": 390663,
+   "id": 854347,
    "name": "shot_smg",
-   "mode": "events",
-   "count": 3,
-   "max": 0.6
+   "mode": "first",
+   "max": 0.4
   },
   {
-   "id": 418431,
+   "id": 187534,
    "name": "shot_smg",
-   "mode": "events",
-   "count": 2,
-   "max": 0.6
+   "mode": "first",
+   "max": 0.5
+  },
+  {
+   "id": 212601,
+   "name": "shot_smg",
+   "mode": "first",
+   "max": 0.5
+  },
+  {
+   "id": 520934,
+   "name": "shot_rifle",
+   "mode": "first",
+   "max": 0.8
   },
   {
    "id": 855654,
    "name": "shot_rifle",
    "mode": "first",
-   "max": 1.0
+   "max": 0.8
   },
   {
-   "id": 160590,
+   "id": 390970,
    "name": "shot_rifle",
-   "mode": "events",
-   "count": 2,
-   "max": 0.7
+   "mode": "first",
+   "max": 0.8
   },
   {
-   "id": 520935,
-   "name": "shot_rifle",
-   "mode": "events",
-   "count": 2,
-   "max": 0.7
-  },
-  {
-   "id": 482121,
+   "id": 854641,
    "name": "shot_lmg",
-   "mode": "events",
-   "count": 3,
-   "max": 0.7
+   "mode": "first",
+   "max": 0.8
+  },
+  {
+   "id": 212607,
+   "name": "shot_lmg",
+   "mode": "first",
+   "max": 0.8
   },
   {
    "id": 482122,
    "name": "shot_lmg",
    "mode": "events",
    "count": 2,
-   "max": 0.7
+   "max": 0.5
   },
   {
    "id": 385785,
    "name": "shot_semi",
    "mode": "first",
-   "max": 2.0
+   "max": 1.5
   },
   {
    "id": 433858,
    "name": "shot_semi",
    "mode": "first",
-   "max": 1.6
+   "max": 1.2
   },
   {
    "id": 483536,
    "name": "shot_semi",
    "mode": "first",
-   "max": 1.8
+   "max": 1.5
+  },
+  {
+   "id": 391180,
+   "name": "shot_semi",
+   "mode": "first",
+   "max": 1.5
   },
   {
    "id": 450854,
    "name": "shot_bolt",
    "mode": "first",
-   "max": 2.4
+   "max": 2.0
   },
   {
    "id": 710084,
    "name": "shot_bolt",
    "mode": "first",
-   "max": 2.6
+   "max": 2.0
   },
   {
    "id": 411567,
    "name": "shot_bolt",
    "mode": "first",
-   "max": 2.4
+   "max": 2.0
+  },
+  {
+   "id": 388054,
+   "name": "shot_bolt",
+   "mode": "first",
+   "max": 2.0
   },
   {
    "id": 855608,
    "name": "shot_sniper",
    "mode": "first",
-   "max": 2.6
+   "max": 2.0
   },
   {
-   "id": 524738,
+   "id": 668071,
    "name": "shot_sniper",
-   "mode": "events",
-   "count": 2,
+   "mode": "first",
+   "max": 2.0
+  },
+  {
+   "id": 392226,
+   "name": "shot_sniper",
+   "mode": "first",
    "max": 2.0
   },
   {
    "id": 405504,
    "name": "shot_shotgun",
    "mode": "first",
-   "max": 2.0
-  },
-  {
-   "id": 408099,
-   "name": "shot_shotgun",
-   "mode": "first",
-   "max": 2.0
+   "max": 1.5
   },
   {
    "id": 473846,
    "name": "shot_shotgun",
    "mode": "first",
-   "max": 2.0
+   "max": 1.5
+  },
+  {
+   "id": 163455,
+   "name": "shot_shotgun",
+   "mode": "first",
+   "max": 1.2
+  },
+  {
+   "id": 408099,
+   "name": "shot_shotgun",
+   "mode": "first",
+   "max": 1.5
   },
   {
    "id": 384714,
