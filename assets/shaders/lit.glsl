@@ -302,9 +302,17 @@ mat3 cotangentFrame(vec3 n, vec3 p, vec2 uv) {
 // Textured forest ground from CC0 scans. Layers: 0 grass, 1 needles, 2 leaves, 3 path, 4 rock, 5 creek bed.
 const float TERRAIN_TILE = 3.0;
 
+float g_farMix = 0.0; // Set per fragment: 0 near, 1 far (anti-tiling blend).
+
 void sampleLayer(int layer, vec2 uv, float weight, inout vec3 albedo, inout vec3 tn, inout vec2 rough_ao) {
     if (weight <= 0.001) return;
-    albedo += texture(uTerrainAlbedo, vec3(uv, layer)).rgb * weight;
+    vec3 near = texture(uTerrainAlbedo, vec3(uv, layer)).rgb;
+    if (g_farMix > 0.001) {
+        // Same texture at a lower, rotated frequency hides the repeating pattern at a distance.
+        vec2 farUv = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.27;
+        near = mix(near, texture(uTerrainAlbedo, vec3(farUv, layer)).rgb, g_farMix * 0.6);
+    }
+    albedo += near * weight;
     tn += (texture(uTerrainNormal, vec3(uv, layer)).xyz * 2.0 - 1.0) * weight;
     vec3 arm = texture(uTerrainArm, vec3(uv, layer)).rgb;
     rough_ao += vec2(arm.g, arm.r) * weight;
@@ -326,6 +334,7 @@ void terrainTextured(inout vec3 n, out vec3 albedo, out float roughness, out flo
     float wRock = smoothstep(0.3, 0.45, slope + (medium - 0.5) * 0.15);
 
     // Planar layers projected from above.
+    g_farMix = smoothstep(12.0, 55.0, length(uCameraPos - vWorldPos));
     vec2 uv = p / TERRAIN_TILE;
     float other = (1.0 - wPath) * (1.0 - wCreek);
     vec3 planarAlbedo = vec3(0.0);
