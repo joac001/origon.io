@@ -53,7 +53,9 @@ glm::vec3 adsOffset(const glm::vec3& body) { return {0.0f, -0.085f - body.y * 0.
 } // namespace
 
 App::App(const LaunchOptions& options) : m_options(options) {
+    m_autoPresetPending = !std::filesystem::exists(settingsPath()) && options.benchSeconds <= 0.0f;
     m_settings = GameSettings::load(settingsPath());
+    if (m_autoPresetPending) applyGraphicsPreset(2);
     m_window = std::make_unique<Window>(WindowDesc{"Origon", 1600, 900, m_settings.vsync && options.benchSeconds <= 0.0f});
     m_input.attach(m_window->handle());
     initImGui();
@@ -570,6 +572,7 @@ int App::run() {
             m_frameMs = glm::mix(m_frameMs, dt * 1000.0f, 0.05f);
         }
         ++m_frameCount;
+        updateAutoPreset();
         if (m_titleScreen && m_options.pressPlayFrame > 0 && m_frameCount == m_options.pressPlayFrame) playFromTitle();
 
         m_input.beginFrame();
@@ -1380,13 +1383,11 @@ void App::drawMenu() {
             RenderSettings& r = m_settings.render;
             ImGui::TextDisabled("Preajustes:");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Batata")) { r.shadowQuality = 1; r.msaaSamples = 0; r.renderScale = 0.7f; r.ssao = false; r.bloom = false; r.godRays = false; r.ssr = false; r.contactShadows = false; m_settings.adsDepthOfField = false; m_settings.vegetationDensity = 0.3f; m_settings.vegetationDistance = 40.0f; }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Media")) { r.shadowQuality = 2; r.msaaSamples = 2; r.renderScale = 0.9f; r.ssao = true; r.bloom = true; r.godRays = false; }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Alta")) { r.shadowQuality = 3; r.msaaSamples = 4; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true; }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Ultra")) { r.shadowQuality = 4; r.msaaSamples = 8; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true; m_settings.vegetationDensity = 1.0f; m_settings.vegetationDistance = 150.0f; }
+            const char* presets[] = {"Batata", "Media", "Alta", "Ultra"};
+            for (int i = 0; i < 4; ++i) {
+                if (i > 0) ImGui::SameLine();
+                if (ImGui::SmallButton(presets[i])) applyGraphicsPreset(i);
+            }
             ImGui::Separator();
             const char* shadowLabels[] = {"Desactivadas", "Bajas", "Medias", "Altas", "Ultra"};
             ImGui::Combo("Calidad de sombras", &r.shadowQuality, shadowLabels, 5);
@@ -1522,6 +1523,47 @@ void App::drawMenu() {
         ImGui::EndTabBar();
     }
     ImGui::End();
+}
+
+void App::applyGraphicsPreset(int level) {
+    RenderSettings& r = m_settings.render;
+    switch (level) {
+    case 0: // Batata: integrated GPUs.
+        r.shadowQuality = 1; r.msaaSamples = 0; r.renderScale = 0.7f; r.ssao = false; r.bloom = false; r.godRays = false;
+        r.ssr = false; r.contactShadows = false; m_settings.adsDepthOfField = false;
+        m_settings.vegetationDensity = 0.3f; m_settings.vegetationDistance = 40.0f;
+        break;
+    case 1: // Media.
+        r.shadowQuality = 2; r.msaaSamples = 2; r.renderScale = 0.9f; r.ssao = true; r.bloom = true; r.godRays = false;
+        r.ssr = false; r.contactShadows = false; m_settings.adsDepthOfField = true;
+        m_settings.vegetationDensity = 0.6f; m_settings.vegetationDistance = 70.0f;
+        break;
+    case 2: // Alta.
+        r.shadowQuality = 3; r.msaaSamples = 4; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true;
+        r.ssr = true; r.contactShadows = true; m_settings.adsDepthOfField = true;
+        m_settings.vegetationDensity = 1.0f; m_settings.vegetationDistance = 90.0f;
+        break;
+    default: // Ultra.
+        r.shadowQuality = 4; r.msaaSamples = 8; r.renderScale = 1.0f; r.ssao = true; r.bloom = true; r.godRays = true;
+        r.ssr = true; r.contactShadows = true; m_settings.adsDepthOfField = true;
+        m_settings.vegetationDensity = 1.0f; m_settings.vegetationDistance = 150.0f;
+        break;
+    }
+}
+
+void App::updateAutoPreset() {
+    // First launch only: run "Alta" for a few seconds, then step down (or up) from the GPU time.
+    if (!m_autoPresetPending || m_frameCount < 120) return;
+    m_autoPresetSamples.push_back(m_renderer.stats().gpuTotalMs);
+    if (m_autoPresetSamples.size() < 180) return;
+    std::sort(m_autoPresetSamples.begin(), m_autoPresetSamples.end());
+    const float gpu = m_autoPresetSamples[m_autoPresetSamples.size() / 2];
+    const int level = gpu > 14.0f ? 0 : gpu > 8.0f ? 1 : gpu > 3.5f ? 2 : 3;
+    const char* names[] = {"Batata", "Media", "Alta", "Ultra"};
+    log::info("Graphics: first launch, GPU {:.1f} ms on Alta -> preset {}", gpu, names[level]);
+    if (level != 2) applyGraphicsPreset(level);
+    m_autoPresetPending = false;
+    m_settings.save(settingsPath());
 }
 
 void App::playFromTitle() {

@@ -104,6 +104,10 @@ private:
     void drawInternetSection();
     void drawCharacterTab();
     void playFromTitle();
+    void applyGraphicsPreset(int level); // 0 Batata, 1 Media, 2 Alta, 3 Ultra.
+    void updateAutoPreset();
+    bool m_autoPresetPending = false;    // No settings file yet: pick a preset from measured GPU time.
+    std::vector<float> m_autoPresetSamples;
     // CPU frame sections: update, scene building, renderer command submission, UI, swap.
     static constexpr int kCpuSections = 5;
     static constexpr const char* kCpuSectionNames[kCpuSections] = {"Lógica", "Escena", "Render", "UI", "Swap"};
