@@ -39,6 +39,9 @@ Buffer windLoop(float seconds, uint32_t seed);
 Buffer streamLoop(float seconds, uint32_t seed);
 Buffer birdCall(uint32_t seed);
 
+// Distant version of a sound: high frequencies absorbed, long rolling echo from the terrain.
+Buffer distant(const Buffer& in, uint32_t seed);
+
 // Mixes b into a starting at offsetSeconds (a grows if needed).
 void mixInto(Buffer& a, const Buffer& b, float offsetSeconds, float gain);
 void normalize(Buffer& buffer, float peak);

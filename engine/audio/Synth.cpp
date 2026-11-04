@@ -299,6 +299,28 @@ Buffer streamLoop(float seconds, uint32_t seed) {
     return out;
 }
 
+Buffer distant(const Buffer& in, uint32_t seed) {
+    Rng rng(seed);
+    Buffer dry(in.size(), 0.0f);
+    LowPass lp1, lp2;
+    for (size_t i = 0; i < in.size(); ++i) dry[i] = lp2.process(lp1.process(in[i], 700.0f), 900.0f);
+    Buffer out = dry;
+    // Rolling echoes off hills and trees, each one darker and quieter.
+    float delay = 0.18f;
+    float gain = 0.55f;
+    for (int e = 0; e < 7; ++e) {
+        mixInto(out, dry, delay, gain);
+        delay += 0.12f + rng.unit() * 0.18f;
+        gain *= 0.62f;
+    }
+    LowPass smooth;
+    for (float& s : out) s = smooth.process(s, 1200.0f);
+    const size_t fade = std::min<size_t>(out.size(), samplesFor(0.2f));
+    for (size_t i = 0; i < fade; ++i) out[out.size() - 1 - i] *= static_cast<float>(i) / static_cast<float>(fade);
+    normalize(out, 0.8f);
+    return out;
+}
+
 Buffer birdCall(uint32_t seed) {
     Rng rng(seed);
     Buffer out;

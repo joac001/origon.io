@@ -4,7 +4,10 @@
 
 #include <miniaudio.h>
 
+#include <algorithm>
 #include <array>
+#include <filesystem>
+#include <fstream>
 
 namespace origon {
 namespace {
@@ -87,6 +90,32 @@ bool AudioSystem::ready() const { return m_impl->engineReady; }
 SoundId AudioSystem::add(const std::string& name, std::vector<float> samples) {
     m_impl->sounds.push_back({name, std::move(samples)});
     return static_cast<SoundId>(m_impl->sounds.size()) - 1;
+}
+
+void AudioSystem::dumpWav(const std::string& folder) const {
+    std::filesystem::create_directories(folder);
+    for (const SoundData& sound : m_impl->sounds) {
+        std::ofstream file(std::filesystem::path(folder) / (sound.name + ".wav"), std::ios::binary);
+        const auto dataBytes = static_cast<uint32_t>(sound.samples.size() * 2);
+        auto put32 = [&](uint32_t v) { file.write(reinterpret_cast<const char*>(&v), 4); };
+        auto put16 = [&](uint16_t v) { file.write(reinterpret_cast<const char*>(&v), 2); };
+        file.write("RIFF", 4);
+        put32(36 + dataBytes);
+        file.write("WAVEfmt ", 8);
+        put32(16);
+        put16(1);
+        put16(1);
+        put32(kSampleRate);
+        put32(kSampleRate * 2);
+        put16(2);
+        put16(16);
+        file.write("data", 4);
+        put32(dataBytes);
+        for (float s : sound.samples) {
+            put16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 32767.0f)));
+        }
+    }
+    log::info("Audio: {} sounds written to {}", m_impl->sounds.size(), folder);
 }
 
 SoundId AudioSystem::find(const std::string& name) const {

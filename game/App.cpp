@@ -61,6 +61,9 @@ App::App(const LaunchOptions& options) : m_options(options) {
         throw std::runtime_error("Weapon data could not be loaded");
     }
     m_audioReady = m_audio.init();
+    if (m_audioReady && !options.dumpSounds.empty()) {
+        m_audio.dumpWav(options.dumpSounds);
+    }
     if (m_audioReady) {
         m_audio.setVolume(m_settings.masterVolume);
         m_audio.setAmbienceEnabled(m_settings.ambience);

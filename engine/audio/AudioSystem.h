@@ -37,6 +37,8 @@ public:
     // Takes a mono float buffer at kSampleRate.
     SoundId add(const std::string& name, std::vector<float> samples);
     SoundId find(const std::string& name) const;
+    // Writes every sound as 16-bit PCM WAV into a folder (sound design review).
+    void dumpWav(const std::string& folder) const;
 
     void play(SoundId id, const PlayParams& params = {});
     // Starts a looping sound on a dedicated voice. Returns a loop handle.

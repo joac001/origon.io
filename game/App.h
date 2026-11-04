@@ -35,6 +35,7 @@ struct LaunchOptions {
     bool hideUi = false;
     bool forceTitle = false; // Show the title screen even in capture mode.
     int followPlayer = -1;   // Third-person spectator camera behind this player.
+    std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
     glm::vec3 cameraPosition{0.0f};

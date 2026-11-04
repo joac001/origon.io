@@ -57,6 +57,21 @@ void GameAudio::build() {
                                                  .thumpGain = 1.0f, .tailCutoff = 650, .tailDecay = 0.55f, .tailGain = 0.5f,
                                                  .echoDelay = 0.14f, .echoGain = 0.3f, .duration = 1.6f, .seed = 18}));
 
+    // Distant variants, one per weapon category (same order as WeaponCategory).
+    const char* names[] = {"pistol", "smg", "rifle", "lmg", "semi", "bolt", "sniper", "shotgun"};
+    const std::pair<const char*, GunshotParams> farSources[] = {
+        {names[0], {.crackCutoff = 7000, .crackDecay = 0.018f, .thumpFrequency = 95, .duration = 0.8f, .seed = 11}},
+        {names[1], {.crackCutoff = 6500, .crackDecay = 0.02f, .thumpFrequency = 85, .duration = 0.7f, .seed = 12}},
+        {names[2], {.crackCutoff = 8000, .crackDecay = 0.022f, .thumpFrequency = 70, .duration = 0.9f, .seed = 13}},
+        {names[3], {.crackCutoff = 7000, .crackDecay = 0.026f, .thumpFrequency = 60, .duration = 0.9f, .seed = 14}},
+        {names[4], {.crackCutoff = 9000, .crackDecay = 0.024f, .thumpFrequency = 65, .duration = 1.0f, .seed = 15}},
+        {names[5], {.crackCutoff = 10000, .crackDecay = 0.028f, .thumpFrequency = 55, .duration = 1.0f, .seed = 16}},
+        {names[6], {.crackCutoff = 11000, .crackDecay = 0.03f, .thumpFrequency = 50, .duration = 1.0f, .seed = 17}},
+        {names[7], {.crackCutoff = 5000, .crackDecay = 0.035f, .thumpFrequency = 48, .duration = 1.0f, .seed = 18}},
+    };
+    for (const auto& [name, params] : farSources) {
+        m_farShots.push_back(add(std::string("shot_far_") + name, distant(gunshot(params), params.seed)));
+    }
     m_swish = add("knife_swish", swish(0.22f, 700.0f, 3200.0f, 21));
     m_jump = add("jump", swish(0.15f, 400.0f, 1200.0f, 22));
     m_land = add("land", thud(65.0f, 0.06f, 900.0f, 0.5f, 23));
@@ -152,8 +167,16 @@ void GameAudio::onEvents(const std::vector<GameEvent>& events, const Simulation&
         const bool isLocal = e.a == local;
         switch (e.type) {
         case GameEvent::Type::Fired: {
-            const SoundId id = shotSound(e.category);
-            playAt(id, e.start, isLocal ? 0.55f : 1.0f, 0.04f, isLocal);
+            SoundId id = shotSound(e.category);
+            float volume = isLocal ? 0.55f : 1.0f;
+            // Far shots: muffled with a rolling echo instead of the close crack.
+            const float distance = glm::distance(e.start, m_listener);
+            const int category = static_cast<int>(e.category);
+            if (!isLocal && distance > 35.0f && category < static_cast<int>(m_farShots.size())) {
+                id = m_farShots[static_cast<size_t>(category)];
+                volume = 1.4f;
+            }
+            playAt(id, e.start, volume, 0.04f, isLocal);
             if (e.category == WeaponCategory::BoltRifle || e.category == WeaponCategory::Sniper ||
                 e.category == WeaponCategory::Shotgun) {
                 PlayParams cycle{.volume = isLocal ? 0.45f : 0.6f, .pitch = jitter(0.03f), .spatial = !isLocal, .position = e.start};

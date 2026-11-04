@@ -6,6 +6,7 @@
 #include <glm/vec3.hpp>
 
 #include <random>
+#include <string>
 #include <vector>
 
 namespace origon {
@@ -22,6 +23,7 @@ public:
     void setVolume(float master);
     void setAmbienceEnabled(bool enabled);
     void playUi(const char* name);
+    void dumpWav(const std::string& folder) const { m_audio.dumpWav(folder); }
     // 0..1: how close the listener is to water (creek loop volume).
     void setWaterProximity(float proximity);
 
@@ -34,6 +36,7 @@ private:
 
     void build();
     SoundId shotSound(WeaponCategory category) const;
+    std::vector<SoundId> m_farShots; // Indexed by WeaponCategory.
     void play(SoundId id, const PlayParams& params);
     void playAt(SoundId id, const glm::vec3& position, float volume, float pitchJitter, bool local);
     void schedule(float delay, SoundId id, const PlayParams& params);
