@@ -40,7 +40,7 @@ One pipeline for the whole project. No manual modeling.
 | `tools/blender/gen_weapons.py` | `assets/models/weapons/*.glb`: the 19 ladder weapons and the knife |
 | `tools/textures/gen_foliage.py` | `assets/textures/foliage/*.png`: needles, fern, leaves, grass cards |
 | `tools/fetch_assets.py` | `assets/textures/<id>/{albedo,normal,arm}.jpg` from Poly Haven (CC0) |
-| `tools/mapgen` (`origon_mapgen`) | `maps/bosque.json` |
+| `tools/mapgen` (`origon_mapgen`) | `maps/bosque.json`, `maps/aserradero.json` |
 
 Material naming contract (models do not embed images): `bark_<id>`, `rock_<id>` and `pbr_<id>`
 use `assets/textures/<id>/`; `foliage_<name>` uses `assets/textures/foliage/<name>.png` with

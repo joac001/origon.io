@@ -92,6 +92,7 @@ $BLENDER --background --factory-startup --python tools/blender/gen_weapons.py
 $BLENDER --background --factory-startup --python tools/blender/gen_character.py
 python3 tools/textures/gen_foliage.py
 ./build/tools/mapgen/origon_mapgen bosque
+./build/tools/mapgen/origon_mapgen aserradero
 ```
 
 See `docs/asset-pipeline.md`.
@@ -110,7 +111,7 @@ game/     sim/ (authoritative simulation, Gun Game, bots), world/ (maps, terrain
 tools/    blender/ (mesh generators), textures/, mapgen/, fetch_assets.py
 assets/   shaders, fonts, models (generated), textures (foliage generated, scans fetched)
 data/     weapons.json, gungame_ladder.json
-maps/     graybox.json, bosque.json
+maps/     graybox.json, bosque.json (creek forest), aserradero.json (lakeside sawmill)
 docs/     architecture, asset pipeline, art direction, research
 tests/    headless simulation tests
 ```

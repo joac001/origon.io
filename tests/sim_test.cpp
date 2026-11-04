@@ -8,6 +8,7 @@
 #include "world/World.h"
 
 #include <cstdio>
+#include <string>
 #include <cstdlib>
 #include <vector>
 
@@ -113,9 +114,10 @@ void testFullMatch(const WeaponDatabase& weapons) {
     check(positionsValid, "living players stay inside the map");
 }
 
-void testForestMatch(const WeaponDatabase& weapons) {
-    auto map = MapData::load(fs::resolve("maps/bosque.json"));
-    check(map.has_value(), "bosque map loads");
+// Full bot match on a generated outdoor map: terrain, vegetation collision and structures.
+void testOutdoorMatch(const WeaponDatabase& weapons, const char* name) {
+    auto map = MapData::load(fs::resolve("maps") / (std::string(name) + ".json"));
+    check(map.has_value(), "outdoor map loads");
     if (!map) {
         return;
     }
@@ -141,10 +143,10 @@ void testForestMatch(const WeaponDatabase& weapons) {
             if (e.type == GameEvent::Type::Kill) ++kills;
         }
     }
-    std::printf("       forest match: %.1f s, %d kills, %zu vegetation instances\n", static_cast<float>(tick) / kTickRate,
+    std::printf("       %s match: %.1f s, %d kills, %zu vegetation instances\n", name, static_cast<float>(tick) / kTickRate,
                 kills, world.vegetation().instanceCount());
-    check(sim.gunGame().phase() == GunGame::Phase::Finished, "forest match finishes");
-    check(kills > 20, "bots fight in the forest");
+    check(sim.gunGame().phase() == GunGame::Phase::Finished, "outdoor match finishes");
+    check(kills > 20, "bots fight outdoors");
     bool aboveGround = true;
     for (const Player& p : sim.players()) {
         if (p.alive && p.position.y < world.terrainHeight(p.position.x, p.position.z) - 1.0f) aboveGround = false;
@@ -160,7 +162,8 @@ int main() {
     check(weapons.tierCount() == 20, "ladder has 20 tiers");
     testRules(weapons);
     testFullMatch(weapons);
-    testForestMatch(weapons);
+    testOutdoorMatch(weapons, "bosque");
+    testOutdoorMatch(weapons, "aserradero");
     std::printf("%s (%d failures)\n", g_failures == 0 ? "ALL PASSED" : "FAILED", g_failures);
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
