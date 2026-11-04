@@ -17,7 +17,9 @@ uniform vec2 uSourceTexel;
 uniform int uFirstPass;
 
 vec3 tap(vec2 offset) {
-    return texture(uSource, vUv + offset * uSourceTexel).rgb;
+    vec3 c = texture(uSource, vUv + offset * uSourceTexel).rgb;
+    // Guard: a single NaN/Inf texel would otherwise flood every bloom mip (black screen).
+    return (any(isnan(c)) || any(isinf(c))) ? vec3(0.0) : c;
 }
 
 float karisWeight(vec3 c) {

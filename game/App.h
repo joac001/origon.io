@@ -42,7 +42,8 @@ struct LaunchOptions {
     bool forceTitle = false; // Show the title screen even in capture mode.
     int followPlayer = -1;   // Third-person spectator camera behind this player.
     bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
-    int lookGallery = -1;     // Debug: five random looks (from this seed) standing close to the fixed camera.
+    int lookGallery = -1;
+    int pressPlayFrame = 0;   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
@@ -99,6 +100,7 @@ private:
     void joinRelayRoom(const std::string& code);
     void drawInternetSection();
     void drawCharacterTab();
+    void playFromTitle();
     void applyLook(const CharacterLook& look);
     // Character tab preview: a soldier in front of the camera while the tab is open.
     bool m_characterPreview = false;      // Tab drawn this frame.

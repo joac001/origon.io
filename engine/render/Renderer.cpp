@@ -787,6 +787,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     setLitFrameUniforms(m_litInstanced, camera, viewProj, environment, shadowsOn);
     setLitFrameUniforms(m_litFoliage, camera, viewProj, environment, shadowsOn);
     setLitFrameUniforms(m_litSkinned, camera, viewProj, environment, shadowsOn);
+    setLitFrameUniforms(m_litSkinnedAlpha, camera, viewProj, environment, shadowsOn);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);
     glBindTextureUnit(8, shadowsOn ? m_shadowArray : 0);

@@ -45,8 +45,14 @@ void main() {
         float coc = clamp((linear - uFocus) / max(uFocus * 1.5, 1.0), 0.0, 1.0) * uDof;
         hdr = mix(hdr, texture(uBlurred, vUv).rgb, coc);
     }
-    hdr = mix(hdr, texture(uBloom, vUv).rgb, uBloomStrength);
-    hdr += texture(uGodRays, vUv).rgb;
+    vec3 bloom = texture(uBloom, vUv).rgb;
+    vec3 rays = texture(uGodRays, vUv).rgb;
+    // Never let a stray NaN/Inf from any pass blank the image.
+    if (any(isnan(bloom)) || any(isinf(bloom))) bloom = vec3(0.0);
+    if (any(isnan(rays)) || any(isinf(rays))) rays = vec3(0.0);
+    hdr = mix(hdr, bloom, uBloomStrength);
+    hdr += rays;
+    if (any(isnan(hdr)) || any(isinf(hdr))) hdr = vec3(0.0);
     vec3 color = acesFitted(hdr * uExposure);
     color = pow(color, vec3(1.0 / 2.2));
 

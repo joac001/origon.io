@@ -449,7 +449,9 @@ void main() {
 #endif
     if (uHasNormalMap == 1 && uShading < 3) {
         vec3 mapped = texture(uNormalMap, uv).xyz * 2.0 - 1.0;
-        n = normalize(cotangentFrame(n, vWorldPos, uv) * mapped);
+        vec3 perturbed = cotangentFrame(n, vWorldPos, uv) * mapped;
+        // Degenerate UVs give a zero frame: keep the geometric normal instead of a NaN.
+        if (dot(perturbed, perturbed) > 1e-8 && !any(isnan(perturbed))) n = normalize(perturbed);
     }
     if (uHasArmMap == 1 && uShading < 3) {
         vec3 arm = texture(uArmMap, uv).rgb;
@@ -506,5 +508,7 @@ void main() {
     vec3 fogColor = mix(uFogColor, uSkyColor, 0.25) * 1.3 + uSunColor * pow(sunAmount, 8.0) * 0.025;
     color = mix(color, fogColor, fog);
 
-    fragColor = vec4(color, clamp(alpha, 0.0, 1.0));
+    // One NaN/Inf pixel would spread through bloom and blacken the whole frame.
+    if (any(isnan(color)) || any(isinf(color))) color = vec3(0.0);
+    fragColor = vec4(min(color, vec3(60000.0)), clamp(alpha, 0.0, 1.0));
 }

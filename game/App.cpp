@@ -561,6 +561,7 @@ int App::run() {
             m_frameMs = glm::mix(m_frameMs, dt * 1000.0f, 0.05f);
         }
         ++m_frameCount;
+        if (m_titleScreen && m_options.pressPlayFrame > 0 && m_frameCount == m_options.pressPlayFrame) playFromTitle();
 
         m_input.beginFrame();
         m_window->pollEvents();
@@ -1492,6 +1493,13 @@ void App::drawMenu() {
     ImGui::End();
 }
 
+void App::playFromTitle() {
+    m_titleScreen = false;
+    m_sim->players()[0].isBot = false;
+    restartMatch();
+    m_window->setCursorCaptured(true);
+}
+
 void App::drawTitleScreen() {
     const ImVec2 screen = ImGui::GetIO().DisplaySize;
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
@@ -1507,12 +1515,7 @@ void App::drawTitleScreen() {
     ImGui::Begin("##title", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
     ImGui::PushFont(m_fontBold, 22.0f);
     const ImVec2 size(-1, 46);
-    if (ImGui::Button("Jugar contra bots", size)) {
-        m_titleScreen = false;
-        m_sim->players()[0].isBot = false;
-        restartMatch();
-        m_window->setCursorCaptured(true);
-    }
+    if (ImGui::Button("Jugar contra bots", size)) playFromTitle();
     if (ImGui::Button("Multijugador", size)) {
         m_menuTab = 1;
         setMenuOpen(true);
