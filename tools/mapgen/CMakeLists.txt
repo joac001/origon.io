@@ -1,0 +1,2 @@
+add_executable(origon_mapgen main.cpp)
+target_link_libraries(origon_mapgen PRIVATE origon_sim origon_warnings)

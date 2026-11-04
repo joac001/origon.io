@@ -1,0 +1,230 @@
+#pragma once
+
+#include <array>
+
+#include "audio/GameAudio.h"
+#include "core/Input.h"
+#include "core/Window.h"
+#include "editor/MapEditor.h"
+#include "fx/Effects.h"
+#include "fx/SoldierLook.h"
+#include "net/LanDiscovery.h"
+#include "net/RelayBrowser.h"
+#include "net/RelayProtocol.h"
+#include "net/NetSession.h"
+#include "physics/PhysicsWorld.h"
+#include "render/Renderer.h"
+#include "render/SkinnedModel.h"
+#include "render/Texture.h"
+#include "world/Vegetation.h"
+#include "sim/Simulation.h"
+#include "sim/Weapons.h"
+#include "ui/Hud.h"
+#include "ui/Settings.h"
+#include "world/World.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+struct ImFont;
+
+namespace origon {
+
+// Command line options (mostly for automated captures and testing).
+struct LaunchOptions {
+    std::string map = "bosque";
+    std::string screenshotPath; // When set, save a screenshot at screenshotFrame and exit.
+    int screenshotFrame = 300;
+    bool startInEditor = false;
+    bool autoplay = false; // The local player is driven by the bot AI (spectator/demo).
+    bool hideUi = false;
+    bool forceTitle = false; // Show the title screen even in capture mode.
+    int followPlayer = -1;   // Third-person spectator camera behind this player.
+    bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
+    int lookGallery = -1;
+    bool weaponGallery = false;
+    bool forceAds = false;      // Debug: the local player aims down sights (view model captures). // Debug: all weapons in profile in front of the fixed camera.
+    int pressPlayFrame = 0;
+    int forceLod = -1;
+    std::string recordFolder;  // Debug: save frames to PNGs (fixed 60 Hz simulation step per frame).
+    int recordFrames = 0;         // Debug: draw characters at this LOD regardless of distance.
+    int botCount = -1;         // >= 0: overrides the saved bot count for this run.
+    float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
+    std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
+    // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
+    bool fixedCamera = false;
+    glm::vec3 cameraPosition{0.0f};
+    float cameraYaw = 0.0f;
+    float cameraPitch = 0.0f;
+    glm::ivec2 shotSize{0};
+    // Networking.
+    int hostPort = 0;              // > 0: start a listen server on this port.
+    std::string connectAddress;    // Non-empty: join this server.
+    int connectPort = net::kDefaultPort;
+    std::string playerName = "Jugador";
+    std::string relayAddress;      // Overrides the relay (servidor intermedio) from settings.
+    bool publish = false;          // With hostPort: publish the game on the relay.
+    std::string joinCode;          // Join a relay room by code.
+};
+
+class App {
+public:
+    explicit App(const LaunchOptions& options);
+    ~App();
+    int run();
+
+private:
+    enum class Mode { Playing, Editor };
+
+    void initImGui();
+    void shutdownImGui();
+    void loadMap(const std::string& fileName);
+    void buildWorld(const MapData& map);
+    void restartMatch();
+    void enterEditor();
+    void leaveEditor();
+    void setMenuOpen(bool open);
+
+    void updatePlaying(float frameDt);
+    PlayerCommand buildLocalCommand() const;
+    void processEvents(const std::vector<GameEvent>& events);
+
+    CameraView playingCamera(float alpha) const;
+    glm::vec3 localMuzzle() const;
+    void updateCameraFeel(float frameDt);
+    void submitPlayers(float alpha, bool includeLocal);
+    void submitViewModel(float frameDt);
+    void drawMenu();
+    void drawTitleScreen();
+    void drawStats(float frameDt);
+    void takeScreenshot(const std::string& path);
+    net::Snapshot makeSnapshot() const;
+    void applySnapshot(const net::Snapshot& snapshot);
+    void updateNetworkClient();
+    void startHosting(int port, bool publish = false);
+    void joinServer(const std::string& address, int port);
+    void joinRelayRoom(const std::string& code);
+    void drawInternetSection();
+    void drawCharacterTab();
+    void playFromTitle();
+    static std::string mapLabel(const std::string& file);
+    static std::string randomProceduralMap();
+    int m_proceduralSeed = 1;
+    void applyGraphicsPreset(int level); // 0 Batata, 1 Media, 2 Alta, 3 Ultra.
+    void updateAutoPreset();
+    bool m_autoPresetPending = false;    // No settings file yet: pick a preset from measured GPU time.
+    std::vector<float> m_autoPresetSamples;
+    // CPU frame sections: update, scene building, renderer command submission, UI, swap.
+    static constexpr int kCpuSections = 5;
+    static constexpr const char* kCpuSectionNames[kCpuSections] = {"Lógica", "Escena", "Render", "UI", "Swap"};
+    std::array<float, kCpuSections> m_cpuMs{};
+    void recordBench(float dt, const std::array<float, kCpuSections>& cpu);
+    float m_benchClock = 0.0f;
+    std::vector<float> m_benchFrames;
+    std::array<float, kCpuSections> m_benchCpu{};
+    std::array<float, 6> m_benchGpu{};
+    float m_benchGpuTotal = 0.0f;
+    void applyLook(const CharacterLook& look);
+    // Character tab preview: a soldier in front of the camera while the tab is open.
+    bool m_characterPreview = false;      // Tab drawn this frame.
+    bool m_characterPreviewShown = false; // Tab drawn last frame (drives the camera).
+    float m_previewTurn = 0.0f;
+    void leaveNetwork();
+
+    LaunchOptions m_options;
+    std::unique_ptr<Window> m_window;
+    Input m_input;
+    Renderer m_renderer;
+    TextureCache m_textures;
+    ModelLibrary m_models{&m_textures};
+    PhysicsWorld m_physics;
+    WeaponDatabase m_weapons;
+    std::unique_ptr<Simulation> m_sim;
+    World m_world;
+    Hud m_hud;
+    MapEditor m_editor;
+    GameSettings m_settings;
+    GameAudio m_audio;
+    Effects m_effects;
+    bool m_audioReady = false;
+
+    Mode m_mode = Mode::Playing;
+    bool m_menuOpen = false;
+    bool m_titleScreen = false;
+    int m_menuTab = -1; // Tab to open when the pause menu appears (-1: keep).
+    std::string m_mapFile = "bosque";
+    std::vector<std::string> m_mapFiles;
+
+    float m_viewYaw = 0.0f;
+    float m_viewPitch = 0.0f;
+    float m_tickAccumulator = 0.0f;
+    float m_adsBlend = 0.0f;
+    float m_bobPhase = 0.0f;
+    float m_time = 0.0f;
+    float m_landDip = 0.0f;
+    float m_landVelocity = 0.0f;
+    float m_roll = 0.0f;
+    glm::vec2 m_sway{0.0f};
+    std::vector<float> m_walkPhase; // Cube-model fallback only.
+    // Per-player locomotion animation state (third-person soldiers).
+    struct Locomotion {
+        float phase = 0.0f;      // Gait cycle 0..1 (0 = right heel strike).
+        float direction = 1.0f;  // -1: walking backwards (cycle plays in reverse).
+        float legYaw = 0.0f;     // Lower body turned toward the direction of travel (radians).
+        float speed = 0.0f;      // Smoothed ground speed.
+        float moveWeight = 0.0f, runWeight = 0.0f, airWeight = 0.0f;
+    };
+    std::vector<Locomotion> m_locomotion;
+    void updateLocomotion(Locomotion& l, const Player& p, float dt);
+    std::array<SkinnedModel, 2> m_soldiers; // Male, female (tools/blender/gen_human.py).
+    bool m_soldierReady = false;
+    bool m_soldierFemale = false;
+    const SkinnedModel& soldierModel(const CharacterLook& look) const {
+        return m_soldiers[look.female() && m_soldierFemale ? 1 : 0];
+    }
+    glm::vec3 m_lodView{0.0f}; // Camera of the frame being built (character LOD selection).
+    float m_lodFov = 80.0f;
+    std::vector<glm::mat4> m_soldierGlobals; // Scratch: joint globals of the last drawn soldier.
+    std::vector<std::vector<glm::mat4>> m_skinBuffers;
+    void submitSoldier(const Player& p, float alpha);
+    const std::vector<glm::mat4>& drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model,
+                                                    const CharacterLook& look, const glm::vec3& tint, bool highlight);
+    std::array<std::vector<SoldierPiece>, 2> m_soldierPieces; // Parsed piece names, parallel to each model's parts.
+    void submitModel(const Model& model, const glm::mat4& transform);
+    void submitCorpses();
+    // First-person arms: the player's own soldier, arms solved onto the weapon (two-bone IK).
+    bool submitViewArms(const glm::mat4& gunBase, const Model& gun, const WeaponDef& weapon);
+    void submitPoseGallery(const glm::vec3& eye, float yaw);
+    void submitLookGallery(const glm::vec3& eye, float yaw, int seed);
+    CameraView m_lastCamera;
+
+    ImFont* m_fontRegular = nullptr;
+    ImFont* m_fontBold = nullptr;
+    float m_fpsSmoothed = 60.0f;
+    float m_frameMs = 16.0f;
+    long m_frameCount = 0;
+    std::string m_pendingScreenshot;
+    net::NetSession m_net;
+    net::LanDiscovery m_lan;
+    net::RelayBrowser m_relayBrowser;
+    double m_nextRelayRefresh = 0.0;
+    std::string m_joinCode;
+    bool m_browserOpen = false;
+    uint32_t m_netTick = 0;
+    bool m_clientReady = false;
+    float m_snapshotAge = 0.0f;
+    float m_predictedFireCooldown = 0.0f;
+    uint32_t m_previousClientButtons = 0;
+    void predictLocalFire(const PlayerCommand& command);
+    float m_rematchTimer = -1.0f;
+    std::vector<net::PropState> m_replicatedProps;
+    std::string m_joinAddress = "127.0.0.1";
+    int m_joinPort = net::kDefaultPort;
+    int m_hostPort = net::kDefaultPort;
+    std::string m_playerName = "Jugador";
+    unsigned m_shotFbo = 0;
+    unsigned m_shotColor = 0;
+};
+
+} // namespace origon

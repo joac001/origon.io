@@ -1,0 +1,3 @@
+add_executable(origon_sim_test sim_test.cpp)
+target_link_libraries(origon_sim_test PRIVATE origon_sim origon_warnings)
+add_test(NAME sim_gun_game COMMAND origon_sim_test)

@@ -1,3 +1,9 @@
-# Godot 4+ specific ignores
-.godot/
-/android/
+build/
+.cache/
+settings.json
+imgui.ini
+compile_commands.json
+screenshots/
+assets/textures/*/
+!assets/textures/foliage/
+__pycache__/

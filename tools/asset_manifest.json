@@ -1,0 +1,94 @@
+{
+  "source": "Poly Haven (https://polyhaven.com), CC0 license",
+  "resolution": "1k",
+  "textures": [
+    {
+      "id": "bark_brown_02",
+      "use": "pine and fir bark"
+    },
+    {
+      "id": "bark_brown_01",
+      "use": "redwood bark"
+    },
+    {
+      "id": "bark_willow_02",
+      "use": "deciduous bark"
+    },
+    {
+      "id": "mossy_rock",
+      "use": "rocks and boulders"
+    },
+    {
+      "id": "rock_face_03",
+      "use": "terrain slopes"
+    },
+    {
+      "id": "forest_ground_04",
+      "use": "terrain forest floor"
+    },
+    {
+      "id": "forest_leaves_02",
+      "use": "terrain leaf litter"
+    },
+    {
+      "id": "brown_mud_leaves_01",
+      "use": "terrain paths"
+    },
+    {
+      "id": "rocks_ground_05",
+      "use": "terrain creek bed"
+    },
+    {
+      "id": "aerial_grass_rock",
+      "use": "terrain grass"
+    },
+    {
+      "id": "wood_planks_dirt",
+      "use": "structures"
+    },
+    {
+      "id": "american_walnut_veneer",
+      "use": "weapon stocks"
+    },
+    {
+      "id": "metal_plate",
+      "use": "weapon metal"
+    }
+  ],
+  "atlases": {
+    "source": "ambientCG (https://ambientcg.com), CC0 license",
+    "resolution": "1K-PNG",
+    "note": "Scanned leaf atlases. Cached in .cache/ambientcg/<id>/ (not committed); tools/textures/gen_foliage.py composes the committed foliage cards from them.",
+    "items": [
+      {
+        "id": "LeafSet019",
+        "use": "conifer sprays: needle branch cards"
+      },
+      {
+        "id": "LeafSet026",
+        "use": "lobed leaflets: fern frond pinnae"
+      },
+      {
+        "id": "LeafSet024",
+        "use": "broad leaves: maple and bush cards"
+      },
+      {
+        "id": "Foliage001",
+        "use": "grass blades: ground cover cards"
+      }
+    ]
+  },
+  "makehuman": {
+    "source": "MakeHuman CC0 data: base mesh, targets and rig from the MPFB2 repository (data released as CC0; the GPL code is not used) and the makehuman_system_assets pack (CC0).",
+    "mpfb_zip": "https://github.com/makehumancommunity/mpfb2/archive/refs/tags/v2.0.18.zip",
+    "mpfb_data": [
+      "3dobjs/",
+      "targets/macrodetails/",
+      "rigs/standard/"
+    ],
+    "packs": [
+      "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+    ],
+    "note": "Cached in .cache/makehuman/ (not committed). tools/blender/gen_human.py builds the soldiers from it."
+  }
+}
