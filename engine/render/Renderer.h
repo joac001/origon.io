@@ -45,6 +45,8 @@ struct DrawItem {
     bool castShadow = true;
     // Shadow cascades this item is drawn into (nearest first). Small detail can skip the far ones.
     int shadowCascades = 4;
+    // Drawn only into shadow maps (a cheaper stand-in for an item with castShadow = false).
+    bool shadowOnly = false;
     // Instanced draw: per-instance model matrices (model is ignored). Must stay valid until render().
     const glm::mat4* instances = nullptr;
     int instanceCount = 0;

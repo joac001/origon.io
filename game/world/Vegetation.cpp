@@ -220,8 +220,11 @@ void VegetationField::submit(Renderer& renderer, const glm::mat4& viewProj, cons
         const Model& model = *layer.model;
         for (auto& list : layer.lodMatrices) list.clear();
         const float height = model.height();
+        const bool impostor = model.lodCount() > 3;
         const float lod0 = std::max(18.0f, height * 2.2f) * settings.lodBias;
-        const float lod1 = std::max(45.0f, height * 5.5f) * settings.lodBias;
+        // Trees with an impostor switch earlier: LOD2 is short-lived, the crossed quads take over.
+        const float lod1 = (impostor ? std::max(40.0f, height * 3.5f) : std::max(45.0f, height * 5.5f)) * settings.lodBias;
+        const float lod2 = (impostor ? std::max(70.0f, height * 5.0f) : 1.0e9f) * settings.lodBias;
         const float maxDistance = layer.config.groundCover ? settings.distance : 500.0f;
         const float maxDistance2 = maxDistance * maxDistance;
         for (const Instance& instance : layer.instances) {
@@ -240,23 +243,30 @@ void VegetationField::submit(Renderer& renderer, const glm::mat4& viewProj, cons
             }
             if (!visible) continue;
             const float distance = std::sqrt(distance2);
-            const int lod = distance < lod0 ? 0 : (distance < lod1 ? 1 : 2);
+            const int lod = distance < lod0 ? 0 : distance < lod1 ? 1 : distance < lod2 ? 2 : 3;
             layer.lodMatrices[static_cast<size_t>(std::min(lod, model.lodCount() - 1))].push_back(instance.transform);
         }
+        // Close trees cast their shadow with LOD1: same silhouette, a fraction of the triangles.
+        const bool shadowProxy = !layer.config.groundCover && model.lodCount() > 2;
         for (int lod = 0; lod < model.lodCount(); ++lod) {
             const auto& matrices = layer.lodMatrices[static_cast<size_t>(lod)];
             if (matrices.empty()) continue;
-            for (const ModelPart& part : model.lod(lod)) {
-                DrawItem item;
-                item.mesh = &part.mesh;
-                item.material = part.material;
-                item.material.windStrength = layer.config.wind;
-                item.material.windHeight = height;
-                item.instances = matrices.data();
-                item.instanceCount = static_cast<int>(matrices.size());
-                item.castShadow = !layer.config.groundCover || lod == 0;
-                renderer.submit(item);
-            }
+            auto submit = [&](int meshLod, bool shadowOnly) {
+                for (const ModelPart& part : model.lod(meshLod)) {
+                    DrawItem item;
+                    item.mesh = &part.mesh;
+                    item.material = part.material;
+                    item.material.windStrength = layer.config.wind;
+                    item.material.windHeight = height;
+                    item.instances = matrices.data();
+                    item.instanceCount = static_cast<int>(matrices.size());
+                    item.castShadow = shadowOnly || ((!layer.config.groundCover || lod == 0) && !(shadowProxy && lod == 0));
+                    item.shadowOnly = shadowOnly;
+                    renderer.submit(item);
+                }
+            };
+            submit(lod, false);
+            if (shadowProxy && lod == 0) submit(1, true);
         }
     }
 }

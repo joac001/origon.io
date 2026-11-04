@@ -25,7 +25,7 @@ struct ModelPart {
 // assets/textures/<id>/{albedo,normal,arm}.jpg, foliage_<name> uses assets/textures/foliage/<name>.png.
 class Model {
 public:
-    static constexpr int kLodCount = 3;
+    static constexpr int kLodCount = 4; // LOD3: impostor (crossed quads) on trees.
 
     // textures == nullptr loads geometry for collision only (no GL, for servers and tests).
     bool load(const std::filesystem::path& path, TextureCache* textures);

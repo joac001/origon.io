@@ -409,7 +409,8 @@ void Renderer::drawDepth(const std::vector<DrawItem>& items, const glm::mat4& vi
     Shader* current = nullptr;
     for (size_t i = 0; i < items.size(); ++i) {
         const DrawItem& item = items[i];
-        if (!item.mesh || (shadowPass && (!item.castShadow || cascade >= item.shadowCascades))) {
+        if (!item.mesh || (shadowPass && (!item.castShadow || cascade >= item.shadowCascades)) ||
+            (!shadowPass && item.shadowOnly)) {
             continue;
         }
         Shader& shader = item.boneCount > 0 ? (item.material.alphaTest ? m_depthSkinnedAlpha : m_depthSkinned)
@@ -495,7 +496,7 @@ void Renderer::drawLit(const std::vector<DrawItem>& items, const glm::mat4& toWo
     const bool alphaToCoverage = m_targetSamples > 0;
     for (size_t i = 0; i < items.size(); ++i) {
         const DrawItem& item = items[i];
-        if (!item.mesh) {
+        if (!item.mesh || item.shadowOnly) {
             continue;
         }
         Shader& shader = litVariant(item);
