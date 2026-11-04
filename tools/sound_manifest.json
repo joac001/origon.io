@@ -1,6 +1,6 @@
 {
  "source": "Freesound (https://freesound.org). Only sounds whose page states Creative Commons 0 are used; the build script checks the license on every download.",
- "note": "mode: 'events' cuts up to 'count' separate hits (onset to decay), 'first' keeps the first hit, 'whole' keeps a full sequence from the first onset up to 'max' seconds, 'loop' makes a seamless loop of 'length' seconds starting at 'start'. Output: assets/sounds/<name>_NN.flac (48 kHz mono 16-bit).",
+ "note": "mode: 'events' cuts up to 'count' separate hits (onset to decay), 'first' keeps the first hit, 'whole' keeps a full sequence from the first onset up to 'max' seconds, 'loop' makes a seamless loop of 'length' seconds starting at 'start'. Output: assets/sounds/<name>_NN.flac (48 kHz mono 16-bit). 'lowpass' (Hz) filters a loop before it is cut (wind and water hiss).",
  "sounds": [
   {
    "id": 386845,
@@ -313,21 +313,24 @@
    "name": "ambience_forest",
    "mode": "loop",
    "start": 5.0,
-   "length": 40.0
+   "length": 40.0,
+   "lowpass": 7000
   },
   {
    "id": 760990,
    "name": "ambience_wind",
    "mode": "loop",
    "start": 1.0,
-   "length": 15.0
+   "length": 15.0,
+   "lowpass": 900
   },
   {
    "id": 786172,
    "name": "ambience_stream",
    "mode": "loop",
    "start": 2.0,
-   "length": 20.0
+   "length": 20.0,
+   "lowpass": 2800
   }
  ]
 }

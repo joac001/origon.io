@@ -69,6 +69,26 @@ App::App(const LaunchOptions& options) : m_options(options) {
         throw std::runtime_error("Weapon data could not be loaded");
     }
     m_audioReady = m_audio.init();
+    // Sound propagation: three rays (direct, above, beside) against static geometry; the blocked
+    // fraction muffles and quiets the sound.
+    m_audio.setOcclusionQuery([this](const glm::vec3& listener, const glm::vec3& source) {
+        const glm::vec3 delta = source - listener;
+        const float distance = glm::length(delta);
+        if (distance < 1.0f) return 0.0f;
+        const glm::vec3 side = glm::normalize(glm::cross(delta, glm::vec3(0, 1, 0)) + glm::vec3(1e-4f, 0, 0)) * 0.8f;
+        const glm::vec3 offsets[3] = {glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f), side};
+        int blocked = 0;
+        for (const glm::vec3& o : offsets) {
+            const glm::vec3 from = listener + o;
+            const glm::vec3 to = source + o * 0.5f;
+            const glm::vec3 path = to - from;
+            const float length = glm::length(path);
+            if (length < 0.5f) continue;
+            // Stop short of the source so its own surroundings do not count as a wall.
+            if (m_physics.rayCast(from, path / length, std::max(length - 0.6f, 0.1f), false)) ++blocked;
+        }
+        return static_cast<float>(blocked) / 3.0f;
+    });
     // Footsteps on structures (bridges, floors, docks) sound like wood, on the ground like dirt.
     m_audio.setSurfaceQuery([this](const glm::vec3& feet) {
         return m_world.map().terrain.valid() ? feet.y > m_world.terrainHeight(feet.x, feet.z) + 0.25f : true;

@@ -29,6 +29,8 @@ public:
     void setWaterProximity(float proximity);
     // Footstep surface: returns true when a position stands on a wooden structure (not terrain).
     void setSurfaceQuery(std::function<bool(const glm::vec3&)> onWood) { m_onWood = std::move(onWood); }
+    // Sound propagation: how much geometry blocks the path from listener to a source (0..1).
+    void setOcclusionQuery(AudioSystem::OcclusionQuery query) { m_audio.setOcclusionQuery(std::move(query)); }
 
 private:
     struct Pending {
@@ -52,6 +54,8 @@ private:
     int m_forestLoop = -1;
     SoundId m_forest = kInvalidSound;
     std::function<bool(const glm::vec3&)> m_onWood;
+    float m_duck = 0.0f;     // Ambience ducking after nearby gunfire (0..1).
+    float m_ambienceTime = 0.0f;
     void play(SoundId id, const PlayParams& params);
     void playAt(SoundId id, const glm::vec3& position, float volume, float pitchJitter, bool local);
     void schedule(float delay, SoundId id, const PlayParams& params);

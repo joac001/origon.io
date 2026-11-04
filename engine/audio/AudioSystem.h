@@ -2,6 +2,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -51,6 +52,15 @@ public:
 
     void setListener(const glm::vec3& position, const glm::vec3& forward, const glm::vec3& up);
     void setMasterVolume(float volume);
+
+    // --- Propagation -----------------------------------------------------------------------------
+    // Fraction (0 open .. 1 fully blocked) of the paths between two points that hit geometry.
+    using OcclusionQuery = std::function<float(const glm::vec3& listener, const glm::vec3& source)>;
+    void setOcclusionQuery(OcclusionQuery query);
+    // Per frame: every playing 3D voice gets air absorption by distance (low-pass), occlusion
+    // (quieter and muffled behind terrain, walls and trunks) and a slightly darker sound when the
+    // source is behind the listener, which helps tell front from back.
+    void update(float dt);
 
 private:
     struct Impl;

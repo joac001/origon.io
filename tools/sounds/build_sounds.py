@@ -138,6 +138,19 @@ def shape(clip, fade_in=0.003, fade_out=0.03, rms_db=-16.0, peak_db=-0.5):
     return [s * gain for s in clip]
 
 
+def lowpass(samples, cutoff, passes=2):
+    """One-pole low-pass, applied twice (12 dB/octave): tames hiss in ambience loops."""
+    a = math.exp(-2.0 * math.pi * cutoff / RATE)
+    for _ in range(passes):
+        y = 0.0
+        out = []
+        for x in samples:
+            y = (1.0 - a) * x + a * y
+            out.append(y)
+        samples = out
+    return samples
+
+
 def make_loop(samples, start, length, rms_db, fade=1.5):
     """Seamless loop: the segment's end crossfades into its beginning (equal power)."""
     a = int(start * RATE)
@@ -186,6 +199,8 @@ def main():
         samples = decode(audio)
         mode = entry.get("mode", "first")
         if mode == "loop":
+            if entry.get("lowpass"):
+                samples = lowpass(samples, entry["lowpass"])
             clips = [make_loop(samples, entry.get("start", 0.0), entry.get("length", 20.0), LOOP_TARGETS.get(name, -22.0))]
         elif mode == "whole":
             # A full sequence (reloads, bolt cycles): from the first onset, up to "max" seconds.

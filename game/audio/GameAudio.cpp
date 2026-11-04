@@ -224,6 +224,12 @@ void GameAudio::playAt(SoundId id, const glm::vec3& position, float volume, floa
         params.position = position;
         params.minDistance = 3.0f;
         params.maxDistance = 250.0f;
+        // Sound travels at 343 m/s: far shots arrive after their muzzle flash.
+        const float delay = glm::distance(position, m_listener) / 343.0f;
+        if (delay > 0.03f) {
+            schedule(delay, id, params);
+            return;
+        }
     }
     m_audio.play(id, params);
 }
@@ -273,6 +279,7 @@ void GameAudio::onEvents(const std::vector<GameEvent>& events, const Simulation&
                 }
             }
             playAt(id, e.start, volume, 0.04f, isLocal);
+            if (isLocal || distance < 30.0f) m_duck = std::max(m_duck, isLocal ? 0.7f : 0.7f * (1.0f - distance / 30.0f));
             const bool manual = e.category == WeaponCategory::BoltRifle || e.category == WeaponCategory::Sniper ||
                                 e.category == WeaponCategory::Shotgun;
             if (manual) {
@@ -365,6 +372,18 @@ void GameAudio::onEvents(const std::vector<GameEvent>& events, const Simulation&
 void GameAudio::update(float dt, const Simulation& sim, const glm::vec3& listener, const glm::vec3& forward) {
     m_listener = listener;
     m_audio.setListener(listener, forward, glm::vec3(0, 1, 0));
+    m_audio.update(dt);
+
+    // Ambience: wind in slow gusts instead of a constant hiss, everything ducked after gunfire.
+    m_ambienceTime += dt;
+    m_duck = std::max(0.0f, m_duck - dt * 0.8f);
+    if (m_ambience) {
+        const float t = m_ambienceTime;
+        const float gust = 0.5f + 0.3f * std::sin(t * 0.47f) + 0.2f * std::sin(t * 0.19f + 1.3f);
+        const float duck = 1.0f - 0.6f * m_duck;
+        m_audio.setLoopVolume(m_windLoop, (m_recordedAmbience ? 0.16f : 0.3f) * std::clamp(gust, 0.15f, 1.0f) * duck);
+        m_audio.setLoopVolume(m_forestLoop, 0.32f * duck);
+    }
 
     for (Pending& pending : m_pending) {
         pending.delay -= dt;
@@ -393,7 +412,7 @@ void GameAudio::update(float dt, const Simulation& sim, const glm::vec3& listene
             const bool wood = m_onWood && m_onWood(p.position);
             const std::vector<SoundId>& set = wood ? m_stepsWood : m_steps;
             playAt(set[std::uniform_int_distribution<size_t>(0, set.size() - 1)(m_rng)], p.position,
-                   local ? volume * 0.35f : volume * 0.8f, 0.08f, local);
+                   local ? volume * 0.35f : volume * 1.1f, 0.08f, local);
         }
     }
 
