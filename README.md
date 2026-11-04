@@ -53,8 +53,10 @@ Tests (headless): `ctest --test-dir build --output-on-failure`
 ## Playing online
 
 - Host: menu (Esc) → **Multijugador** → *Crear partida*, or `origon --host 27015`.
-- Join: menu → **Multijugador** → IP and *Unirse*, or `origon --connect 192.168.1.10:27015 --name Ana`.
-- Open UDP port 27015 on the host's router for internet games (or use a LAN VPN).
+- Join: menu → **Multijugador**: LAN games appear automatically (UDP broadcast on port 27020);
+  or type an IP and *Unirse*, or `origon --connect 192.168.1.10:27015 --name Ana`.
+- Open UDP port 27015 on the host's router for internet games (or use a LAN VPN). There is no
+  NAT punch-through yet: that needs a small public rendezvous/relay server.
 - Joining players replace bots. The host's current map (including custom maps) is sent to them.
 
 ## Controls

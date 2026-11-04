@@ -584,6 +584,10 @@ int App::run() {
 void App::updatePlaying(float frameDt) {
     if (m_net.isServer()) {
         m_net.serverPoll(*m_sim, m_world.map());
+        int humans = 0;
+        for (const Player& p : m_sim->players()) humans += p.isBot ? 0 : 1;
+        m_lan.announce(m_time, static_cast<uint16_t>(m_hostPort), m_playerName, m_world.map().name, humans,
+                       m_weapons.rules().maxPlayers);
     }
     if (m_net.isClient()) {
         updateNetworkClient();
@@ -1070,7 +1074,23 @@ void App::drawMenu() {
                 startHosting(std::clamp(m_hostPort, 1024, 65535));
                 setMenuOpen(false);
             }
-            ImGui::SeparatorText("Unirse a una partida");
+            ImGui::SeparatorText("Partidas en la red local");
+            m_lan.listen(m_time);
+            if (m_lan.servers().empty()) {
+                ImGui::TextDisabled("Buscando partidas... (los servidores se anuncian cada segundo)");
+            }
+            for (const net::LanDiscovery::Server& server : m_lan.servers()) {
+                ImGui::PushID((server.address + ":" + std::to_string(server.port)).c_str());
+                ImGui::Text("%s  ·  %s  ·  %d/%d  (%s:%d)", server.name.c_str(), server.map.c_str(), server.players, server.maxPlayers,
+                            server.address.c_str(), server.port);
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Unirse")) {
+                    joinServer(server.address, server.port);
+                    setMenuOpen(false);
+                }
+                ImGui::PopID();
+            }
+            ImGui::SeparatorText("Unirse por IP");
             ImGui::InputText("Dirección IP", &m_joinAddress);
             ImGui::InputInt("Puerto##join", &m_joinPort);
             if (ImGui::Button("Unirse", ImVec2(-1, 0))) {

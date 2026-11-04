@@ -5,6 +5,7 @@
 #include "core/Window.h"
 #include "editor/MapEditor.h"
 #include "fx/Effects.h"
+#include "net/LanDiscovery.h"
 #include "net/NetSession.h"
 #include "physics/PhysicsWorld.h"
 #include "render/Renderer.h"
@@ -135,6 +136,8 @@ private:
     long m_frameCount = 0;
     std::string m_pendingScreenshot;
     net::NetSession m_net;
+    net::LanDiscovery m_lan;
+    bool m_browserOpen = false;
     uint32_t m_netTick = 0;
     bool m_clientReady = false;
     float m_snapshotAge = 0.0f;
