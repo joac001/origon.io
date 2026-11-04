@@ -158,6 +158,8 @@ Environment World::environment() const {
     env.ambientIntensity = e.ambientIntensity;
     env.fogColor = toLinear(e.fogColor);
     env.fogDensity = e.fogDensity;
+    env.volumetricDensity = std::max(e.fogDensity * 1.3f, 0.003f);
+    env.groundHeight = m_map.terrain.valid() ? m_map.terrain.heightAt(0.0f, 0.0f) : 0.0f;
     return env;
 }
 

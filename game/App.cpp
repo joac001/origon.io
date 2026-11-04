@@ -921,7 +921,7 @@ void App::drawMenu() {
             if (ImGui::SliderInt("Escala de resolución", &scale, 50, 100, "%d%%")) r.renderScale = static_cast<float>(scale) / 100.0f;
             ImGui::Checkbox("Oclusión ambiental (SSAO)", &r.ssao);
             ImGui::Checkbox("Bloom", &r.bloom);
-            ImGui::Checkbox("Luces volumétricas (rayos de sol)", &r.godRays);
+            ImGui::Checkbox("Luces volumétricas (niebla con sombras)", &r.godRays);
             ImGui::Checkbox("Reflejos en el agua (SSR)", &r.ssr);
             ImGui::Checkbox("Sombras de contacto", &r.contactShadows);
             ImGui::Checkbox("Profundidad de campo al apuntar", &m_settings.adsDepthOfField);

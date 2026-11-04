@@ -64,6 +64,8 @@ struct Environment {
     glm::vec3 fogColor{0.62f, 0.7f, 0.78f};
     float fogDensity = 0.008f;
     float time = 0.0f; // Seconds, for animated materials (water, wind).
+    float groundHeight = 0.0f; // Reference height for the volumetric fog falloff.
+    float volumetricDensity = 0.012f;
 };
 
 struct CameraView {
@@ -216,6 +218,8 @@ private:
     Shader m_lineShader;
     Shader m_waterShader;
     Shader m_blurShader;
+    Shader m_volumetricShader;
+    void renderVolumetric(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment);
     unsigned m_dofFbo[2] = {0, 0};
     unsigned m_dofTexture[2] = {0, 0};
     void renderDofBlur();

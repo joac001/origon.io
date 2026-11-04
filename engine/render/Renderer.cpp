@@ -93,6 +93,7 @@ bool Renderer::init() {
     ok &= m_lineShader.loadFile("assets/shaders/lines.glsl");
     ok &= m_waterShader.loadFile("assets/shaders/water.glsl");
     ok &= m_blurShader.loadFile("assets/shaders/blur.glsl");
+    ok &= m_volumetricShader.loadFile("assets/shaders/volumetric.glsl");
     if (!ok) {
         log::error("Renderer: shader loading failed");
         return false;
@@ -598,6 +599,48 @@ void Renderer::renderDofBlur() {
     m_stats.drawCalls += 2;
 }
 
+void Renderer::renderVolumetric(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment) {
+    const glm::ivec2 half = m_bloomSizes[0];
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_godRaysFbo);
+    glViewport(0, 0, half.x, half.y);
+    m_volumetricShader.bind();
+    m_volumetricShader.set("uDepth", 0);
+    m_volumetricShader.set("uShadowMap", 1);
+    m_volumetricShader.set("uInvViewProj", glm::inverse(viewProj));
+    m_volumetricShader.set("uView", camera.view);
+    m_volumetricShader.set("uCameraPos", camera.position);
+    m_volumetricShader.set("uSunDirection", glm::normalize(environment.sunDirection));
+    m_volumetricShader.set("uSunColor", environment.sunColor * environment.sunIntensity);
+    m_volumetricShader.set("uDensity", environment.volumetricDensity);
+    m_volumetricShader.set("uGroundHeight", environment.groundHeight);
+    m_volumetricShader.set("uMaxDistance", 90.0f);
+    m_volumetricShader.set("uTime", environment.time);
+    m_volumetricShader.set("uCascadeCount", m_cascadeCount);
+    for (int c = 0; c < m_cascadeCount; ++c) {
+        const std::string index = "[" + std::to_string(c) + "]";
+        m_volumetricShader.set(("uCascadeViewProj" + index).c_str(), m_cascadeViewProj[static_cast<size_t>(c)]);
+        m_volumetricShader.set(("uCascadeSplit" + index).c_str(), m_cascadeSplits[static_cast<size_t>(c)]);
+    }
+    glBindTextureUnit(0, m_resolveDepth);
+    glBindTextureUnit(1, m_shadowArray);
+    drawFullscreen(m_emptyVao);
+
+    // Blur away the per-pixel jitter: horizontal into a scratch texture, vertical back.
+    m_blurShader.bind();
+    m_blurShader.set("uSource", 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_dofFbo[0]);
+    m_blurShader.set("uDirection", glm::vec2(1.0f / static_cast<float>(half.x), 0.0f));
+    glBindTextureUnit(0, m_godRaysTexture);
+    drawFullscreen(m_emptyVao);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_godRaysFbo);
+    m_blurShader.set("uDirection", glm::vec2(0.0f, 1.0f / static_cast<float>(half.y)));
+    glBindTextureUnit(0, m_dofTexture[0]);
+    drawFullscreen(m_emptyVao);
+    m_stats.drawCalls += 3;
+}
+
 void Renderer::renderGodRays(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment) {
     const glm::vec3 sunDir = glm::normalize(environment.sunDirection);
     const glm::vec3 forward = -glm::vec3(glm::inverse(camera.view)[2]);
@@ -771,7 +814,11 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
         renderBloom();
     }
     if (m_settings.godRays) {
-        renderGodRays(camera, viewProj, environment);
+        if (m_shadowSize > 0) {
+            renderVolumetric(camera, viewProj, environment);
+        } else {
+            renderGodRays(camera, viewProj, environment);
+        }
     }
     if (m_settings.depthOfField > 0.001f) {
         renderDofBlur();
