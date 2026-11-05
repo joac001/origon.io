@@ -299,6 +299,41 @@ class Pose:
         wanted = parent_m.to_3x3().inverted() @ target_dir
         self.local[name] = rotation_between(tail - head, wanted)
 
+    def aim_point(self, name, ref_rest, target):
+        """Rotate a bone about its head so the rest point ref_rest (usually the child's head) lands on
+        the line towards target (world space, after the parents' pose)."""
+        mats = self.matrices()
+        head, _, parent = self.bones[name]
+        parent_m = mats.get(parent, Matrix.Identity(4))
+        wanted = parent_m.to_3x3().inverted() @ (target - parent_m @ head)
+        self.local[name] = rotation_between(ref_rest - head, wanted)
+
+    def orient(self, name, frame_now, frame_wanted):
+        """Extra world-space rotation of a bone (and its children) taking the orthonormal frame
+        frame_now (3x3, columns) onto frame_wanted."""
+        mats = self.matrices()
+        parent = self.bones[name][2]
+        parent_q = mats.get(parent, Matrix.Identity(4)).to_quaternion()
+        delta = (frame_wanted @ frame_now.transposed()).to_quaternion()
+        self.local[name] = parent_q.inverted() @ delta @ parent_q @ self.local[name]
+
+    def solve_arm(self, upper, lower, hand, target, pole):
+        """Analytic two-bone IK: the wrist (hand head) reaches target, the elbow bends towards pole."""
+        mats = self.matrices()
+        s = mats[upper] @ self.bones[upper][0]
+        a = (self.bones[lower][0] - self.bones[upper][0]).length
+        b = (self.bones[hand][0] - self.bones[lower][0]).length
+        d = target - s
+        c = min(max(d.length, 0.05 * (a + b)), (a + b) * 0.999)
+        d.normalize()
+        cos_a = max(-1.0, min(1.0, (a * a + c * c - b * b) / (2.0 * a * c)))
+        side = pole - d * pole.dot(d)
+        side.normalize()
+        elbow = s + d * (a * cos_a) + side * (a * math.sqrt(max(0.0, 1.0 - cos_a * cos_a)))
+        self.aim_point(upper, self.bones[lower][0], elbow)
+        self.aim_point(lower, self.bones[hand][0], s + d * c)
+        return (target - (s + d * c)).length
+
     def rotate(self, name, axis_world_rest, angle):
         """Additional rotation about an axis given in the bone's rest frame."""
         self.local[name] = Quaternion(axis_world_rest.normalized(), angle) @ self.local[name]

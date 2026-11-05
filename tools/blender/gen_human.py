@@ -51,7 +51,19 @@ OUTFITS = {
 SHOES = ["shoes01", "shoes02", "shoes03", "shoes04", "shoes05", "shoes06"]
 EYEBROWS = {"m": "eyebrow001", "f": "eyebrow010"}
 
-# Rifle rest pose: bone directions of gen_character.BONES (Blender space).
+# Rifle rest pose. Legs: bone directions of gen_character.BONES (Blender space). Arms: IK to a rifle
+# held at the right shoulder (GUN_REST is the weapon origin, at the trigger; weapon axes = body axes).
+GUN_REST = Vector((0.10, 0.40, 1.40))
+# Per hand, in weapon space (Blender axes: +X right, +Y forward, +Z up): wrist position, direction of the
+# fingers (wrist to knuckles), index-minus-pinky knuckle line, and where the elbow points.
+HOLD = {
+    "r": dict(wrist=(0.04, -0.075, -0.005), fingers=(-0.25, 1.0, -0.35), knuckles=(0.0, 0.35, 1.0),
+              pole=(0.8, -0.2, -1.0), curl=(50, 65, 40), thumb=25),
+    "l": dict(wrist=(-0.035, 0.16, -0.03), fingers=(0.55, 0.75, 0.1), knuckles=(-0.75, 0.55, 0.0),
+              pole=(-0.4, -0.1, -1.0), curl=(30, 45, 25), thumb=10),
+}
+# Bladed stance: chest turned (degrees about the vertical, negative brings the left shoulder forward).
+TWIST = (("spine_02", -12.0), ("spine_03", -13.0), ("neck_01", 12.0), ("head", 13.0))
 AIM = {
     "upperarm_r": "upperarm.R", "lowerarm_r": "forearm.R", "hand_r": "hand.R",
     "upperarm_l": "upperarm.L", "lowerarm_l": "forearm.L", "hand_l": "hand.L",
@@ -190,37 +202,65 @@ def build_body(gender):
     bones = mh.rig_bones(base, verts)
     base_w = mh.base_weights()
 
-    # Rifle pose: aim arms and legs along the old skeleton, curl the fingers around the grip.
+    # Rifle pose, stage 1: legs along the old skeleton, a bladed stance (chest turned so the left
+    # shoulder leads, head turned back to the front).
     pose = mh.Pose(bones)
     for mh_bone, ours in AIM.items():
         pose.aim(mh_bone, mh.from_blender_dir(bone_dir(ours)))
-    for side in ("l", "r"):
-        knuckles = bones[f"index_01_{side}"][0] - bones[f"pinky_01_{side}"][0]
-        axis = knuckles.normalized() * (1.0 if side == "l" else -1.0)
-        for finger in ("index", "middle", "ring", "pinky"):
-            for segment, angle in (("01", 50), ("02", 65), ("03", 40)):
-                pose.rotate(f"{finger}_{segment}_{side}", axis, math.radians(angle) * CURL_SIGN)
-        pose.rotate(f"thumb_02_{side}", axis, math.radians(25) * CURL_SIGN)
-
-    posed_bones = pose.posed_bones()
-    skeleton = mh.our_skeleton(posed_bones)
+    up = mh.from_blender_dir(Vector((0.0, 0.0, 1.0)))
+    for name, degrees in TWIST:
+        pose.rotate(name, up, math.radians(degrees))
 
     # Body: the "body" group of the base mesh only (helpers and joint cubes dropped).
     body_faces = [f for f, g in zip(base.faces, base.face_groups) if g == "body"]
     used = sorted({v for f in body_faces for v, _ in f})
     remap = {v: i for i, v in enumerate(used)}
     body_w = [base_w.get(v, {}) for v in used]
-    posed = pose.skin([verts[v] for v in used], body_w)
 
-    # Place: MakeHuman space -> Blender, scaled to HEIGHT with the soles at the origin.
-    blender = [mh.to_blender(p) for p in posed]
-    top = max(p.z for p in blender)
-    bottom = min(p.z for p in blender)
+    # Placement (MakeHuman space -> Blender, scaled to HEIGHT with the soles at the origin). The arms
+    # never reach the soles or the top of the head, so it is measured before posing them.
+    standing = [mh.to_blender(p) for p in pose.skin([verts[v] for v in used], body_w)]
+    top = max(p.z for p in standing)
+    bottom = min(p.z for p in standing)
     scale = (HEIGHT - 0.03) / (top - bottom)
 
     def place(p):
         b = mh.to_blender(p)
         return Vector((b.x * scale, b.y * scale, (b.z - bottom) * scale + 0.03))
+
+    def unplace(v):
+        return Vector((-v.x / scale * 10.0, ((v.z - 0.03) / scale + bottom) * 10.0, v.y / scale * 10.0))
+
+    # Stage 2: both hands on the rifle (IK for the wrists, explicit hand frames: the palm of the right
+    # hand wraps the grip from the right side, the left palm supports the forend from below).
+    def frame(direction, knuckles):
+        f = direction.normalized()
+        k = (knuckles - f * knuckles.dot(f)).normalized()
+        return Matrix((f, k, f.cross(k))).transposed()
+
+    for side, hold in HOLD.items():
+        target = GUN_REST + Vector(hold["wrist"])
+        miss = pose.solve_arm(f"upperarm_{side}", f"lowerarm_{side}", f"hand_{side}", unplace(target),
+                              mh.from_blender_dir(Vector(hold["pole"])))
+        mats = pose.matrices()
+        m = mats[f"hand_{side}"]
+        now = frame(m @ bones[f"middle_01_{side}"][0] - m @ bones[f"hand_{side}"][0],
+                    m @ bones[f"index_01_{side}"][0] - m @ bones[f"pinky_01_{side}"][0])
+        wanted = frame(mh.from_blender_dir(Vector(hold["fingers"])), mh.from_blender_dir(Vector(hold["knuckles"])))
+        pose.orient(f"hand_{side}", now, wanted)
+        print(f"[origon] {gender} arm {side}: wrist misses its target by {miss * 0.1 * scale * 100:.1f} cm")
+    # Fingers curled around the grip (the support hand cups the forend: a looser wrap).
+    for side, hold in HOLD.items():
+        knuckles = bones[f"index_01_{side}"][0] - bones[f"pinky_01_{side}"][0]
+        axis = knuckles.normalized() * (1.0 if side == "l" else -1.0)
+        for finger in ("index", "middle", "ring", "pinky"):
+            for segment, angle in zip(("01", "02", "03"), hold["curl"]):
+                pose.rotate(f"{finger}_{segment}_{side}", axis, math.radians(angle) * CURL_SIGN)
+        pose.rotate(f"thumb_02_{side}", axis, math.radians(hold["thumb"]) * CURL_SIGN)
+
+    posed_bones = pose.posed_bones()
+    skeleton = mh.our_skeleton(posed_bones)
+    posed = pose.skin([verts[v] for v in used], body_w)
 
     parts = []
     # Body split by the garments that hide each face (MHCLO delete_verts), so skin never pokes
@@ -273,6 +313,9 @@ def build_body(gender):
     add_proxy("x_headwear_fedora", mh.ASSETS / "clothes" / "fedora01" / "fedora01.mhclo")
 
     rig_bones = {name: (place(h), place(t)) for name, (h, t) in skeleton.items()}
+    # Weapon joint (child of the right hand): where the rifle's origin (trigger) sits in the rest pose,
+    # axes as the weapon models (muzzle along +Y). The engine attaches every weapon to it.
+    rig_bones["weapon"] = (GUN_REST.copy(), GUN_REST + Vector((0.0, 0.1, 0.0)))
     return parts, rig_bones, head_points, hidden_by
 
 
@@ -382,6 +425,7 @@ def main():
         bpy.context.scene.render.fps = gen_character.FPS
         parts, rig_bones, head_points, hidden_by = build_body(gender)
         parents = {name: parent for name, (_, _, parent) in gen_character.BONES.items()}
+        parents["weapon"] = "hand.R"
         bones = {name: (tuple(h), tuple(t), parents[name]) for name, (h, t) in rig_bones.items()}
         rig = gen_character.make_armature(bones)
         objects = [part.build(rig) for part in parts]

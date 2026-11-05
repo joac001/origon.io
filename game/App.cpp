@@ -1131,6 +1131,22 @@ struct SoldierRig {
           upperBody(m.jointMask(m.findJoint("spine"))) {}
 };
 
+// Where the weapon sits (model space of the soldier) for a posed skeleton. The "weapon" joint (child of
+// the right hand) marks the weapon origin in the rest pose with the weapon's own axes; the weapon
+// follows that joint's motion away from rest. Older models without it hold it at the right wrist.
+glm::mat4 weaponAttachment(const SkinnedModel& sk, const std::vector<glm::mat4>& globals) {
+    const int joint = sk.findJoint("weapon");
+    if (joint < 0) {
+        const int hand = sk.findJoint("hand.R");
+        if (hand < 0) return glm::mat4(1.0f);
+        return glm::translate(glm::mat4(1.0f), glm::vec3(globals[static_cast<size_t>(hand)][3]) + glm::vec3(-0.02f, -0.02f, 0.03f));
+    }
+    std::vector<glm::mat4> rest, skin;
+    sk.evaluate(sk.restPose(), rest, skin);
+    const glm::mat4& restJoint = rest[static_cast<size_t>(joint)];
+    return globals[static_cast<size_t>(joint)] * glm::inverse(restJoint) * glm::translate(glm::mat4(1.0f), glm::vec3(restJoint[3]));
+}
+
 // Weight envelope for one-shot upper-body clips: fades in and out over `edge` of the progress.
 float clipEnvelope(float progress, float edge) {
     return std::clamp(std::min(progress, 1.0f - progress) / edge, 0.0f, 1.0f);
@@ -1199,13 +1215,9 @@ void App::submitSoldier(const Player& p, float alpha) {
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), p.yaw, glm::vec3(0, 1, 0));
     const glm::vec3 tint = World::toLinear(p.color);
     const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, p.look, tint, p.spawnProtection > 0.0f);
-    // Weapon in the right hand, aligned with the aim direction.
+    // Weapon in the hands: it follows the rifle joint (the chest already carries most of the pitch).
     if (const Model* gun = m_models.getWeapon(weapon.id); gun && rig.hand >= 0) {
-        const glm::vec3 handPosition(globals[static_cast<size_t>(rig.hand)][3]);
-        const glm::mat4 gunMatrix = model * glm::translate(glm::mat4(1.0f), handPosition) *
-                                    glm::rotate(glm::mat4(1.0f), p.pitch, glm::vec3(1, 0, 0)) *
-                                    glm::translate(glm::mat4(1.0f), glm::vec3(-0.02f, -0.02f, 0.03f));
-        submitModel(*gun, gunMatrix);
+        submitModel(*gun, model * weaponAttachment(sk, globals));
     }
 }
 
@@ -1340,12 +1352,8 @@ void App::submitLookGallery(const glm::vec3& eye, float yaw, int seed) {
         const float turn = glm::pi<float>() + (static_cast<float>(i) - 2.0f) * 0.25f;
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), yaw + turn, glm::vec3(0, 1, 0));
         const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
-        // Rifle in the right hand, as in third person.
-        const int hand = sk.findJoint("hand.R");
-        if (const Model* gun = m_models.getWeapon("garand"); gun && hand >= 0) {
-            submitModel(*gun, model * glm::translate(glm::mat4(1.0f), glm::vec3(globals[static_cast<size_t>(hand)][3])) *
-                                  glm::translate(glm::mat4(1.0f), glm::vec3(-0.02f, -0.02f, 0.03f)));
-        }
+        // Rifle in the hands, as in third person.
+        if (const Model* gun = m_models.getWeapon("garand")) submitModel(*gun, model * weaponAttachment(sk, globals));
     }
 }
 
@@ -1392,28 +1400,29 @@ bool App::submitViewArms(const glm::mat4& gunBase, const Model& gun, const Weapo
     auto position = [&](int joint) { return glm::vec3(globals[static_cast<size_t>(joint)][3]); };
     // Body where it belongs: its eyes at the camera (model faces -Z like the view).
     const glm::vec3 eye = position(j.head) + glm::vec3(0.0f, 0.1f, -0.08f);
-    const glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.02f, 0.02f) - eye);
+    // How the rest pose holds a rifle: each hand's placement and orientation relative to the weapon.
+    // The arms are solved (IK) so the hands keep that grip wherever the view puts the weapon.
+    const glm::mat4 restGun = weaponAttachment(sk, globals);
+    // The shoulders follow most of the weapon's offset from where the rest pose holds it (raising it
+    // to the eye moves the whole upper body, as a real shooter does); the arms take up the rest.
+    const glm::vec3 restInView = glm::vec3(restGun[3]) - eye;
+    const glm::vec3 shift = (glm::vec3(gunBase[3]) - restInView) * 0.85f;
+    const glm::mat4 model = glm::translate(glm::mat4(1.0f), shift - eye);
     const glm::mat4 toModel = glm::inverse(model);
-
-    // How the rest pose holds a rifle: the weapon sits at the right wrist with the model's axes.
-    // Keep each hand's placement and orientation relative to the weapon, and solve the arms (IK)
-    // so the hands follow the weapon wherever the view puts it.
-    const glm::vec3 gripOffset(-0.02f, -0.02f, 0.03f);
-    const glm::mat4 restGun = glm::translate(glm::mat4(1.0f), position(j.hand[0]) + gripOffset);
     const glm::mat4 gunModel = toModel * gunBase;
-    const glm::quat gunRotation = glm::quat_cast(glm::mat3(gunModel));
+    const glm::quat gunRotation = glm::normalize(glm::quat_cast(glm::mat3(gunModel)));
     glm::vec3 handInGun[2];
-    glm::quat handRest[2];
+    glm::quat handInGunRotation[2];
     for (int side = 0; side < 2; ++side) {
-        handInGun[side] = glm::vec3(glm::inverse(restGun) * glm::vec4(position(j.hand[side]), 1.0f));
-        handRest[side] = glm::quat_cast(glm::mat3(globals[static_cast<size_t>(j.hand[side])]));
+        const glm::mat4 local = glm::inverse(restGun) * globals[static_cast<size_t>(j.hand[side])];
+        handInGun[side] = glm::vec3(local[3]);
+        handInGunRotation[side] = glm::normalize(glm::quat_cast(glm::mat3(local)));
     }
-    // The support hand slides along the barrel to this weapon's forend (pistols: cups the grip hand).
-    const float front = gun.boundsMin().z;
+    // Pistols and knives: the support hand cups the grip hand instead of reaching for a forend.
     const bool oneHanded = weapon.isMelee() || weapon.category == WeaponCategory::Pistol;
     if (oneHanded) handInGun[1] = handInGun[0] + glm::vec3(-0.05f, -0.03f, 0.02f);
-    else handInGun[1] = glm::vec3(-0.01f, -0.045f, front * 0.42f); // Under the barrel.
-    const glm::vec3 poles[2] = {glm::vec3(0.8f, -1.0f, 0.3f), glm::vec3(-0.6f, -1.0f, 0.1f)};
+    (void)gun;
+    const glm::vec3 poles[2] = {glm::vec3(1.0f, -0.6f, 0.3f), glm::vec3(-0.6f, -1.0f, 0.1f)};
     for (int side = 0; side < 2; ++side) {
         const glm::vec3 target(gunModel * glm::vec4(handInGun[side], 1.0f));
         sk.evaluate(pose, globals, skin);
@@ -1430,20 +1439,15 @@ bool App::submitViewArms(const glm::mat4& gunBase, const Model& gun, const Weapo
         const glm::vec3 elbow = s + d * (a * cosA) + pole * (a * std::sqrt(1.0f - cosA * cosA));
         sk.aimJoint(pose, j.upper[side], j.fore[side], elbow);
         sk.aimJoint(pose, j.fore[side], j.hand[side], s + d * c);
-        // Fingers along the weapon: the hand bone runs along its local +Y (wrist to knuckles).
+        // The whole hand frame as in the rest grip (not just the finger direction), so each palm
+        // stays on its own side of the weapon.
         sk.evaluate(pose, globals, skin);
-        const glm::vec3 forward = glm::normalize(glm::vec3(gunModel * glm::vec4(0, 0, -1, 0)));
-        const glm::vec3 right = glm::normalize(glm::vec3(gunModel * glm::vec4(1, 0, 0, 0)));
-        const glm::vec3 up = glm::normalize(glm::vec3(gunModel * glm::vec4(0, 1, 0, 0)));
-        const glm::vec3 fingers = side == 0 ? glm::normalize(forward * 0.55f - up * 0.65f - right * 0.2f)
-                                            : glm::normalize(forward * 0.7f + right * 0.6f);
-        const glm::vec3 current = glm::normalize(glm::mat3(globals[static_cast<size_t>(j.hand[side])]) * glm::vec3(0, 1, 0));
-        const glm::vec3 axis = glm::cross(current, fingers);
-        if (glm::length(axis) > 1e-4f) {
-            sk.rotateJoint(pose, j.hand[side], glm::normalize(axis), std::atan2(glm::length(axis), glm::dot(current, fingers)));
-        }
-        (void)handRest;
-        (void)gunRotation;
+        const glm::quat current = glm::normalize(glm::quat_cast(glm::mat3(globals[static_cast<size_t>(j.hand[side])])));
+        glm::quat delta = gunRotation * handInGunRotation[side] * glm::inverse(current);
+        if (delta.w < 0.0f) delta = -delta;
+        const float angle = 2.0f * std::acos(std::clamp(delta.w, -1.0f, 1.0f));
+        const glm::vec3 axis(delta.x, delta.y, delta.z);
+        if (angle > 1e-4f && glm::length(axis) > 1e-6f) sk.rotateJoint(pose, j.hand[side], glm::normalize(axis), angle);
     }
     sk.evaluate(pose, globals, skin);
     // Only arm-weighted geometry is drawn (the shader discards the rest), cut cleanly at the shoulders.
