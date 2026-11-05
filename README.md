@@ -47,7 +47,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build
 python3 tools/fetch_assets.py      # CC0 textures, leaf atlases, MakeHuman data (once, ~400 MB download)
 $BLENDER --background --factory-startup --python tools/blender/gen_human.py   # character textures
-./build/game/origon --map bosque
+./build/game/origon                 # default map: plaza_de_mayo (--map bosque for the forest)
 ```
 
 All C/C++ dependencies (GLFW, glad, glm, nlohmann/json, Jolt, Dear ImGui, ImGuizmo, ENet,
@@ -126,7 +126,8 @@ game/     sim/ (authoritative simulation, Gun Game, bots), world/ (maps, terrain
 tools/    blender/ (mesh generators), textures/, mapgen/, fetch_assets.py
 assets/   shaders, fonts, models (generated), textures (foliage generated, scans fetched)
 data/     weapons.json, gungame_ladder.json
-maps/     graybox.json, bosque.json (creek forest), aserradero.json (lakeside sawmill);
+maps/     plaza_de_mayo.json (default, Buenos Aires from OpenStreetMap), graybox.json, bosque.json (creek forest),
+          aserradero.json (lakeside sawmill);
           procedural maps are generated in-game from a seed (`--map procedural:42`, menu Partida)
 docs/     architecture, asset pipeline, art direction, research
 tests/    headless simulation tests

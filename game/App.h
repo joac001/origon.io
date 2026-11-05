@@ -33,7 +33,7 @@ namespace origon {
 
 // Command line options (mostly for automated captures and testing).
 struct LaunchOptions {
-    std::string map = "bosque";
+    std::string map = "plaza_de_mayo";
     std::string screenshotPath; // When set, save a screenshot at screenshotFrame and exit.
     int screenshotFrame = 300;
     bool startInEditor = false;
@@ -159,7 +159,7 @@ private:
     bool m_titleScreen = false;
     int m_menuTab = -1; // Page to open when the pause menu appears (-1: keep).
     int m_menuPage = 5; // Current menu page (see drawMenu).
-    std::string m_mapFile = "bosque";
+    std::string m_mapFile = "plaza_de_mayo";
     std::vector<std::string> m_mapFiles;
 
     float m_viewYaw = 0.0f;

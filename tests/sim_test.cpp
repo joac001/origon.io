@@ -237,7 +237,7 @@ void testOutdoorMatch(const WeaponDatabase& weapons, const char* name) {
 }
 
 // City map: generated scenery (collision from the chunks' _COL meshes). Skipped when the chunks have not
-// been generated (tools/blender/gen_plaza.py; they are not committed).
+// been generated (tools/blender/gen_plaza.py).
 void testCityMatch(const WeaponDatabase& weapons) {
     auto map = MapData::load(fs::resolve("maps/plaza_de_mayo.json"));
     if (!map || map->scenery.empty() || !std::filesystem::exists(fs::resolve("assets/models/" + map->scenery.front().model + ".glb"))) {
