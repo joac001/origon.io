@@ -56,6 +56,13 @@ struct DrawItem {
     unsigned jointMask = 0; // Skinned: draw only geometry weighted to these joints (bit per joint, 0 = all).
 };
 
+// One camera-facing particle (see assets/shaders/particles.glsl). Laid out for a std430 buffer.
+struct ParticleInstance {
+    glm::vec4 positionSize{0.0f}; // World position, half size in meters.
+    glm::vec4 color{1.0f};        // Albedo (or glow color) and opacity.
+    glm::vec4 params{0.0f};       // Rotation (radians), random seed 0..1, glow (1 = additive emissive), unused.
+};
+
 struct PointLight {
     glm::vec3 position{0.0f};
     float radius = 10.0f;
@@ -128,6 +135,8 @@ public:
     // Water surfaces: drawn after opaque geometry with access to the scene color and depth.
     void submitTransparent(const DrawItem& item) { m_transparentItems.push_back(item); }
     void addLight(const PointLight& light);
+    // Soft particles: drawn after water, sorted back to front, faded against the scene depth.
+    void submitParticle(const ParticleInstance& particle) { m_particles.push_back(particle); }
     // Lines are drawn in HDR after opaque geometry. Overlay lines ignore depth.
     void addLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color, bool overlay = false);
     void render(const CameraView& camera, const Environment& environment);
@@ -162,6 +171,7 @@ private:
     void renderSsao(const glm::mat4& proj);
     void renderBloom();
     void renderWater(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment, unsigned sceneFbo);
+    void renderParticles(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment, unsigned sceneFbo);
     void renderGodRays(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment);
 
     RenderSettings m_settings;
@@ -270,6 +280,10 @@ private:
     std::vector<DrawItem> m_items;
     std::vector<DrawItem> m_viewModelItems;
     std::vector<DrawItem> m_transparentItems;
+    std::vector<ParticleInstance> m_particles;
+    unsigned m_particleBuffer = 0;
+    size_t m_particleCapacity = 0;
+    Shader m_particleShader;
     std::vector<PointLight> m_lights;
     std::vector<LineVertex> m_lines;
     std::vector<LineVertex> m_overlayLines;

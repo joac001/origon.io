@@ -96,6 +96,7 @@ bool Renderer::init() {
     ok &= m_godRaysShader.loadFile("assets/shaders/godrays.glsl");
     ok &= m_lineShader.loadFile("assets/shaders/lines.glsl");
     ok &= m_waterShader.loadFile("assets/shaders/water.glsl");
+    ok &= m_particleShader.loadFile("assets/shaders/particles.glsl");
     ok &= m_blurShader.loadFile("assets/shaders/blur.glsl");
     ok &= m_volumetricShader.loadFile("assets/shaders/volumetric.glsl");
     if (!ok) {
@@ -134,6 +135,7 @@ void Renderer::beginFrame(const RenderSettings& settings, glm::ivec2 framebuffer
     m_items.clear();
     m_viewModelItems.clear();
     m_transparentItems.clear();
+    m_particles.clear();
     m_lights.clear();
     m_lines.clear();
     m_overlayLines.clear();
@@ -757,6 +759,62 @@ void Renderer::renderWater(const CameraView& camera, const glm::mat4& viewProj, 
     glEnable(GL_CULL_FACE);
 }
 
+void Renderer::renderParticles(const CameraView& camera, const glm::mat4& viewProj, const Environment& environment,
+                               unsigned sceneFbo) {
+    if (m_particles.empty()) return;
+    if (m_transparentItems.empty()) {
+        // Water did not copy the depth this frame: the soft fade needs it.
+        glBlitNamedFramebuffer(sceneFbo, m_copyFbo, 0, 0, m_sceneSize.x, m_sceneSize.y, 0, 0, m_sceneSize.x, m_sceneSize.y,
+                               GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    }
+    // Back to front for correct blending.
+    std::sort(m_particles.begin(), m_particles.end(), [&](const ParticleInstance& a, const ParticleInstance& b) {
+        const glm::vec3 da = glm::vec3(a.positionSize) - camera.position, db = glm::vec3(b.positionSize) - camera.position;
+        return glm::dot(da, da) > glm::dot(db, db);
+    });
+    const size_t bytes = m_particles.size() * sizeof(ParticleInstance);
+    if (bytes > m_particleCapacity) {
+        if (m_particleBuffer) glDeleteBuffers(1, &m_particleBuffer);
+        m_particleCapacity = std::max<size_t>(bytes * 2, 64 * 1024);
+        glCreateBuffers(1, &m_particleBuffer);
+        glNamedBufferData(m_particleBuffer, static_cast<GLsizeiptr>(m_particleCapacity), nullptr, GL_DYNAMIC_DRAW);
+    }
+    glNamedBufferSubData(m_particleBuffer, 0, static_cast<GLsizeiptr>(bytes), m_particles.data());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_particleBuffer);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
+    GLint previousDepthFunc = GL_LESS;
+    glGetIntegerv(GL_DEPTH_FUNC, &previousDepthFunc);
+    glDepthMask(GL_FALSE);
+    glDepthFunc(GL_LEQUAL);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // Premultiplied; alpha 0 adds.
+    m_particleShader.bind();
+    m_particleShader.set("uViewProj", viewProj);
+    m_particleShader.set("uView", camera.view);
+    m_particleShader.set("uCameraRight", glm::vec3(camera.view[0][0], camera.view[1][0], camera.view[2][0]));
+    m_particleShader.set("uCameraUp", glm::vec3(camera.view[0][1], camera.view[1][1], camera.view[2][1]));
+    m_particleShader.set("uCameraPos", camera.position);
+    m_particleShader.set("uSceneSize", glm::vec2(m_sceneSize));
+    m_particleShader.set("uNear", camera.nearPlane);
+    m_particleShader.set("uFar", camera.farPlane);
+    m_particleShader.set("uSunDirection", glm::normalize(environment.sunDirection));
+    m_particleShader.set("uSunColor", environment.sunColor * environment.sunIntensity);
+    m_particleShader.set("uSkyColor", environment.skyColor);
+    m_particleShader.set("uFogColor", environment.fogColor);
+    m_particleShader.set("uFogDensity", environment.fogDensity);
+    m_particleShader.set("uSceneDepth", 1);
+    glBindTextureUnit(1, m_copyDepth);
+    glBindVertexArray(m_emptyVao);
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, static_cast<GLsizei>(m_particles.size()));
+    m_stats.drawCalls++;
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
+    glDepthFunc(static_cast<GLenum>(previousDepthFunc));
+}
+
 void Renderer::markGpu(int boundary) {
     unsigned& query = m_timerQueries[m_timerFrame][boundary];
     if (!query) glCreateQueries(GL_TIMESTAMP, 1, &query);
@@ -873,6 +931,7 @@ void Renderer::render(const CameraView& camera, const Environment& environment) 
     glDepthMask(GL_TRUE);
     markGpu(4);
     renderWater(camera, viewProj, environment, sceneFbo);
+    renderParticles(camera, viewProj, environment, sceneFbo);
     markGpu(5);
     glBindTextureUnit(0, shadowsOn ? m_shadowArray : 0);
     glBindTextureUnit(1, m_settings.ssao ? m_ssaoBlurred : m_whiteTexture);

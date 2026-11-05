@@ -710,14 +710,21 @@ int App::run() {
                 camera.fovYDegrees = 65.0f;
             }
             if (m_titleScreen) {
-                // Very slow orbit above the map center, with a gentle height drift.
-                const float angle = m_time * 0.015f;
-                const float x = std::sin(angle) * 38.0f;
-                const float z = std::cos(angle) * 38.0f;
-                const glm::vec3 position(x, 9.0f + 0.6f * std::sin(m_time * 0.05f) + m_world.terrainHeight(x, z), z);
-                camera.position = position;
-                camera.view = glm::lookAt(position, glm::vec3(0.0f, m_world.terrainHeight(0.0f, 0.0f) + 2.0f, 0.0f), glm::vec3(0, 1, 0));
-                camera.fovYDegrees = 70.0f;
+                // A soldier's eye view from the spawn points (placed in the open, so no foliage in the
+                // lens): a slow pan toward the map center, moving to the next spawn every 24 s.
+                const auto& spawns = m_world.map().spawns;
+                glm::vec3 position(0.0f, m_world.terrainHeight(0.0f, 0.0f) + 1.7f, 12.0f);
+                float baseYaw = 0.0f;
+                if (!spawns.empty()) {
+                    const size_t shot = static_cast<size_t>(m_time / 24.0f) % spawns.size();
+                    const glm::vec3 feet = spawns[(shot * 7) % spawns.size()].position;
+                    position = glm::vec3(feet.x, m_world.terrainHeight(feet.x, feet.z) + 1.75f, feet.z);
+                    baseYaw = std::atan2(position.x, position.z); // Looks toward the center (0, 0).
+                }
+                const float pan = 0.35f * std::sin(m_time * 0.04f);
+                camera.position = position + glm::vec3(0.0f, 0.04f * std::sin(m_time * 0.3f), 0.0f);
+                camera.view = glm::lookAt(camera.position, camera.position + viewDirection(baseYaw + pan, -0.04f), glm::vec3(0, 1, 0));
+                camera.fovYDegrees = 65.0f;
             }
             if (m_options.fixedCamera) {
                 camera.position = m_options.cameraPosition;

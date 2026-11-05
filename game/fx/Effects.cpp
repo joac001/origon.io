@@ -195,21 +195,24 @@ void Effects::update(float dt, PhysicsWorld& physics) {
 }
 
 void Effects::submit(Renderer& renderer, const PhysicsWorld& physics) const {
-    for (const Particle& p : m_particles) {
+    for (size_t i = 0; i < m_particles.size(); ++i) {
+        const Particle& p = m_particles[i];
         const float fade = std::clamp(p.life / p.maxLife, 0.0f, 1.0f);
-        DrawItem item;
-        // Sparks are small cubes; smoke, dust and chips are rounded puffs.
-        item.mesh = p.emissive ? &renderer.cube() : &renderer.sphere();
-        item.model = glm::translate(glm::mat4(1.0f), p.position) * glm::scale(glm::mat4(1.0f), glm::vec3(p.size * (p.emissive ? 1.0f : std::sqrt(fade))));
-        item.castShadow = false;
+        // Soft camera-facing particles: sparks glow (additive), smoke and dust fade out as they
+        // spread, heavy chips (wood, blood) stay mostly opaque and small.
+        const float seed = std::fmod(static_cast<float>(i) * 0.6180339f + p.maxLife * 7.31f, 1.0f);
+        ParticleInstance instance;
         if (p.emissive) {
-            item.material.albedo = glm::vec3(0.0f);
-            item.material.emissive = p.color * fade;
+            instance.positionSize = glm::vec4(p.position, p.size * 0.9f);
+            instance.color = glm::vec4(p.color * fade, 0.0f);
+            instance.params = glm::vec4(0.0f, seed, 1.0f, 0.0f);
         } else {
-            item.material.albedo = p.color;
-            item.material.roughness = 1.0f;
+            const bool puff = p.gravity > -5.0f; // Floating smoke and dust.
+            instance.positionSize = glm::vec4(p.position, p.size * (puff ? 0.85f : 0.55f));
+            instance.color = glm::vec4(p.color, puff ? 0.4f * fade * std::min(1.0f, (p.maxLife - p.life) * 12.0f) : 0.95f * std::sqrt(fade));
+            instance.params = glm::vec4(seed * 6.2831853f, seed, 0.0f, 0.0f);
         }
-        renderer.submit(item);
+        renderer.submitParticle(instance);
     }
     for (const Tracer& t : m_tracers) {
         const float fade = 1.0f - t.age / kTracerLifetime;
@@ -224,13 +227,11 @@ void Effects::submit(Renderer& renderer, const PhysicsWorld& physics) const {
     for (const Flash& f : m_flashes) {
         const float fade = 1.0f - f.age / kFlashLifetime;
         renderer.addLight({f.position, 9.0f, glm::vec3(1.0f, 0.7f, 0.35f), 30.0f * fade});
-        DrawItem item;
-        item.mesh = &renderer.sphere();
-        item.model = glm::translate(glm::mat4(1.0f), f.position) * glm::scale(glm::mat4(1.0f), glm::vec3(0.12f + 0.1f * fade));
-        item.material.albedo = glm::vec3(0.0f);
-        item.material.emissive = glm::vec3(12.0f, 7.0f, 2.5f) * fade;
-        item.castShadow = false;
-        renderer.submit(item);
+        ParticleInstance glow;
+        glow.positionSize = glm::vec4(f.position, 0.07f + 0.1f * fade);
+        glow.color = glm::vec4(glm::vec3(12.0f, 7.0f, 2.5f) * fade, 0.0f);
+        glow.params = glm::vec4(0.0f, 0.5f, 1.0f, 0.0f);
+        renderer.submitParticle(glow);
     }
     for (const Debris& d : m_debris) {
         const BodyTransform t = physics.transform(d.body);
