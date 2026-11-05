@@ -1,5 +1,7 @@
 #include "App.h"
 
+#include "ui/Theme.h"
+
 #include "world/MapGenerator.h"
 
 #include "core/FileSystem.h"
@@ -116,7 +118,6 @@ App::App(const LaunchOptions& options) : m_options(options) {
     m_world.setTextureCache(&m_textures);
     m_sim = std::make_unique<Simulation>(m_physics, m_weapons);
     m_sim->setLocalLook(m_settings.look);
-    m_hud.setFonts(m_fontRegular, m_fontBold);
     m_mapFiles = listMaps();
     loadMap(options.map);
     m_window->setCursorCaptured(!options.autoplay);
@@ -160,29 +161,9 @@ void App::initImGui() {
     io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    const std::string regular = fs::resolve("assets/fonts/DejaVuSans.ttf").string();
-    const std::string bold = fs::resolve("assets/fonts/DejaVuSans-Bold.ttf").string();
-    m_fontRegular = io.Fonts->AddFontFromFileTTF(regular.c_str(), 16.0f);
-    m_fontBold = io.Fonts->AddFontFromFileTTF(bold.c_str(), 16.0f);
-    if (!m_fontRegular) m_fontRegular = io.Fonts->AddFontDefault();
-    if (!m_fontBold) m_fontBold = m_fontRegular;
-
-    ImGui::StyleColorsDark();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 6.0f;
-    style.FrameRounding = 4.0f;
-    style.GrabRounding = 4.0f;
-    style.WindowPadding = ImVec2(12, 10);
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.07f, 0.08f, 0.08f, 0.94f);
-    style.Colors[ImGuiCol_Header] = ImVec4(0.3f, 0.36f, 0.24f, 0.6f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.38f, 0.46f, 0.3f, 0.8f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.25f, 0.3f, 0.22f, 0.8f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.35f, 0.42f, 0.28f, 1.0f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.55f, 0.48f, 0.2f, 1.0f);
-    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.16f, 0.18f, 0.15f, 0.9f);
-    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.22f, 0.27f, 0.18f, 1.0f);
-    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.9f, 0.78f, 0.35f, 1.0f);
-    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.8f, 0.68f, 0.3f, 1.0f);
+    const ui::Fonts& fonts = ui::loadFontsAndStyle();
+    m_fontRegular = fonts.body;
+    m_fontBold = fonts.display;
 
     ImGui_ImplGlfw_InitForOpenGL(m_window->handle(), true);
     ImGui_ImplOpenGL3_Init("#version 450");
@@ -841,7 +822,7 @@ int App::run() {
             } else if (m_mode == Mode::Playing) {
                 const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
                 const bool scoped = m_sim->weaponFor(me).scoped && m_adsBlend > 0.9f;
-                m_hud.draw(*m_sim, dt, m_input.keyDown(GLFW_KEY_TAB) && !m_menuOpen, scoped);
+                m_hud.draw(*m_sim, dt, (m_input.keyDown(GLFW_KEY_TAB) || m_options.showScoreboard) && !m_menuOpen, scoped);
                 if (m_menuOpen) drawMenu();
             } else {
                 m_editor.drawUi();

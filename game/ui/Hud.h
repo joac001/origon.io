@@ -17,22 +17,21 @@ class Simulation;
 // In-game HUD. All player-facing text is Spanish.
 class Hud {
 public:
-    void setFonts(ImFont* regular, ImFont* bold) {
-        m_regular = regular;
-        m_bold = bold;
-    }
     void reset();
     void onEvents(const std::vector<GameEvent>& events, const Simulation& sim);
     void draw(const Simulation& sim, float dt, bool showScoreboard, bool aimingScoped);
 
 private:
     struct FeedEntry {
-        std::string text;
+        std::string killer;  // Empty: a death without a killer (falls, suicide) or a notice.
+        std::string weapon;
+        std::string victim;
+        bool killerLocal = false, victimLocal = false;
         float age = 0.0f;
-        bool involvesLocal = false;
     };
     struct Banner {
-        std::string text;
+        std::string title;  // Big tracked uppercase line.
+        std::string detail; // Smaller line under it.
         float age = 0.0f;
         float duration = 2.5f;
         unsigned color = 0xFFFFFFFF;
@@ -44,10 +43,8 @@ private:
     void drawBanners(float dt);
     void drawScoreboard(const Simulation& sim, bool matchOver);
     void drawDeathScreen(const Simulation& sim);
-    void pushBanner(const std::string& text, unsigned color, float duration = 2.5f);
-
-    ImFont* m_regular = nullptr;
-    ImFont* m_bold = nullptr;
+    void pushBanner(const std::string& title, const std::string& detail, unsigned color, float duration = 2.5f);
+    void drawConfirmations(float dt);
     std::deque<FeedEntry> m_feed;
     std::deque<Banner> m_banners;
     float m_hitMarker = 0.0f;
@@ -60,6 +57,12 @@ private:
     std::vector<DamageMarker> m_damageMarkers;
     void drawDamageMarkers(const Simulation& sim, float dt);
     int m_lastKillerId = -1;
+    std::string m_lastKillerWeapon;
+    struct Confirmation {
+        std::string text;
+        float age = 0.0f;
+    };
+    std::deque<Confirmation> m_confirmations; // "Eliminado X" notes under the crosshair.
 };
 
 } // namespace origon
