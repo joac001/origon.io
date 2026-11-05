@@ -964,6 +964,9 @@ void App::updatePlaying(float frameDt) {
                     }
                 }
             }
+            if (m_options.forceTier >= 0 && !m_net.isClient()) {
+                m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())].tier = m_options.forceTier;
+            }
             m_sim->tick(commands);
             const std::vector<GameEvent> events = m_sim->takeEvents();
             m_net.broadcastEvents(events);
@@ -1418,10 +1421,24 @@ bool App::submitViewArms(const glm::mat4& gunBase, const Model& gun, const Weapo
         handInGun[side] = glm::vec3(local[3]);
         handInGunRotation[side] = glm::normalize(glm::quat_cast(glm::mat3(local)));
     }
-    // Pistols and knives: the support hand cups the grip hand instead of reaching for a forend.
-    const bool oneHanded = weapon.isMelee() || weapon.category == WeaponCategory::Pistol;
-    if (oneHanded) handInGun[1] = handInGun[0] + glm::vec3(-0.05f, -0.03f, 0.02f);
+    // Pistols: the support hand wraps the grip hand from the left (mirror grip, fingers over the
+    // right hand's fingers) instead of reaching for a forend. Hand frames are given as finger and
+    // knuckle-line (index minus pinky) directions in weapon space, Blender axes as in gen_human.py
+    // (HOLD["l"] is the rest support grip), converted to model axes (x, z, -y).
+    auto handFrame = [](glm::vec3 fingers, glm::vec3 knuckles) {
+        const glm::vec3 f = glm::normalize(glm::vec3(fingers.x, fingers.z, -fingers.y));
+        glm::vec3 k(knuckles.x, knuckles.z, -knuckles.y);
+        k = glm::normalize(k - f * glm::dot(k, f));
+        return glm::mat3(f, k, glm::cross(f, k));
+    };
     (void)gun;
+    const bool melee = weapon.isMelee();
+    if (weapon.category == WeaponCategory::Pistol) {
+        const glm::mat3 rifleSupport = handFrame({0.55f, 0.75f, 0.1f}, {-0.75f, 0.55f, 0.0f});
+        const glm::mat3 pistolSupport = handFrame({0.35f, 0.75f, -0.55f}, {0.0f, 0.55f, 0.8f});
+        handInGunRotation[1] = glm::normalize(glm::quat_cast(pistolSupport * glm::transpose(rifleSupport)) * handInGunRotation[1]);
+        handInGun[1] = glm::vec3(-0.055f, -0.045f, 0.06f); // Blender (-0.055, -0.06, -0.045).
+    }
     const glm::vec3 poles[2] = {glm::vec3(1.0f, -0.6f, 0.3f), glm::vec3(-0.6f, -1.0f, 0.1f)};
     for (int side = 0; side < 2; ++side) {
         const glm::vec3 target(gunModel * glm::vec4(handInGun[side], 1.0f));
@@ -1452,7 +1469,7 @@ bool App::submitViewArms(const glm::mat4& gunBase, const Model& gun, const Weapo
     sk.evaluate(pose, globals, skin);
     // Only arm-weighted geometry is drawn (the shader discards the rest), cut cleanly at the shoulders.
     unsigned armMask = 0;
-    for (int side = 0; side < 2; ++side) {
+    for (int side = 0; side < (melee ? 1 : 2); ++side) { // Knives: the free arm stays out of view.
         for (int joint : {j.upper[side], j.fore[side], j.hand[side]}) {
             if (joint >= 0 && joint < 32) armMask |= 1u << static_cast<unsigned>(joint);
         }

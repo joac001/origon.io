@@ -41,16 +41,17 @@ struct LaunchOptions {
     bool hideUi = false;
     bool forceTitle = false; // Show the title screen even in capture mode.
     int followPlayer = -1;   // Third-person spectator camera behind this player.
-    bool poseGallery = false; // Debug: a row of soldiers in front of the fixed camera, one per clip.
-    int lookGallery = -1;
-    bool weaponGallery = false;
-    bool forceAds = false;      // Debug: the local player aims down sights (view model captures). // Debug: all weapons in profile in front of the fixed camera.
-    int pressPlayFrame = 0;
-    int forceLod = -1;
+    bool poseGallery = false;  // Debug: a row of soldiers in front of the fixed camera, one per clip.
+    int lookGallery = -1;      // Debug: five random looks (from this seed) standing close to the fixed camera.
+    bool weaponGallery = false; // Debug: all weapons in profile in front of the fixed camera.
+    bool forceAds = false;     // Debug: the local player aims down sights (view model captures).
+    int forceTier = -1;        // Debug: the local player holds this ladder weapon (view model captures).
+    int pressPlayFrame = 0;    // Test: press "Jugar contra bots" on the title screen at this frame.
+    int forceLod = -1;         // Debug: draw characters at this LOD regardless of distance.
     std::string recordFolder;  // Debug: save frames to PNGs (fixed 60 Hz simulation step per frame).
-    int recordFrames = 0;         // Debug: draw characters at this LOD regardless of distance.
+    int recordFrames = 0;
     int botCount = -1;         // >= 0: overrides the saved bot count for this run.
-    float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.   // Test: press "Jugar contra bots" on the title screen at this frame.     // Debug: five random looks (from this seed) standing close to the fixed camera.
+    float benchSeconds = 0.0f; // > 0: measure frame times with vsync off for this long, log them and quit.
     std::string dumpSounds;  // Write the synthesized sound bank as WAV files here.
     // Photo mode: fixed camera (position, yaw/pitch degrees) and offscreen capture size.
     bool fixedCamera = false;
