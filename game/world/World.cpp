@@ -1,5 +1,7 @@
 #include "world/World.h"
 
+#include "core/Log.h"
+
 #include "physics/PhysicsWorld.h"
 #include "render/Texture.h"
 
@@ -62,6 +64,34 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
     if (m_models && terrain.valid() && m_vegetationEnabled) {
         m_vegetation.build(m_map, *m_models, physics);
     }
+    m_scenery.clear();
+    if (m_models) {
+        for (const SceneryData& item : m_map.scenery) {
+            Model* model = m_models->getScenery(item.model);
+            if (!model) {
+                log::warn("Scenery model missing: {}", item.model);
+                continue;
+            }
+            const glm::quat rotation = glm::angleAxis(glm::radians(item.yawDegrees), glm::vec3(0, 1, 0));
+            if (item.trunkRadius > 0.0f) {
+                // Cylinder colliders run along local Z: stand it up.
+                const glm::quat upright = rotation * glm::angleAxis(glm::half_pi<float>(), glm::vec3(1, 0, 0));
+                physics.addStaticBox(item.position + glm::vec3(0.0f, item.trunkHeight * 0.5f, 0.0f),
+                                     glm::vec3(item.trunkRadius, item.trunkRadius, item.trunkHeight * 0.5f) * item.scale, upright, true);
+            } else if (const ShapeHandle shape = m_models->sceneryShape(item.model, physics); shape >= 0) {
+                physics.addStaticShape(shape, item.position, rotation, item.scale);
+            }
+            if (m_headless) continue;
+            SceneryInstance instance;
+            instance.model = model;
+            instance.transform = glm::translate(glm::mat4(1.0f), item.position) * glm::mat4_cast(rotation) *
+                                 glm::scale(glm::mat4(1.0f), glm::vec3(item.scale));
+            const glm::vec3 localCenter = (model->boundsMin() + model->boundsMax()) * 0.5f;
+            instance.center = glm::vec3(instance.transform * glm::vec4(localCenter, 1.0f));
+            instance.radius = glm::length(model->boundsMax() - model->boundsMin()) * 0.5f * item.scale;
+            m_scenery.push_back(instance);
+        }
+    }
     for (const BlockData& block : m_map.blocks) {
         const BodyHandle body = block.dynamic
                                     ? physics.addDynamicBox(block.position, block.size * 0.5f, block.orientation(), block.mass,
@@ -70,6 +100,48 @@ void World::build(const MapData& map, PhysicsWorld& physics) {
         m_blockBodies.push_back(body);
     }
     physics.optimize();
+}
+
+void World::submitScenery(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera, float lodBias) const {
+    glm::vec4 planes[6];
+    const glm::mat4 m = glm::transpose(viewProj);
+    planes[0] = m[3] + m[0];
+    planes[1] = m[3] - m[0];
+    planes[2] = m[3] + m[1];
+    planes[3] = m[3] - m[1];
+    planes[4] = m[3] + m[2];
+    planes[5] = m[3] - m[2];
+    for (glm::vec4& plane : planes) plane /= glm::length(glm::vec3(plane));
+    for (const SceneryInstance& instance : m_scenery) {
+        bool visible = true;
+        for (const glm::vec4& plane : planes) {
+            if (glm::dot(glm::vec3(plane), instance.center) + plane.w < -instance.radius) {
+                visible = false;
+                break;
+            }
+        }
+        const float distance = std::max(0.0f, glm::length(instance.center - camera) - instance.radius);
+        // Off-screen scenery close by still throws shadows into the view (tall buildings behind you).
+        if (!visible && distance > 120.0f) continue;
+        const int lodCount = instance.model->lodCount();
+        int lod = distance < 45.0f * lodBias ? 0 : distance < 140.0f * lodBias ? 1 : 2;
+        if (!visible) lod = 2;
+        lod = std::min(lod, std::max(lodCount - 1, 0));
+        for (const ModelPart& part : instance.model->lod(lod)) {
+            DrawItem item;
+            item.mesh = &part.mesh;
+            item.material = part.material;
+            item.model = instance.transform;
+            if (instance.model->hasFoliage()) {
+                // Trees go through the instanced path (foliage shading: two-sided, translucency).
+                item.instances = &instance.transform;
+                item.instanceCount = 1;
+            }
+            item.shadowOnly = !visible;
+            item.shadowCascades = visible ? 4 : 3;
+            renderer.submit(item);
+        }
+    }
 }
 
 void World::submit(Renderer& renderer, const PhysicsWorld& physics) const {
@@ -159,7 +231,7 @@ Environment World::environment() const {
     env.ambientIntensity = e.ambientIntensity;
     env.fogColor = toLinear(e.fogColor);
     env.fogDensity = e.fogDensity;
-    env.volumetricDensity = std::max(e.fogDensity * 1.3f, 0.003f);
+    env.volumetricDensity = e.fogDensity * 1.3f; // Clear city air stays clear; forests set their own haze.
     env.groundHeight = m_map.terrain.valid() ? m_map.terrain.heightAt(0.0f, 0.0f) : 0.0f;
     return env;
 }

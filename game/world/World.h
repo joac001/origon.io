@@ -25,6 +25,8 @@ public:
     void setHeadless(bool headless) { m_headless = headless; }
     void submitVegetation(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera,
                           const VegetationSettings& settings) const;
+    // Static scenery models: frustum culled (off-screen ones nearby still cast shadows), LOD by distance.
+    void submitScenery(Renderer& renderer, const glm::mat4& viewProj, const glm::vec3& camera, float lodBias) const;
     const VegetationField& vegetation() const { return m_vegetation; }
     // Bodies of dynamic map props, in block order (for network replication).
     std::vector<BodyHandle> dynamicBodies() const;
@@ -47,6 +49,13 @@ private:
     bool m_headless = false;
     VegetationField m_vegetation;
     std::vector<BodyHandle> m_blockBodies; // One per block.
+    struct SceneryInstance {
+        const Model* model = nullptr;
+        glm::mat4 transform{1.0f};
+        glm::vec3 center{0.0f}; // World bounding sphere.
+        float radius = 1.0f;
+    };
+    std::vector<SceneryInstance> m_scenery;
 };
 
 } // namespace origon

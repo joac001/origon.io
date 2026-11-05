@@ -53,6 +53,38 @@
     {
       "id": "metal_plate",
       "use": "weapon metal"
+    },
+    {
+      "id": "asphalt_02",
+      "use": "city streets (Plaza de Mayo)"
+    },
+    {
+      "id": "concrete_pavement",
+      "use": "sidewalks"
+    },
+    {
+      "id": "granite_tile",
+      "use": "plaza walkways"
+    },
+    {
+      "id": "white_stucco",
+      "use": "colonial and neoclassical facades"
+    },
+    {
+      "id": "painted_plaster_wall",
+      "use": "city facades"
+    },
+    {
+      "id": "grey_plaster",
+      "use": "city facades"
+    },
+    {
+      "id": "marble_01",
+      "use": "monuments and cornices"
+    },
+    {
+      "id": "rectangular_paving",
+      "use": "plaza squares"
     }
   ],
   "atlases": {

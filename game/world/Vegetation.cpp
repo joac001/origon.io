@@ -96,6 +96,30 @@ Model* ModelLibrary::getWeapon(const std::string& id) {
     return raw;
 }
 
+Model* ModelLibrary::getScenery(const std::string& path) {
+    auto it = m_scenery.find(path);
+    if (it != m_scenery.end()) return it->second.get();
+    auto model = std::make_unique<Model>();
+    if (!model->load(std::filesystem::path("assets/models") / (path + ".glb"), m_textures)) {
+        m_scenery.emplace(path, nullptr);
+        return nullptr;
+    }
+    Model* raw = model.get();
+    m_scenery.emplace(path, std::move(model));
+    return raw;
+}
+
+ShapeHandle ModelLibrary::sceneryShape(const std::string& path, PhysicsWorld& physics) {
+    auto it = m_sceneryShapes.find(path);
+    if (it != m_sceneryShapes.end()) return it->second;
+    ShapeHandle handle = -1;
+    if (Model* model = getScenery(path); model && !model->collisionIndices().empty()) {
+        handle = physics.createMeshShape(model->collisionVertices(), model->collisionIndices());
+    }
+    m_sceneryShapes.emplace(path, handle);
+    return handle;
+}
+
 ShapeHandle ModelLibrary::collisionShape(const std::string& name, PhysicsWorld& physics) {
     auto it = m_shapes.find(name);
     if (it != m_shapes.end()) {

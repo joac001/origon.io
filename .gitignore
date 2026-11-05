@@ -7,3 +7,4 @@ screenshots/
 assets/textures/*/
 !assets/textures/foliage/
 __pycache__/
+assets/models/maps/

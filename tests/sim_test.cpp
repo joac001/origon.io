@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <cstdlib>
 #include <vector>
@@ -235,6 +236,47 @@ void testOutdoorMatch(const WeaponDatabase& weapons, const char* name) {
     check(aboveGround, "living players stay on the terrain");
 }
 
+// City map: generated scenery (collision from the chunks' _COL meshes). Skipped when the chunks have not
+// been generated (tools/blender/gen_plaza.py; they are not committed).
+void testCityMatch(const WeaponDatabase& weapons) {
+    auto map = MapData::load(fs::resolve("maps/plaza_de_mayo.json"));
+    if (!map || map->scenery.empty() || !std::filesystem::exists(fs::resolve("assets/models/" + map->scenery.front().model + ".glb"))) {
+        std::printf("       plaza_de_mayo: scenery not generated, skipped\n");
+        return;
+    }
+    PhysicsWorld physics;
+    ModelLibrary library(nullptr);
+    World world;
+    world.setHeadless(true);
+    world.setModelLibrary(&library);
+    world.build(*map, physics);
+    Simulation sim(physics, weapons);
+    sim.startMatch(world.map(), 9);
+    sim.players()[0].isBot = true;
+    std::vector<PlayerCommand> commands;
+    int kills = 0;
+    int tick = 0;
+    bool grounded = true, inside = true;
+    const int maxTicks = static_cast<int>(weapons.rules().timeLimitSeconds * kTickRate) + 300;
+    for (; tick < maxTicks && sim.gunGame().phase() == GunGame::Phase::Playing; ++tick) {
+        sim.computeBotCommands(commands);
+        sim.tick(commands);
+        for (const GameEvent& e : sim.takeEvents()) {
+            if (e.type == GameEvent::Type::Kill) ++kills;
+        }
+        for (const Player& p : sim.players()) {
+            if (!p.alive) continue;
+            if (p.position.y < -1.0f) grounded = false;
+            if (std::abs(p.position.x) > 300.0f || std::abs(p.position.z) > 260.0f) inside = false;
+        }
+    }
+    std::printf("       plaza_de_mayo match: %.1f s, %d kills\n", static_cast<float>(tick) / kTickRate, kills);
+    check(sim.gunGame().phase() == GunGame::Phase::Finished, "city match finishes");
+    check(kills > 20, "bots fight in the city");
+    check(grounded, "nobody falls through the city ground");
+    check(inside, "the barriers keep everyone inside the map");
+}
+
 } // namespace
 
 int main() {
@@ -247,6 +289,7 @@ int main() {
     testOutdoorMatch(weapons, "bosque");
     testOutdoorMatch(weapons, "aserradero");
     testProceduralMaps(weapons);
+    testCityMatch(weapons);
     std::printf("%s (%d failures)\n", g_failures == 0 ? "ALL PASSED" : "FAILED", g_failures);
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

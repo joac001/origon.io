@@ -181,6 +181,16 @@ std::optional<MapData> MapData::fromJson(const std::string& text) {
             block.texture = b.value("texture", std::string());
             map.blocks.push_back(block);
         }
+        for (const json& e : root.value("scenery", json::array())) {
+            SceneryData item;
+            item.model = e.value("model", std::string());
+            item.position = readVec3(e, "pos", item.position);
+            item.yawDegrees = e.value("yaw", 0.0f);
+            item.scale = e.value("scale", 1.0f);
+            item.trunkRadius = e.value("trunk", 0.0f);
+            item.trunkHeight = e.value("trunk_height", item.trunkHeight);
+            if (!item.model.empty()) map.scenery.push_back(item);
+        }
         for (const json& s : root.value("spawns", json::array())) {
             SpawnData spawn;
             spawn.position = readVec3(s, "pos", spawn.position);
@@ -195,8 +205,8 @@ std::optional<MapData> MapData::fromJson(const std::string& text) {
             light.radius = l.value("radius", light.radius);
             map.lights.push_back(light);
         }
-        log::info("Map loaded: {} ({} blocks, {} spawns, {} lights)", map.name, map.blocks.size(),
-                  map.spawns.size(), map.lights.size());
+        log::info("Map loaded: {} ({} blocks, {} scenery, {} spawns, {} lights)", map.name, map.blocks.size(),
+                  map.scenery.size(), map.spawns.size(), map.lights.size());
         return map;
     } catch (const std::exception& e) {
         log::error("Map parse error: {}", e.what());
@@ -267,6 +277,20 @@ std::string MapData::toJson() const {
         blockArray.push_back(block);
     }
     root["blocks"] = blockArray;
+    if (!scenery.empty()) {
+        json sceneryArray = json::array();
+        for (const SceneryData& e : scenery) {
+            json item = {{"model", e.model}, {"pos", writeVec3(e.position)}};
+            if (e.yawDegrees != 0.0f) item["yaw"] = e.yawDegrees;
+            if (e.scale != 1.0f) item["scale"] = e.scale;
+            if (e.trunkRadius > 0.0f) {
+                item["trunk"] = e.trunkRadius;
+                item["trunk_height"] = e.trunkHeight;
+            }
+            sceneryArray.push_back(item);
+        }
+        root["scenery"] = sceneryArray;
+    }
     json spawnArray = json::array();
     for (const SpawnData& s : spawns) {
         spawnArray.push_back({{"pos", writeVec3(s.position)}, {"yaw", s.yawDegrees}});

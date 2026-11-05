@@ -46,12 +46,16 @@ Material resolveMaterial(const cgltf_material* source, TextureCache* textures, b
         material.metallic = 0.0f;
         foliage = true;
     } else if (startsWith("bark_") || startsWith("rock_") || startsWith("pbr_")) {
-        const std::string id = name.substr(name.find('_') + 1);
+        // pbr_<id>[@variant]: the base color is kept as a tint (one texture set, many paint colors).
+        std::string id = name.substr(name.find('_') + 1);
+        const bool tinted = startsWith("pbr_");
+        if (const size_t at = id.find('@'); at != std::string::npos) id = id.substr(0, at);
+        if (const size_t dot = id.find('.'); dot != std::string::npos) id = id.substr(0, dot); // Blender duplicates (.001).
         const std::filesystem::path folder = std::filesystem::path("assets/textures") / id;
         material.albedoMap = textures->load(folder / "albedo.jpg", true).id;
         material.normalMap = textures->load(folder / "normal.jpg", false).id;
         material.armMap = textures->load(folder / "arm.jpg", false).id;
-        material.albedo = glm::vec3(1.0f);
+        if (!tinted) material.albedo = glm::vec3(1.0f);
         material.roughness = 0.8f;
         material.metallic = 0.0f;
     }

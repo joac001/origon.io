@@ -790,6 +790,7 @@ int App::run() {
         vegetation.density = m_settings.vegetationDensity;
         vegetation.distance = m_settings.vegetationDistance;
         m_world.submitVegetation(m_renderer, m_renderer.projection(camera) * camera.view, camera.position, vegetation);
+        m_world.submitScenery(m_renderer, m_renderer.projection(camera) * camera.view, camera.position, vegetation.lodBias);
         const auto tRender = Clock::now();
         m_renderer.render(camera, environment);
         const auto tUi = Clock::now();

@@ -46,11 +46,16 @@ public:
     // Weapon models: assets/models/weapons/<id>.glb (nullptr when missing).
     Model* getWeapon(const std::string& id);
     ShapeHandle collisionShape(const std::string& name, PhysicsWorld& physics);
+    // Scenery models: assets/models/<path>.glb (path may contain folders, e.g. "maps/plaza_de_mayo/chunk_03").
+    Model* getScenery(const std::string& path);
+    ShapeHandle sceneryShape(const std::string& path, PhysicsWorld& physics);
 
 private:
     TextureCache* m_textures;
     std::map<std::string, std::unique_ptr<Model>> m_models;
     std::map<std::string, ShapeHandle> m_shapes;
+    std::map<std::string, std::unique_ptr<Model>> m_scenery;
+    std::map<std::string, ShapeHandle> m_sceneryShapes;
 };
 
 struct VegetationSettings {

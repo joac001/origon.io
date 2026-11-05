@@ -31,6 +31,17 @@ struct BlockData {
     glm::quat orientation() const;
 };
 
+// Static scenery: a model from assets/models/<model>.glb (city chunks, monuments, single trees).
+// Collision comes from the model's _COL mesh, or a vertical cylinder when trunkRadius > 0.
+struct SceneryData {
+    std::string model;
+    glm::vec3 position{0.0f};
+    float yawDegrees = 0.0f;
+    float scale = 1.0f;
+    float trunkRadius = 0.0f;
+    float trunkHeight = 4.0f;
+};
+
 struct SpawnData {
     glm::vec3 position{0.0f}; // Feet position.
     float yawDegrees = 0.0f;
@@ -62,6 +73,7 @@ struct MapData {
     TerrainData terrain;
     std::vector<VegetationLayer> vegetation;
     std::vector<BlockData> blocks;
+    std::vector<SceneryData> scenery;
     std::vector<SpawnData> spawns;
     std::vector<LightData> lights;
 
