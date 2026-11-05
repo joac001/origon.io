@@ -713,6 +713,14 @@ int App::run() {
                                           glm::vec3(0, 1, 0));
                 camera.fovYDegrees = m_settings.fov;
             }
+            if (m_options.gaitTest && m_options.fixedCamera && m_gaitFeet != glm::vec3(0.0f)) {
+                // Tracking shot: the camera keeps its position across the path, turned toward the soldier.
+                const glm::vec3 target = m_gaitFeet + glm::vec3(0.0f, 0.95f, 0.0f);
+                const glm::vec3 back = glm::normalize(camera.position - target);
+                camera.position = target + back * 3.6f + glm::vec3(0.0f, 0.15f, 0.0f);
+                camera.view = glm::lookAt(camera.position, target, glm::vec3(0, 1, 0));
+                camera.fovYDegrees = 55.0f;
+            }
             // Character tab: look at a preview soldier standing in front of the camera, right of the menu.
             const bool preview = m_characterPreviewShown && m_menuOpen && !m_titleScreen;
             Player previewSoldier;
@@ -746,6 +754,7 @@ int App::run() {
                           m_options.fixedCamera || m_options.followPlayer >= 0);
             if (preview) submitSoldier(previewSoldier, 1.0f);
             m_effects.submit(m_renderer, m_physics);
+            if (m_options.gaitTest && m_options.fixedCamera) submitGaitTest(dt);
             if (m_options.poseGallery && m_options.fixedCamera) {
                 submitPoseGallery(m_options.cameraPosition, glm::radians(m_options.cameraYaw));
             }
@@ -1199,16 +1208,19 @@ void App::submitSoldier(const Player& p, float alpha) {
     // In the air: tucked legs.
     if (rig.jump >= 0 && l.airWeight > 0.01f) SkinnedModel::blend(pose, clipAt(rig.jump, 0.0f), l.airWeight * 0.9f);
     // Upper-body actions layered over locomotion.
+    float actionWeight = 0.0f;
     if (p.reloadTimer > 0.0f && weapon.reloadSeconds > 0.0f && rig.reload >= 0) {
         const float progress = std::clamp(1.0f - p.reloadTimer / weapon.reloadSeconds, 0.0f, 0.999f);
         SkinnedModel::Pose reload = sk.restPose();
         sk.sample(rig.reload, progress * sk.clipDuration(rig.reload), reload);
+        actionWeight = std::max(actionWeight, clipEnvelope(progress, 0.08f));
         SkinnedModel::blend(pose, reload, clipEnvelope(progress, 0.08f), rig.upperBody);
     }
     if (p.meleeAnimation > 0.0f && rig.knife >= 0) {
         const float progress = std::clamp(1.0f - p.meleeAnimation / 0.3f, 0.0f, 0.999f);
         SkinnedModel::Pose knife = sk.restPose();
         sk.sample(rig.knife, progress * sk.clipDuration(rig.knife), knife);
+        actionWeight = std::max(actionWeight, clipEnvelope(progress, 0.1f));
         SkinnedModel::blend(pose, knife, clipEnvelope(progress, 0.1f), rig.upperBody);
     }
     // Legs face the direction of travel; spine and chest turn back so the upper body keeps aiming.
@@ -1217,9 +1229,31 @@ void App::submitSoldier(const Player& p, float alpha) {
         sk.rotateJoint(pose, rig.spine, glm::vec3(0, 1, 0), l.legYaw * 0.5f);
         sk.rotateJoint(pose, rig.chest, glm::vec3(0, 1, 0), l.legYaw * 0.5f);
     }
-    // Aim: bend the spine and chest toward the view pitch (positive pitch leans back = looks up).
-    sk.rotateJoint(pose, rig.spine, glm::vec3(1, 0, 0), p.pitch * 0.45f);
-    sk.rotateJoint(pose, rig.chest, glm::vec3(1, 0, 0), p.pitch * 0.45f);
+    // Aim: the spine and chest bend (half each) so the weapon points where the player looks, whatever
+    // lean the clips carry (running leans forward, crouching sits back). Upper-body actions (reload,
+    // knife) keep their own motion. Model space faces -Z; positive pitch looks up.
+    const glm::vec3 aim(0.0f, std::sin(p.pitch), -std::cos(p.pitch));
+    const float aimWeight = 1.0f - actionWeight;
+    for (int joint : {rig.spine, rig.chest}) {
+        if (joint < 0 || aimWeight < 0.01f) break;
+        sk.evaluate(pose, m_soldierGlobals, m_aimScratch);
+        const glm::vec3 current = glm::normalize(glm::mat3(weaponAttachment(sk, m_soldierGlobals)) * glm::vec3(0, 0, -1));
+        const glm::vec3 axis = glm::cross(current, aim);
+        const float sine = glm::length(axis);
+        if (sine < 1e-4f) break;
+        const float angle = std::atan2(sine, glm::dot(current, aim)) * aimWeight * (joint == rig.spine ? 0.5f : 1.0f);
+        sk.rotateJoint(pose, joint, axis / sine, angle);
+    }
+    // Gait life on top of the aim: the shoulders counter-rotate against the hips (right shoulder back
+    // at the right heel strike, phase 0) and the chest rolls toward the stance leg twice per cycle.
+    if (rig.chest >= 0 && l.moveWeight > 0.01f) {
+        const float weight = l.moveWeight * aimWeight * (1.0f - 0.5f * crouch);
+        const float twist = glm::radians(glm::mix(4.0f, 7.0f, l.runWeight));
+        const float roll = glm::radians(glm::mix(1.5f, 2.5f, l.runWeight));
+        const float cycle = glm::two_pi<float>() * l.phase;
+        sk.rotateJoint(pose, rig.chest, glm::vec3(0, 1, 0), -twist * std::cos(cycle) * weight * l.direction);
+        sk.rotateJoint(pose, rig.chest, glm::vec3(0, 0, -1), roll * std::sin(2.0f * cycle) * weight);
+    }
 
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), p.yaw, glm::vec3(0, 1, 0));
     const glm::vec3 tint = World::toLinear(p.color);
@@ -1346,6 +1380,60 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
         const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
         if (const Model* gun = m_models.getWeapon("garand")) submitModel(*gun, model * weaponAttachment(sk, globals));
     }
+}
+
+void App::submitGaitTest(float dt) {
+    if (!m_soldierReady) return;
+    // Script: (seconds, speed along the camera's right axis, facing: 0 travel direction, 1 camera, 2 +right).
+    struct Segment {
+        float seconds, speed;
+        int facing;
+        bool crouch;
+    };
+    static const Segment script[] = {{1.5f, 0.0f, 2, false}, {2.5f, 1.8f, 0, false},  {1.8f, -5.0f, 0, false},
+                                     {2.25f, 2.0f, 1, false}, {2.8f, -1.6f, 2, false}, {3.0f, 1.5f, 0, true}};
+    float total = 0.0f;
+    for (const Segment& s : script) total += s.seconds;
+    m_gaitTime = std::fmod(m_gaitTime + dt, total);
+    const Segment* segment = &script[0];
+    for (float t = m_gaitTime; const Segment& s : script) {
+        segment = &s;
+        if (t < s.seconds) break;
+        t -= s.seconds;
+    }
+    const float yawCamera = glm::radians(m_options.cameraYaw);
+    const glm::vec3 forward = viewDirection(yawCamera, 0.0f);
+    const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
+    const float previous = m_gaitOffset;
+    m_gaitOffset = std::clamp(m_gaitOffset + segment->speed * dt, -4.6f, 4.6f);
+    if (m_gaitTime < dt) m_gaitOffset = 0.0f;
+
+    Player p;
+    p.id = static_cast<int>(m_sim->players().size());
+    p.tier = 11;
+    p.alive = true;
+    auto feetAt = [&](float offset) {
+        glm::vec3 feet = m_options.cameraPosition + forward * 5.0f + right * offset;
+        feet.y = m_world.terrainHeight(feet.x, feet.z);
+        return feet;
+    };
+    p.previousPosition = feetAt(previous);
+    p.position = feetAt(m_gaitOffset);
+    p.velocity = right * segment->speed;
+    p.onGround = true;
+    p.eyeHeight = segment->crouch ? kCrouchEyeHeight : kEyeHeight;
+    const glm::vec3 facing = segment->facing == 1 ? -forward
+                             : segment->facing == 2 || segment->speed == 0.0f ? right
+                                                                              : right * (segment->speed > 0.0f ? 1.0f : -1.0f);
+    p.yaw = std::atan2(-facing.x, -facing.z);
+    p.pitch = 0.0f;
+    p.reloadTimer = p.meleeAnimation = p.spawnProtection = 0.0f;
+    p.look = CharacterLook::random(7);
+    updateLocomotion(m_gaitLocomotion, p, dt);
+    if (m_locomotion.size() <= static_cast<size_t>(p.id)) m_locomotion.resize(static_cast<size_t>(p.id) + 1);
+    m_locomotion[static_cast<size_t>(p.id)] = m_gaitLocomotion;
+    m_gaitFeet = p.position;
+    submitSoldier(p, 1.0f);
 }
 
 void App::submitLookGallery(const glm::vec3& eye, float yaw, int seed) {

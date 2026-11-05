@@ -44,6 +44,7 @@ struct LaunchOptions {
     bool poseGallery = false;  // Debug: a row of soldiers in front of the fixed camera, one per clip.
     int lookGallery = -1;      // Debug: five random looks (from this seed) standing close to the fixed camera.
     bool weaponGallery = false; // Debug: all weapons in profile in front of the fixed camera.
+    bool gaitTest = false;     // Debug: a soldier walks, runs, strafes, backs up and crouches across the fixed camera.
     bool forceAds = false;     // Debug: the local player aims down sights (view model captures).
     int forceTier = -1;        // Debug: the local player holds this ladder weapon (view model captures).
     int pressPlayFrame = 0;    // Test: press "Jugar contra bots" on the title screen at this frame.
@@ -178,6 +179,12 @@ private:
     };
     std::vector<Locomotion> m_locomotion;
     void updateLocomotion(Locomotion& l, const Player& p, float dt);
+    // --gait-test: scripted soldier (real locomotion blending) in front of the fixed camera.
+    float m_gaitTime = 0.0f;
+    float m_gaitOffset = 0.0f;
+    glm::vec3 m_gaitFeet{0.0f}; // Last drawn position: the test camera tracks it.
+    Locomotion m_gaitLocomotion;
+    void submitGaitTest(float dt);
     std::array<SkinnedModel, 2> m_soldiers; // Male, female (tools/blender/gen_human.py).
     bool m_soldierReady = false;
     bool m_soldierFemale = false;
@@ -187,6 +194,7 @@ private:
     glm::vec3 m_lodView{0.0f}; // Camera of the frame being built (character LOD selection).
     float m_lodFov = 80.0f;
     std::vector<glm::mat4> m_soldierGlobals; // Scratch: joint globals of the last drawn soldier.
+    std::vector<glm::mat4> m_aimScratch;
     std::vector<std::vector<glm::mat4>> m_skinBuffers;
     void submitSoldier(const Player& p, float alpha);
     const std::vector<glm::mat4>& drawSoldierPose(const SkinnedModel::Pose& pose, const glm::mat4& model,

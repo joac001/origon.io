@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
         else if (arg == "--ads") options.forceAds = true;
         else if (arg == "--tier") options.forceTier = std::atoi(next().c_str());
         else if (arg == "--weapon-gallery") options.weaponGallery = true;
+        else if (arg == "--gait-test") options.gaitTest = true;
         else if (arg == "--look-gallery") options.lookGallery = std::atoi(next().c_str());
         else if (arg == "--dump-sounds") options.dumpSounds = next();
         else if (arg == "--screenshot") options.screenshotPath = next();
