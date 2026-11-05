@@ -257,9 +257,11 @@ def build_headgear(rig_bones, pieces=None):
     shell = Matrix.Identity(3)
 
     def helmet(name, outer, mat, stretch=1.1):
+        # Worn tipped back (front rim up over the brows, the back down over the nape), so the eyes
+        # stay clear under the brim.
         inner = [(r * 0.93, z - 0.008) for r, z in reversed(outer)]
-        return piece(name).add(lathe(outer + inner, (0.0, c.y - 0.008, c.z + 0.058), scale=(1.03, 1.03 * stretch, 1.03),
-                                     segments=24),
+        return piece(name).add(lathe(outer + inner, (0.0, c.y - 0.012, c.z + 0.07), scale=(1.03, 1.03 * stretch, 1.03),
+                                     segments=24, rotation=Matrix.Rotation(math.radians(12), 3, "X")),
                                mat, HEAD_BONES, rig_bones)
 
     helmet("x_headwear_helmet", [(0.0, 0.13), (0.06, 0.125), (0.105, 0.1), (0.13, 0.06), (0.142, 0.015), (0.146, -0.012),
