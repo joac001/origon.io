@@ -187,6 +187,26 @@ def add_animations(rig):
     make_action(rig, "jump", [(1, air, -0.04), (11, air, -0.05)])
     # Crouch: hips down, knees bent.
     make_action(rig, "crouch", [(1, crouch, -0.4), (31, crouch, -0.41)])
+    # Prone: lying face down, chest propped up, head up; the hips sit behind the feet position so the
+    # head ends up ahead of it (the game puts the eye there). The engine raises the rifle to the aim.
+    prone = {"hips": (-86, 0, 0), "spine": (9, 0, 0), "chest": (9, 0, 0), "neck": (22, 0, 0), "head": (24, 0, 0),
+             "thigh.R": (-4, 0, -6), "thigh.L": (-4, 0, 6), "shin.R": (-4, 0, 0), "shin.L": (-8, 0, 0),
+             "foot.R": (-50, 0, 0), "foot.L": (-50, 0, 0)}
+    make_action(rig, "prone", [(1, prone, -0.79, 0.15), (61, dict(prone, chest=(10, 0, 0)), -0.79, 0.15)])
+
+    def prone_crawl(p):
+        pose = dict(prone)
+        for side, offset, sign in (("R", 0.0, -1), ("L", 0.5, 1)):
+            q = (p + offset) % 1.0
+            pull = 0.5 - 0.5 * math.cos(2 * math.pi * q)  # Knee drawn up to the side, then pushed back.
+            pose[f"thigh.{side}"] = (-4 + 16 * pull, 0, sign * (6 + 30 * pull))
+            pose[f"shin.{side}"] = (-6 - 38 * pull, 0, 0)
+        c = math.cos(2 * math.pi * p)
+        pose["hips"] = (-86, 6 * c, 0)
+        pose["spine"] = (9, -4 * c, 0)
+        return pose, -0.79, 0.15
+
+    cycle("prone_crawl", 40, prone_crawl)  # 1.33 s per cycle.
 
     # Reload (1 s, the engine scales it to the weapon's reload time): left hand drops to the belt
     # pouch, brings a magazine back to the gun, then the right hand works the action.

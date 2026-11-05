@@ -47,6 +47,7 @@ struct LaunchOptions {
     bool gaitTest = false;     // Debug: a soldier walks, runs, strafes, backs up and crouches across the fixed camera.
     bool forceAds = false;     // Debug: the local player aims down sights (view model captures).
     int forceTier = -1;        // Debug: the local player holds this ladder weapon (view model captures).
+    uint32_t holdButtons = 0;  // Debug: buttons held by the local player (--hold lean-left,lean-right,prone,crouch).
     int pressPlayFrame = 0;    // Test: press "Jugar contra bots" on the title screen at this frame.
     int forceLod = -1;         // Debug: draw characters at this LOD regardless of distance.
     std::string recordFolder;  // Debug: save frames to PNGs (fixed 60 Hz simulation step per frame).
@@ -182,6 +183,8 @@ private:
     // --gait-test: scripted soldier (real locomotion blending) in front of the fixed camera.
     float m_gaitTime = 0.0f;
     float m_gaitOffset = 0.0f;
+    float m_gaitLean = 0.0f;
+    float m_gaitProne = 0.0f;
     glm::vec3 m_gaitFeet{0.0f}; // Last drawn position: the test camera tracks it.
     Locomotion m_gaitLocomotion;
     void submitGaitTest(float dt);

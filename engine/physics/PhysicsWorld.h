@@ -42,6 +42,8 @@ struct CharacterDesc {
     float radius = 0.4f;
     float height = 1.8f;       // Standing height, feet to top.
     float crouchHeight = 1.2f; // Crouched height.
+    float proneHeight = 0.6f;  // Lying down (a low capsule around the body's center).
+    float proneRadius = 0.3f;
     float maxSlopeDegrees = 50.0f;
     float stepHeight = 0.4f;
 };
@@ -57,9 +59,12 @@ public:
 
     void update(float dt, const glm::vec3& velocity, const glm::vec3& gravity);
     void teleport(const glm::vec3& feetPosition);
+    enum class Stance { Standing, Crouching, Prone };
     // Returns false when there is no room to change stance (for example standing up under a ledge).
-    bool setCrouched(bool crouched);
-    bool crouched() const { return m_crouched; }
+    bool setStance(Stance stance);
+    bool setCrouched(bool crouched) { return setStance(crouched ? Stance::Crouching : Stance::Standing); }
+    Stance stance() const { return m_stance; }
+    bool crouched() const { return m_stance == Stance::Crouching; }
 
     glm::vec3 position() const;
     glm::vec3 velocity() const;
@@ -74,7 +79,8 @@ private:
     JPH::CharacterVirtual* m_character = nullptr;
     const JPH::Shape* m_standingShape = nullptr;
     const JPH::Shape* m_crouchingShape = nullptr;
-    bool m_crouched = false;
+    const JPH::Shape* m_proneShape = nullptr;
+    Stance m_stance = Stance::Standing;
 };
 
 // Rigid body world. Static collision always comes from map data and never depends on graphics

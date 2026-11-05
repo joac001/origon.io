@@ -14,7 +14,7 @@
 namespace origon::net {
 
 constexpr uint16_t kDefaultPort = 27015;
-constexpr uint32_t kProtocolVersion = 5;
+constexpr uint32_t kProtocolVersion = 6;
 constexpr int kChannelReliable = 0;
 constexpr int kChannelUnreliable = 1;
 constexpr int kChannelCount = 2;
@@ -100,12 +100,15 @@ private:
 
 struct PlayerState {
     uint8_t id = 0;
-    uint8_t flags = 0; // 1 alive, 2 bot, 4 crouched, 8 on ground, 16 aiming
+    uint8_t flags = 0; // 1 alive, 2 bot, 4 crouched, 8 on ground, 16 aiming, 32 prone
     glm::vec3 position{0.0f};
     glm::vec3 velocity{0.0f};
     float yaw = 0.0f;
     float pitch = 0.0f;
     float eyeHeight = kEyeHeight;
+    glm::vec3 eyeOffset{0.0f};
+    float lean = 0.0f;
+    float proneBlend = 0.0f;
     float health = kMaxHealth;
     uint8_t tier = 0;
     uint16_t kills = 0;

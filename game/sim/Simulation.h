@@ -63,6 +63,8 @@ public:
 private:
     void spawn(Player& player);
     void updateMovement(Player& player, const PlayerCommand& command);
+    // Lean / prone eye offset, shortened where a wall is closer (the eye never goes through geometry).
+    void updateEyeOffset(Player& player) const;
     void updateWeapon(Player& player, const PlayerCommand& command);
     void fire(Player& player, const WeaponDef& weapon);
     void startReload(Player& player, const WeaponDef& weapon);
@@ -90,13 +92,16 @@ private:
     struct HitboxSample {
         glm::vec3 position{0.0f};
         float eyeHeight = kEyeHeight;
+        glm::vec3 eyeOffset{0.0f};
+        float yaw = 0.0f;
+        float proneBlend = 0.0f;
         bool alive = false;
     };
     std::vector<std::array<HitboxSample, kHistoryTicks>> m_history;
     std::vector<int> m_rewindTicks;
     uint32_t m_tickCount = 0;
     void recordHistory();
-    // Copy of a player with its hit volume moved back in time (only position/eyeHeight/alive).
+    // Copy of a player with its hit volume moved back in time (position, eye, posture, alive).
     bool historicalTarget(const Player& target, int rewind, Player& out) const;
 };
 

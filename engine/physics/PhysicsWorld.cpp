@@ -379,6 +379,7 @@ Character::Character(PhysicsWorld& world, const CharacterDesc& desc, const glm::
     : m_world(world), m_desc(desc) {
     m_standingShape = makeCharacterShape(desc.height, desc.radius);
     m_crouchingShape = makeCharacterShape(desc.crouchHeight, desc.radius);
+    m_proneShape = makeCharacterShape(desc.proneHeight, desc.proneRadius);
 
     JPH::Ref<JPH::CharacterVirtualSettings> settings = new JPH::CharacterVirtualSettings();
     settings->mShape = m_standingShape;
@@ -401,6 +402,7 @@ Character::~Character() {
     m_character->Release();
     m_standingShape->Release();
     m_crouchingShape->Release();
+    m_proneShape->Release();
 }
 
 void Character::update(float dt, const glm::vec3& velocity, const glm::vec3& gravity) {
@@ -412,18 +414,19 @@ void Character::update(float dt, const glm::vec3& velocity, const glm::vec3& gra
     m_character->ExtendedUpdate(dt, toJolt(gravity), settings, {}, objectFilter, {}, {}, *m_world.m_impl->tempAllocator);
 }
 
-bool Character::setCrouched(bool crouched) {
-    if (crouched == m_crouched) {
+bool Character::setStance(Stance stance) {
+    if (stance == m_stance) {
         return true;
     }
     const LayerMaskFilter objectFilter(bit(Layers::kStatic) | bit(Layers::kDynamic));
-    const JPH::Shape* shape = crouched ? m_crouchingShape : m_standingShape;
-    // Standing up must not penetrate geometry; crouching always succeeds.
-    const float maxPenetration = crouched ? FLT_MAX : 1.5f * m_character->GetCharacterPadding();
+    const JPH::Shape* shape = stance == Stance::Prone ? m_proneShape : stance == Stance::Crouching ? m_crouchingShape : m_standingShape;
+    // Getting lower always succeeds; getting taller must not penetrate geometry.
+    const auto rank = [](Stance s) { return s == Stance::Standing ? 2 : s == Stance::Crouching ? 1 : 0; };
+    const float maxPenetration = rank(stance) < rank(m_stance) ? FLT_MAX : 1.5f * m_character->GetCharacterPadding();
     if (!m_character->SetShape(shape, maxPenetration, {}, objectFilter, {}, {}, *m_world.m_impl->tempAllocator)) {
         return false;
     }
-    m_crouched = crouched;
+    m_stance = stance;
     return true;
 }
 

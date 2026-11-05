@@ -17,6 +17,9 @@ constexpr float kTickRate = 60.0f;
 constexpr float kTickDt = 1.0f / kTickRate;
 constexpr float kEyeHeight = 1.62f;
 constexpr float kCrouchEyeHeight = 1.05f;
+constexpr float kProneEyeHeight = 0.36f;
+constexpr float kProneEyeForward = 0.55f; // Lying down the head is ahead of the body's center.
+constexpr float kLeanDistance = 0.36f;    // Sideways eye offset at full lean.
 constexpr float kMaxHealth = 100.0f;
 
 enum Button : uint32_t {
@@ -27,6 +30,9 @@ enum Button : uint32_t {
     kButtonReload = 1u << 4,
     kButtonMelee = 1u << 5,
     kButtonCrouch = 1u << 6,
+    kButtonLeanLeft = 1u << 7,
+    kButtonLeanRight = 1u << 8,
+    kButtonProne = 1u << 9, // Toggles lying down.
 };
 
 // Everything a player controls in one tick. This is what clients will send to the host.
@@ -70,7 +76,11 @@ struct Player {
     float pitch = 0.0f;
     bool onGround = false;
     bool crouched = false;
-    float eyeHeight = kEyeHeight; // Smoothed between standing and crouched.
+    bool prone = false;
+    float eyeHeight = kEyeHeight; // Smoothed between standing, crouched and prone.
+    float lean = 0.0f;            // -1 (left) .. 1 (right), smoothed.
+    float proneBlend = 0.0f;      // 0..1, smoothed: how far the body has gone down to the ground.
+    glm::vec3 eyeOffset{0.0f};    // Horizontal eye offset from leaning and lying down (walls clamp it).
     float airTime = 0.0f;
     float fallSpeed = 0.0f;
     // Set when the simulation forces a view direction (spawn). The local view reads and clears it.
@@ -101,7 +111,7 @@ struct Player {
 
     BotState bot;
 
-    glm::vec3 eyePosition() const { return position + glm::vec3(0.0f, eyeHeight, 0.0f); }
+    glm::vec3 eyePosition() const { return position + glm::vec3(0.0f, eyeHeight, 0.0f) + eyeOffset; }
 };
 
 struct GameEvent {

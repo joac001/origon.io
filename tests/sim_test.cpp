@@ -8,6 +8,7 @@
 #include "world/MapGenerator.h"
 #include "world/World.h"
 
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <cstdlib>
@@ -115,6 +116,45 @@ void testFullMatch(const WeaponDatabase& weapons) {
     check(positionsValid, "living players stay inside the map");
 }
 
+// Leaning and lying down: eye offsets, stance toggles and getting up.
+void testStances(const WeaponDatabase& weapons) {
+    auto map = MapData::load(fs::resolve("maps/graybox.json"));
+    if (!map) return;
+    PhysicsWorld physics;
+    World world;
+    world.build(*map, physics);
+    Simulation sim(physics, weapons);
+    sim.startMatch(*map, 0);
+    std::vector<PlayerCommand> commands(1);
+    auto run = [&](uint32_t buttons, int ticks) {
+        for (int i = 0; i < ticks; ++i) {
+            commands[0].buttons = buttons;
+            sim.tick(commands);
+            sim.takeEvents();
+        }
+    };
+    run(0, 90); // Spawn and settle on the ground.
+    const Player& p = sim.players()[0];
+    check(p.alive && p.onGround, "stance test player stands on the ground");
+    const glm::vec3 right(std::cos(p.yaw), 0.0f, -std::sin(p.yaw));
+
+    run(kButtonLeanRight, 40);
+    check(glm::dot(p.eyeOffset, right) > 0.2f, "leaning right moves the eye to the right");
+    run(kButtonLeanLeft, 60);
+    check(glm::dot(p.eyeOffset, right) < -0.2f, "leaning left moves the eye to the left");
+    run(0, 60);
+    check(std::abs(glm::dot(p.eyeOffset, right)) < 0.02f, "releasing the lean centers the eye");
+
+    run(kButtonProne, 2);
+    run(0, 90);
+    check(p.prone && p.eyeHeight < 0.45f, "prone toggles on and lowers the eye");
+    run(kButtonLeanRight, 30);
+    check(std::abs(glm::dot(p.eyeOffset, right)) < 0.02f, "no leaning while prone");
+    run(kButtonJump, 2);
+    run(0, 90);
+    check(!p.prone && p.eyeHeight > 1.5f, "jump gets up from prone");
+}
+
 // Procedural maps: deterministic per seed, valid spawns on dry ground, playable headless.
 void testProceduralMaps(const WeaponDatabase& weapons) {
     for (uint32_t seed : {1u, 7u, 42u, 1234u}) {
@@ -202,6 +242,7 @@ int main() {
     check(weapons.load("data/weapons.json", "data/gungame_ladder.json"), "weapon data loads");
     check(weapons.tierCount() == 20, "ladder has 20 tiers");
     testRules(weapons);
+    testStances(weapons);
     testFullMatch(weapons);
     testOutdoorMatch(weapons, "bosque");
     testOutdoorMatch(weapons, "aserradero");

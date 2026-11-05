@@ -423,12 +423,15 @@ net::Snapshot App::makeSnapshot() const {
         net::PlayerState state;
         state.id = static_cast<uint8_t>(p.id);
         state.flags = static_cast<uint8_t>((p.alive ? 1 : 0) | (p.isBot ? 2 : 0) | (p.crouched ? 4 : 0) | (p.onGround ? 8 : 0) |
-                                           (p.aiming ? 16 : 0));
+                                           (p.aiming ? 16 : 0) | (p.prone ? 32 : 0));
         state.position = p.position;
         state.velocity = p.velocity;
         state.yaw = p.yaw;
         state.pitch = p.pitch;
         state.eyeHeight = p.eyeHeight;
+        state.eyeOffset = p.eyeOffset;
+        state.lean = p.lean;
+        state.proneBlend = p.proneBlend;
         state.health = p.health;
         state.tier = static_cast<uint8_t>(p.tier);
         state.kills = static_cast<uint16_t>(p.kills);
@@ -484,8 +487,13 @@ void App::applySnapshot(const net::Snapshot& snapshot) {
         p.alive = alive;
         p.isBot = (state.flags & 2) != 0;
         p.crouched = (state.flags & 4) != 0;
+        p.prone = (state.flags & 32) != 0;
+        p.character->setStance(p.prone ? Character::Stance::Prone : p.crouched ? Character::Stance::Crouching : Character::Stance::Standing);
         p.aiming = (state.flags & 16) != 0;
         p.eyeHeight = state.eyeHeight;
+        p.eyeOffset = state.eyeOffset;
+        p.lean = state.lean;
+        p.proneBlend = state.proneBlend;
         p.health = state.health;
         p.tier = state.tier;
         p.kills = state.kills;
@@ -634,6 +642,11 @@ int App::run() {
             takeScreenshot(fs::resolve("screenshots").string() + "/origon_" + stamp + ".png");
         }
         if (!m_options.screenshotPath.empty() && m_frameCount == m_options.screenshotFrame) {
+            {
+                const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
+                log::info("Capture: local player lean {:.2f} prone {} eye height {:.2f} offset ({:.2f}, {:.2f}, {:.2f})", me.lean,
+                          me.prone, me.eyeHeight, me.eyeOffset.x, me.eyeOffset.y, me.eyeOffset.z);
+            }
             takeScreenshot(m_options.screenshotPath);
         }
 
@@ -1031,13 +1044,14 @@ void App::updateLocomotion(Locomotion& l, const Player& p, float dt) {
             targetYaw = std::clamp(back, -limit, limit);
         }
     }
+    if (p.prone) targetYaw = 0.0f; // Lying down the whole body turns: no leg yaw.
     l.legYaw += (targetYaw - l.legYaw) * (1.0f - std::exp(-dt * 8.0f));
 
     // Stride per cycle (two steps) grows with speed, so feet do not slide.
     const float crouch = std::clamp((kEyeHeight - p.eyeHeight) / (kEyeHeight - kCrouchEyeHeight), 0.0f, 1.0f);
     const float standingStride = l.speed < 4.6f ? glm::mix(1.5f, 3.3f, glm::smoothstep(1.5f, 4.6f, l.speed))
                                                  : glm::mix(3.3f, 3.9f, glm::smoothstep(4.6f, 6.8f, l.speed));
-    const float stride = glm::mix(standingStride, 1.3f, crouch);
+    const float stride = glm::mix(glm::mix(standingStride, 1.3f, crouch), 0.55f, p.proneBlend);
     if (moving) l.phase = std::fmod(l.phase + l.direction * l.speed * dt / stride + 1.0f, 1.0f);
 
     const float approach = 1.0f - std::exp(-dt * 9.0f);
@@ -1050,6 +1064,12 @@ PlayerCommand App::buildLocalCommand() const {
     PlayerCommand command;
     command.yaw = m_viewYaw;
     command.pitch = m_viewPitch;
+    command.buttons = m_options.holdButtons;
+    if (command.buttons & kButtonProne) {
+        // Debug hold of a toggle: tap it (alternate ticks) until the player is lying down.
+        const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
+        if (me.prone || (m_frameCount & 8u)) command.buttons &= ~kButtonProne;
+    }
     if (m_menuOpen || !m_window->cursorCaptured()) return command;
     if (m_input.keyDown(GLFW_KEY_W)) command.forward += 1.0f;
     if (m_input.keyDown(GLFW_KEY_S)) command.forward -= 1.0f;
@@ -1062,6 +1082,9 @@ PlayerCommand App::buildLocalCommand() const {
     if (m_input.keyDown(GLFW_KEY_R)) command.buttons |= kButtonReload;
     if (m_input.keyDown(GLFW_KEY_V)) command.buttons |= kButtonMelee;
     if (m_input.keyDown(GLFW_KEY_LEFT_CONTROL) || m_input.keyDown(GLFW_KEY_C)) command.buttons |= kButtonCrouch;
+    if (m_input.keyDown(GLFW_KEY_Q)) command.buttons |= kButtonLeanLeft;
+    if (m_input.keyDown(GLFW_KEY_E)) command.buttons |= kButtonLeanRight;
+    if (m_input.keyDown(GLFW_KEY_Z)) command.buttons |= kButtonProne;
     return command;
 }
 
@@ -1094,9 +1117,9 @@ CameraView App::playingCamera(float alpha) const {
     const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
     const WeaponDef& weapon = m_sim->weaponFor(me);
     CameraView camera;
-    glm::vec3 eye = glm::mix(me.previousPosition, me.position, alpha) + glm::vec3(0.0f, me.eyeHeight, 0.0f);
+    glm::vec3 eye = glm::mix(me.previousPosition, me.position, alpha) + glm::vec3(0.0f, me.eyeHeight, 0.0f) + me.eyeOffset;
     float pitch = m_viewPitch + me.viewKick;
-    float roll = m_roll;
+    float roll = m_roll + me.lean * glm::radians(9.0f); // Leaning tilts the head toward the lean.
     if (me.alive) {
         const float speed = glm::length(glm::vec2(me.velocity.x, me.velocity.z));
         const float bob = me.onGround ? std::min(speed / 6.0f, 1.0f) * (1.0f - m_adsBlend * 0.85f) : 0.0f;
@@ -1132,14 +1155,20 @@ namespace {
 struct SoldierRig {
     int idle = -1, walk = -1, run = -1, crouch = -1, crouchWalk = -1, jump = -1, reload = -1, knife = -1, death = -1,
         deathForward = -1;
-    int hips = -1, spine = -1, chest = -1, hand = -1;
+    int prone = -1, proneCrawl = -1;
+    int hips = -1, spine = -1, chest = -1, hand = -1, upperArmR = -1;
+    struct {
+        int upper = -1, fore = -1, hand = -1;
+    } left;
     std::vector<float> upperBody;
 
     explicit SoldierRig(const SkinnedModel& m)
         : idle(m.findClip("idle")), walk(m.findClip("walk")), run(m.findClip("run")), crouch(m.findClip("crouch")),
           crouchWalk(m.findClip("crouch_walk")), jump(m.findClip("jump")), reload(m.findClip("reload")),
           knife(m.findClip("knife")), death(m.findClip("death")), deathForward(m.findClip("death_forward")),
-          hips(m.findJoint("hips")), spine(m.findJoint("spine")), chest(m.findJoint("chest")), hand(m.findJoint("hand.R")),
+          prone(m.findClip("prone")), proneCrawl(m.findClip("prone_crawl")), hips(m.findJoint("hips")),
+          spine(m.findJoint("spine")), chest(m.findJoint("chest")), hand(m.findJoint("hand.R")),
+          upperArmR(m.findJoint("upperarm.R")), left{m.findJoint("upperarm.L"), m.findJoint("forearm.L"), m.findJoint("hand.L")},
           upperBody(m.jointMask(m.findJoint("spine"))) {}
 };
 
@@ -1163,6 +1192,48 @@ glm::mat4 weaponAttachment(const SkinnedModel& sk, const std::vector<glm::mat4>&
         it = restOffsets.emplace(&sk, glm::inverse(restJoint) * glm::translate(glm::mat4(1.0f), glm::vec3(restJoint[3]))).first;
     }
     return globals[static_cast<size_t>(joint)] * it->second;
+}
+
+// Rest-pose transform of a joint relative to the weapon attachment (how the rest grip holds it).
+glm::mat4 restInWeapon(const SkinnedModel& sk, int joint) {
+    static std::map<std::pair<const SkinnedModel*, int>, glm::mat4> cache;
+    const auto key = std::make_pair(&sk, joint);
+    if (auto it = cache.find(key); it != cache.end()) return it->second;
+    std::vector<glm::mat4> rest, skin;
+    sk.evaluate(sk.restPose(), rest, skin);
+    const glm::mat4 value = glm::inverse(weaponAttachment(sk, rest)) * rest[static_cast<size_t>(joint)];
+    cache.emplace(key, value);
+    return value;
+}
+
+// Two-bone IK on one arm: the wrist reaches `target` with the hand turned to `rotation` (model space),
+// the elbow bending toward `pole`.
+struct ArmJoints {
+    int upper = -1, fore = -1, hand = -1;
+};
+void holdWithArm(const SkinnedModel& sk, SkinnedModel::Pose& pose, const ArmJoints& arm, const glm::vec3& target,
+                 const glm::quat& rotation, const glm::vec3& pole) {
+    if (arm.upper < 0 || arm.fore < 0 || arm.hand < 0) return;
+    static thread_local std::vector<glm::mat4> globals, skin;
+    sk.evaluate(pose, globals, skin);
+    auto position = [&](int joint) { return glm::vec3(globals[static_cast<size_t>(joint)][3]); };
+    const glm::vec3 s = position(arm.upper);
+    const float a = glm::length(position(arm.fore) - s), b = glm::length(position(arm.hand) - position(arm.fore));
+    glm::vec3 d = target - s;
+    const float c = std::clamp(glm::length(d), 0.05f, a + b - 0.002f);
+    d = glm::normalize(d);
+    const float cosA = std::clamp((a * a + c * c - b * b) / (2.0f * a * c), -1.0f, 1.0f);
+    glm::vec3 side = pole - d * glm::dot(pole, d);
+    side = glm::length(side) > 1e-4f ? glm::normalize(side) : glm::vec3(0, -1, 0);
+    sk.aimJoint(pose, arm.upper, arm.fore, s + d * (a * cosA) + side * (a * std::sqrt(1.0f - cosA * cosA)));
+    sk.aimJoint(pose, arm.fore, arm.hand, s + d * c);
+    sk.evaluate(pose, globals, skin);
+    const glm::quat current = glm::normalize(glm::quat_cast(glm::mat3(globals[static_cast<size_t>(arm.hand)])));
+    glm::quat delta = rotation * glm::inverse(current);
+    if (delta.w < 0.0f) delta = -delta;
+    const float angle = 2.0f * std::acos(std::clamp(delta.w, -1.0f, 1.0f));
+    const glm::vec3 axis(delta.x, delta.y, delta.z);
+    if (angle > 1e-4f && glm::length(axis) > 1e-6f) sk.rotateJoint(pose, arm.hand, glm::normalize(axis), angle);
 }
 
 // Weight envelope for one-shot upper-body clips: fades in and out over `edge` of the progress.
@@ -1205,6 +1276,15 @@ void App::submitSoldier(const Player& p, float alpha) {
         }
         SkinnedModel::blend(pose, crouched, crouch);
     }
+    // Lying down: prone pose -> crawl.
+    if (rig.prone >= 0 && p.proneBlend > 0.01f) {
+        SkinnedModel::Pose lying = sk.restPose();
+        sk.sample(rig.prone, m_time + static_cast<float>(p.id) * 0.37f, lying);
+        if (rig.proneCrawl >= 0 && l.moveWeight > 0.01f) {
+            SkinnedModel::blend(lying, clipAt(rig.proneCrawl, l.phase), l.moveWeight);
+        }
+        SkinnedModel::blend(pose, lying, glm::smoothstep(0.0f, 1.0f, p.proneBlend));
+    }
     // In the air: tucked legs.
     if (rig.jump >= 0 && l.airWeight > 0.01f) SkinnedModel::blend(pose, clipAt(rig.jump, 0.0f), l.airWeight * 0.9f);
     // Upper-body actions layered over locomotion.
@@ -1229,20 +1309,28 @@ void App::submitSoldier(const Player& p, float alpha) {
         sk.rotateJoint(pose, rig.spine, glm::vec3(0, 1, 0), l.legYaw * 0.5f);
         sk.rotateJoint(pose, rig.chest, glm::vec3(0, 1, 0), l.legYaw * 0.5f);
     }
-    // Aim: the spine and chest bend (half each) so the weapon points where the player looks, whatever
-    // lean the clips carry (running leans forward, crouching sits back). Upper-body actions (reload,
-    // knife) keep their own motion. Model space faces -Z; positive pitch looks up.
+    // Leaning: the spine and chest roll toward the side the eye went (walls may have shortened it).
+    const float lean = glm::dot(p.eyeOffset, glm::vec3(std::cos(p.yaw), 0.0f, -std::sin(p.yaw))) / kLeanDistance;
+    if (std::abs(lean) > 1e-3f) {
+        sk.rotateJoint(pose, rig.spine, glm::vec3(0, 0, -1), lean * glm::radians(17.0f));
+        sk.rotateJoint(pose, rig.chest, glm::vec3(0, 0, -1), lean * glm::radians(17.0f));
+    }
+    // Aim: the spine, chest and (lying down mostly) the right shoulder turn so the weapon points where
+    // the player looks, whatever lean the clips carry (running leans forward, crouching sits back,
+    // prone lies flat). Upper-body actions (reload, knife) keep their own motion. Model space faces
+    // -Z; positive pitch looks up.
     const glm::vec3 aim(0.0f, std::sin(p.pitch), -std::cos(p.pitch));
     const float aimWeight = 1.0f - actionWeight;
-    for (int joint : {rig.spine, rig.chest}) {
+    const float chestShare = glm::mix(1.0f, 0.35f, p.proneBlend);
+    const std::pair<int, float> aimChain[] = {{rig.spine, 0.4f}, {rig.chest, chestShare}, {rig.upperArmR, 1.0f}};
+    for (const auto& [joint, share] : aimChain) {
         if (joint < 0 || aimWeight < 0.01f) break;
         sk.evaluate(pose, m_soldierGlobals, m_aimScratch);
         const glm::vec3 current = glm::normalize(glm::mat3(weaponAttachment(sk, m_soldierGlobals)) * glm::vec3(0, 0, -1));
         const glm::vec3 axis = glm::cross(current, aim);
         const float sine = glm::length(axis);
         if (sine < 1e-4f) break;
-        const float angle = std::atan2(sine, glm::dot(current, aim)) * aimWeight * (joint == rig.spine ? 0.5f : 1.0f);
-        sk.rotateJoint(pose, joint, axis / sine, angle);
+        sk.rotateJoint(pose, joint, axis / sine, std::atan2(sine, glm::dot(current, aim)) * aimWeight * share);
     }
     // Gait life on top of the aim: the shoulders counter-rotate against the hips (right shoulder back
     // at the right heel strike, phase 0) and the chest rolls toward the stance leg twice per cycle.
@@ -1253,6 +1341,13 @@ void App::submitSoldier(const Player& p, float alpha) {
         const float cycle = glm::two_pi<float>() * l.phase;
         sk.rotateJoint(pose, rig.chest, glm::vec3(0, 1, 0), -twist * std::cos(cycle) * weight * l.direction);
         sk.rotateJoint(pose, rig.chest, glm::vec3(0, 0, -1), roll * std::sin(2.0f * cycle) * weight);
+    }
+    // The support hand stays on the forend whatever the body did (actions move it on purpose).
+    if (rig.left.hand >= 0 && aimWeight > 0.5f && !weapon.isMelee()) {
+        sk.evaluate(pose, m_soldierGlobals, m_aimScratch);
+        const glm::mat4 grip = weaponAttachment(sk, m_soldierGlobals) * restInWeapon(sk, rig.left.hand);
+        holdWithArm(sk, pose, {rig.left.upper, rig.left.fore, rig.left.hand}, glm::vec3(grip[3]),
+                    glm::normalize(glm::quat_cast(glm::mat3(grip))), glm::vec3(-0.6f, -1.0f, 0.1f));
     }
 
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) * glm::rotate(glm::mat4(1.0f), p.yaw, glm::vec3(0, 1, 0));
@@ -1388,10 +1483,15 @@ void App::submitGaitTest(float dt) {
     struct Segment {
         float seconds, speed;
         int facing;
-        bool crouch;
+        bool crouch = false;
+        float lean = 0.0f;
+        bool prone = false;
     };
-    static const Segment script[] = {{1.5f, 0.0f, 2, false}, {2.5f, 1.8f, 0, false},  {1.8f, -5.0f, 0, false},
-                                     {2.25f, 2.0f, 1, false}, {2.8f, -1.6f, 2, false}, {3.0f, 1.5f, 0, true}};
+    static const Segment script[] = {{1.5f, 0.0f, 2},         {2.5f, 1.8f, 0},          {1.8f, -5.0f, 0},
+                                     {2.25f, 2.0f, 1},        {2.8f, -1.6f, 2},         {3.0f, 1.5f, 0, true},
+                                     {1.5f, 0.0f, 1, false, 1.0f}, {1.5f, 0.0f, 1, false, -1.0f},
+                                     {2.0f, 0.0f, 2, false, 0.0f, true}, {4.0f, -1.1f, 2, false, 0.0f, true},
+                                     {1.0f, 0.0f, 2}};
     float total = 0.0f;
     for (const Segment& s : script) total += s.seconds;
     m_gaitTime = std::fmod(m_gaitTime + dt, total);
@@ -1410,6 +1510,7 @@ void App::submitGaitTest(float dt) {
 
     Player p;
     p.id = static_cast<int>(m_sim->players().size());
+    p.proneBlend = m_gaitProne;
     p.tier = 11;
     p.alive = true;
     auto feetAt = [&](float offset) {
@@ -1421,7 +1522,10 @@ void App::submitGaitTest(float dt) {
     p.position = feetAt(m_gaitOffset);
     p.velocity = right * segment->speed;
     p.onGround = true;
-    p.eyeHeight = segment->crouch ? kCrouchEyeHeight : kEyeHeight;
+    p.eyeHeight = segment->prone ? kProneEyeHeight : segment->crouch ? kCrouchEyeHeight : kEyeHeight;
+    p.prone = segment->prone;
+    p.proneBlend += ((segment->prone ? 1.0f : 0.0f) - p.proneBlend) * std::min(1.0f, dt * 6.0f);
+    m_gaitProne = p.proneBlend;
     const glm::vec3 facing = segment->facing == 1 ? -forward
                              : segment->facing == 2 || segment->speed == 0.0f ? right
                                                                               : right * (segment->speed > 0.0f ? 1.0f : -1.0f);
@@ -1429,6 +1533,9 @@ void App::submitGaitTest(float dt) {
     p.pitch = 0.0f;
     p.reloadTimer = p.meleeAnimation = p.spawnProtection = 0.0f;
     p.look = CharacterLook::random(7);
+    m_gaitLean += (segment->lean - m_gaitLean) * std::min(1.0f, dt * 9.0f);
+    p.lean = m_gaitLean;
+    p.eyeOffset = glm::vec3(std::cos(p.yaw), 0.0f, -std::sin(p.yaw)) * (p.lean * kLeanDistance);
     updateLocomotion(m_gaitLocomotion, p, dt);
     if (m_locomotion.size() <= static_cast<size_t>(p.id)) m_locomotion.resize(static_cast<size_t>(p.id) + 1);
     m_locomotion[static_cast<size_t>(p.id)] = m_gaitLocomotion;
@@ -1537,30 +1644,10 @@ bool App::submitViewArms(const glm::mat4& gunBase, const Model& gun, const Weapo
     }
     const glm::vec3 poles[2] = {glm::vec3(1.0f, -0.6f, 0.3f), glm::vec3(-0.6f, -1.0f, 0.1f)};
     for (int side = 0; side < 2; ++side) {
-        const glm::vec3 target(gunModel * glm::vec4(handInGun[side], 1.0f));
-        sk.evaluate(pose, globals, skin);
-        const glm::vec3 s = position(j.upper[side]);
-        const glm::vec3 e = position(j.fore[side]);
-        const glm::vec3 w = position(j.hand[side]);
-        const float a = glm::length(e - s), b = glm::length(w - e);
-        glm::vec3 d = target - s;
-        const float c = std::clamp(glm::length(d), 0.05f, a + b - 0.002f);
-        d = glm::normalize(d);
-        const float cosA = std::clamp((a * a + c * c - b * b) / (2.0f * a * c), -1.0f, 1.0f);
-        glm::vec3 pole = poles[side] - d * glm::dot(poles[side], d);
-        pole = glm::length(pole) > 1e-4f ? glm::normalize(pole) : glm::vec3(0, -1, 0);
-        const glm::vec3 elbow = s + d * (a * cosA) + pole * (a * std::sqrt(1.0f - cosA * cosA));
-        sk.aimJoint(pose, j.upper[side], j.fore[side], elbow);
-        sk.aimJoint(pose, j.fore[side], j.hand[side], s + d * c);
         // The whole hand frame as in the rest grip (not just the finger direction), so each palm
         // stays on its own side of the weapon.
-        sk.evaluate(pose, globals, skin);
-        const glm::quat current = glm::normalize(glm::quat_cast(glm::mat3(globals[static_cast<size_t>(j.hand[side])])));
-        glm::quat delta = gunRotation * handInGunRotation[side] * glm::inverse(current);
-        if (delta.w < 0.0f) delta = -delta;
-        const float angle = 2.0f * std::acos(std::clamp(delta.w, -1.0f, 1.0f));
-        const glm::vec3 axis(delta.x, delta.y, delta.z);
-        if (angle > 1e-4f && glm::length(axis) > 1e-6f) sk.rotateJoint(pose, j.hand[side], glm::normalize(axis), angle);
+        holdWithArm(sk, pose, {j.upper[side], j.fore[side], j.hand[side]}, glm::vec3(gunModel * glm::vec4(handInGun[side], 1.0f)),
+                    gunRotation * handInGunRotation[side], poles[side]);
     }
     sk.evaluate(pose, globals, skin);
     // Only arm-weighted geometry is drawn (the shader discards the rest), cut cleanly at the shoulders.
@@ -1799,6 +1886,7 @@ void App::drawMenu() {
             ImGui::Separator();
             ImGui::TextUnformatted("WASD: moverse          Shift: correr        Espacio: saltar");
             ImGui::TextUnformatted("Ctrl / C: agacharse     Clic izq.: disparar  Clic der.: apuntar");
+            ImGui::TextUnformatted("Q / E: asomarse         Z: cuerpo a tierra");
             ImGui::TextUnformatted("R: recargar             V: cuchillo          Tab: tabla");
             ImGui::TextUnformatted("Esc: menú               F1: editor           F3: rendimiento");
             ImGui::TextUnformatted("F12: captura            K: suicidio (prueba)");

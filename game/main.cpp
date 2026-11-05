@@ -39,6 +39,13 @@ int main(int argc, char** argv) {
         else if (arg == "--press-play") options.pressPlayFrame = std::atoi(next().c_str());
         else if (arg == "--ads") options.forceAds = true;
         else if (arg == "--tier") options.forceTier = std::atoi(next().c_str());
+        else if (arg == "--hold") {
+            const std::string list = next();
+            if (list.find("lean-left") != std::string::npos) options.holdButtons |= origon::kButtonLeanLeft;
+            if (list.find("lean-right") != std::string::npos) options.holdButtons |= origon::kButtonLeanRight;
+            if (list.find("prone") != std::string::npos) options.holdButtons |= origon::kButtonProne;
+            if (list.find("crouch") != std::string::npos) options.holdButtons |= origon::kButtonCrouch;
+        }
         else if (arg == "--weapon-gallery") options.weaponGallery = true;
         else if (arg == "--gait-test") options.gaitTest = true;
         else if (arg == "--look-gallery") options.lookGallery = std::atoi(next().c_str());

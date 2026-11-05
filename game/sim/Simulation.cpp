@@ -27,6 +27,7 @@ constexpr float kRegenDelay = 4.0f;
 constexpr float kRegenRate = 30.0f;
 constexpr float kKillHeight = -25.0f;
 constexpr float kCrouchSpeedFactor = 0.5f;
+constexpr float kProneSpeedFactor = 0.22f;
 constexpr float kFallDamageSpeed = 13.0f;
 constexpr float kFallDamagePerMs = 9.0f;
 constexpr float kBulletImpulseScale = 0.12f;
@@ -40,6 +41,12 @@ const glm::vec3 kPlayerColors[] = {
 
 glm::vec3 flatForward(float yaw) { return {-std::sin(yaw), 0.0f, -std::cos(yaw)}; }
 glm::vec3 flatRight(float yaw) { return {std::cos(yaw), 0.0f, -std::sin(yaw)}; }
+
+// Eye offset of a pose: sideways (and a little lower) when leaning, ahead of the body when prone.
+glm::vec3 poseEyeOffset(float yaw, float lean, float proneBlend) {
+    return flatRight(yaw) * (lean * kLeanDistance) + glm::vec3(0.0f, -0.06f * std::abs(lean), 0.0f) +
+           flatForward(yaw) * (proneBlend * kProneEyeForward);
+}
 
 glm::vec3 moveTowards(const glm::vec3& current, const glm::vec3& target, float maxDelta) {
     const glm::vec3 delta = target - current;
@@ -210,7 +217,7 @@ void Simulation::recordHistory() {
     m_history.resize(m_players.size());
     const size_t slot = m_tickCount % kHistoryTicks;
     for (const Player& p : m_players) {
-        m_history[static_cast<size_t>(p.id)][slot] = {p.position, p.eyeHeight, p.alive};
+        m_history[static_cast<size_t>(p.id)][slot] = {p.position, p.eyeHeight, p.eyeOffset, p.yaw, p.proneBlend, p.alive};
     }
     ++m_tickCount;
 }
@@ -224,6 +231,9 @@ bool Simulation::historicalTarget(const Player& target, int rewind, Player& out)
     out.id = target.id;
     out.position = sample.position;
     out.eyeHeight = sample.eyeHeight;
+    out.eyeOffset = sample.eyeOffset;
+    out.yaw = sample.yaw;
+    out.proneBlend = sample.proneBlend;
     out.alive = sample.alive;
     return true;
 }
@@ -281,8 +291,12 @@ void Simulation::spawn(Player& p) {
     p.reloadTimer = 0.0f;
     p.meleeCooldown = 0.0f;
     p.viewKick = 0.0f;
-    p.character->setCrouched(false);
+    p.character->setStance(Character::Stance::Standing);
     p.crouched = false;
+    p.prone = false;
+    p.proneBlend = 0.0f;
+    p.lean = 0.0f;
+    p.eyeOffset = glm::vec3(0.0f);
     p.eyeHeight = kEyeHeight;
     p.airTime = 0.0f;
     p.fallSpeed = 0.0f;
@@ -354,20 +368,45 @@ void Simulation::updateMovement(Player& p, const PlayerCommand& command) {
     if (wishLength > 1.0f) {
         wish /= wishLength;
     }
+    // Stance. Prone toggles (on the ground only); jumping or crouching gets up from it when there is room.
+    const auto pressed = [&](uint32_t button) { return (command.buttons & button) && !(p.previousButtons & button); };
     const bool wantsCrouch = (command.buttons & kButtonCrouch) != 0;
-    if (wantsCrouch != p.crouched && p.character->setCrouched(wantsCrouch)) {
+    if (p.prone) {
+        const bool getUp = pressed(kButtonProne) || pressed(kButtonJump) || pressed(kButtonCrouch);
+        if (getUp) {
+            const Character::Stance next = wantsCrouch ? Character::Stance::Crouching : Character::Stance::Standing;
+            if (p.character->setStance(next) || p.character->setStance(Character::Stance::Crouching)) {
+                p.prone = false;
+                p.crouched = p.character->stance() == Character::Stance::Crouching;
+            }
+        }
+    } else if (pressed(kButtonProne) && p.character->onGround()) {
+        p.character->setStance(Character::Stance::Prone);
+        p.prone = true;
+        p.crouched = false;
+    } else if (wantsCrouch != p.crouched && p.character->setCrouched(wantsCrouch)) {
         p.crouched = wantsCrouch;
     }
-    const float targetEye = p.crouched ? kCrouchEyeHeight : kEyeHeight;
-    p.eyeHeight += (targetEye - p.eyeHeight) * std::min(1.0f, 14.0f * dt);
+    const float targetEye = p.prone ? kProneEyeHeight : p.crouched ? kCrouchEyeHeight : kEyeHeight;
+    p.eyeHeight += (targetEye - p.eyeHeight) * std::min(1.0f, (p.prone ? 6.0f : 14.0f) * dt);
+    p.proneBlend += ((p.prone ? 1.0f : 0.0f) - p.proneBlend) * std::min(1.0f, 6.0f * dt);
 
-    const bool sprinting = (command.buttons & kButtonSprint) && command.forward > 0.1f && !p.aiming && !p.crouched;
+    const bool sprinting = (command.buttons & kButtonSprint) && command.forward > 0.1f && !p.aiming && !p.crouched && !p.prone;
+    // Leaning (not while sprinting or lying down): the eye moves sideways, as far as walls allow.
+    const float leanTarget = sprinting || p.prone ? 0.0f
+                                                  : ((command.buttons & kButtonLeanRight) ? 1.0f : 0.0f) -
+                                                        ((command.buttons & kButtonLeanLeft) ? 1.0f : 0.0f);
+    p.lean += (leanTarget - p.lean) * std::min(1.0f, 9.0f * dt);
+    updateEyeOffset(p);
     float speed = (sprinting ? kSprintSpeed : kWalkSpeed) * weapon.moveSpeedMultiplier;
     if (p.aiming) {
         speed *= kAdsSpeedFactor;
     }
     if (p.crouched) {
         speed *= kCrouchSpeedFactor;
+    }
+    if (p.prone) {
+        speed *= kProneSpeedFactor;
     }
     wish *= speed;
 
@@ -378,7 +417,7 @@ void Simulation::updateMovement(Player& p, const PlayerCommand& command) {
         horizontal = moveTowards(horizontal, wish, kGroundAccel * dt);
         velocity.y = 0.0f;
         const bool jumpPressed = (command.buttons & kButtonJump) && !(p.previousButtons & kButtonJump);
-        if (jumpPressed && !p.crouched) {
+        if (jumpPressed && !p.crouched && !p.prone && p.proneBlend < 0.05f) {
             velocity.y = kJumpSpeed;
             m_events.push_back({.type = GameEvent::Type::Jumped, .a = p.id, .start = p.position});
         }
@@ -482,6 +521,9 @@ void Simulation::fire(Player& p, const WeaponDef& weapon) {
     if (p.crouched) {
         spread *= 0.7f;
     }
+    if (p.prone) {
+        spread *= 0.5f;
+    }
     m_events.push_back({.type = GameEvent::Type::Fired, .a = p.id, .start = origin, .category = weapon.category});
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
@@ -537,7 +579,7 @@ void Simulation::fire(Player& p, const WeaponDef& weapon) {
             }
         }
     }
-    p.viewKick += glm::radians(weapon.recoilDegrees) * (p.aiming ? 0.6f : 1.0f) * (p.crouched ? 0.75f : 1.0f);
+    p.viewKick += glm::radians(weapon.recoilDegrees) * (p.aiming ? 0.6f : 1.0f) * (p.crouched ? 0.75f : p.prone ? 0.55f : 1.0f);
     if (p.ammo == 0 && p.alive) {
         startReload(p, weapon);
     }
@@ -612,17 +654,42 @@ void Simulation::kill(Player* killer, Player& victim, KillCause cause) {
 }
 
 float Simulation::rayVsPlayer(const glm::vec3& origin, const glm::vec3& dir, const Player& target, bool& headshot) {
-    const glm::vec3 head = target.position + glm::vec3(0.0f, target.eyeHeight, 0.0f);
-    const float headT = raySphere(origin, dir, head, 0.24f);
-    const float bodyTop = std::max(0.45f, target.eyeHeight - 0.32f);
-    const float bodyT = rayCapsule(origin, dir, target.position + glm::vec3(0.0f, 0.4f, 0.0f),
-                                   target.position + glm::vec3(0.0f, bodyTop, 0.0f), 0.4f);
+    const glm::vec3 head = target.eyePosition();
+    const float headT = raySphere(origin, dir, head, target.prone ? 0.22f : 0.24f);
+    float bodyT;
+    if (target.proneBlend > 0.5f) {
+        // Lying down: a low capsule along the facing direction, behind the head.
+        const glm::vec3 forward = flatForward(target.yaw);
+        const glm::vec3 base = target.position + glm::vec3(0.0f, 0.22f, 0.0f);
+        bodyT = rayCapsule(origin, dir, base - forward * 0.95f, base + forward * 0.25f, 0.26f);
+    } else {
+        // Standing or crouched: the upper body follows a lean.
+        const float bodyTop = std::max(0.45f, target.eyeHeight - 0.32f);
+        const glm::vec3 lean(target.eyeOffset.x * 0.6f, 0.0f, target.eyeOffset.z * 0.6f);
+        bodyT = rayCapsule(origin, dir, target.position + glm::vec3(0.0f, 0.4f, 0.0f),
+                           target.position + glm::vec3(0.0f, bodyTop, 0.0f) + lean, 0.4f);
+    }
     if (headT >= 0.0f && (bodyT < 0.0f || headT <= bodyT + 0.05f)) {
         headshot = true;
         return headT;
     }
     headshot = false;
     return bodyT;
+}
+
+void Simulation::updateEyeOffset(Player& p) const {
+    const glm::vec3 wanted = poseEyeOffset(p.yaw, p.lean, p.proneBlend);
+    const glm::vec3 flat(wanted.x, 0.0f, wanted.z);
+    const float length = glm::length(flat);
+    float scale = 1.0f;
+    if (length > 1e-3f) {
+        const glm::vec3 from = p.position + glm::vec3(0.0f, p.eyeHeight, 0.0f);
+        constexpr float kMargin = 0.18f;
+        if (auto hit = m_physics.rayCast(from, flat / length, length + kMargin, true)) {
+            scale = std::max(0.0f, hit->distance - kMargin) / length;
+        }
+    }
+    p.eyeOffset = flat * scale + glm::vec3(0.0f, wanted.y, 0.0f);
 }
 
 bool Simulation::lineOfSight(const glm::vec3& from, const glm::vec3& to) const {

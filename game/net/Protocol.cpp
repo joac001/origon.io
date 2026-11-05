@@ -52,6 +52,9 @@ void writeSnapshot(Writer& w, const Snapshot& s) {
         w.put(p.yaw);
         w.put(p.pitch);
         w.put(p.eyeHeight);
+        w.putVec3(p.eyeOffset);
+        w.put(p.lean);
+        w.put(p.proneBlend);
         w.put(p.health);
         w.put(p.tier);
         w.put(p.kills);
@@ -89,6 +92,9 @@ Snapshot readSnapshot(Reader& r) {
         p.yaw = r.get<float>();
         p.pitch = r.get<float>();
         p.eyeHeight = r.get<float>();
+        p.eyeOffset = r.getVec3();
+        p.lean = r.get<float>();
+        p.proneBlend = r.get<float>();
         p.health = r.get<float>();
         p.tier = r.get<uint8_t>();
         p.kills = r.get<uint16_t>();
