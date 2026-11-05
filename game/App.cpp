@@ -258,65 +258,41 @@ void App::drawCharacterTab() {
     m_characterPreview = true;
     CharacterLook look = m_settings.look;
     bool changed = false;
-    ImGui::TextDisabled("Solo cambia el aspecto: todos los personajes tienen el mismo tamaño y las mismas zonas de impacto.");
     auto field = [&](CharacterLook::Field f) {
         const LookCatalog options = lookOptions(f, look.female());
         size_t colorCount = 0;
         const LookColor* colors = lookColors(f, colorCount);
         const size_t count = colors ? colorCount : options.count;
         const size_t current = look[f];
-        const char* preview = colors ? colors[current].label : options.options[current].label;
-        ImGui::PushID(static_cast<int>(f));
-        if (ImGui::ArrowButton("##prev", ImGuiDir_Left)) {
-            look[f] = static_cast<uint8_t>((current + count - 1) % count);
+        const char* value = colors ? colors[current].label : options.options[current].label;
+        ImVec4 swatch;
+        if (colors) swatch = ImVec4(colors[current].srgb.r, colors[current].srgb.g, colors[current].srgb.b, 1.0f);
+        if (const int step = ui::stepper(lookFieldLabel(f), lookFieldLabel(f), value, colors ? &swatch : nullptr)) {
+            look[f] = static_cast<uint8_t>((current + count + static_cast<size_t>(step + static_cast<int>(count))) % count);
             changed = true;
         }
-        ImGui::SameLine();
-        if (ImGui::ArrowButton("##next", ImGuiDir_Right)) {
-            look[f] = static_cast<uint8_t>((current + 1) % count);
-            changed = true;
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(260.0f);
-        if (ImGui::BeginCombo(lookFieldLabel(f), preview)) {
-            for (size_t i = 0; i < count; ++i) {
-                if (colors) {
-                    const glm::vec3 c = colors[i].srgb;
-                    ImGui::ColorButton("##swatch", ImVec4(c.r, c.g, c.b, 1.0f), ImGuiColorEditFlags_NoTooltip, ImVec2(14, 14));
-                    ImGui::SameLine();
-                }
-                const char* label = colors ? colors[i].label : options.options[i].label;
-                ImGui::PushID(static_cast<int>(i));
-                if (ImGui::Selectable(label, i == current)) {
-                    look[f] = static_cast<uint8_t>(i);
-                    changed = true;
-                }
-                ImGui::PopID();
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::PopID();
     };
-    ImGui::SeparatorText("Cuerpo");
+    ui::section("Cuerpo");
     field(CharacterLook::Body);
     field(CharacterLook::SkinTone);
     field(CharacterLook::Hair);
     field(CharacterLook::HairColor);
     if (!look.female()) field(CharacterLook::FacialHair);
-    ImGui::SeparatorText("Accesorios");
+    ui::section("Accesorios");
     field(CharacterLook::Headwear);
     field(CharacterLook::Eyewear);
-    ImGui::SeparatorText("Ropa");
+    ui::section("Ropa");
     field(CharacterLook::Outfit);
     field(CharacterLook::OutfitColor);
     field(CharacterLook::Shoes);
-    ImGui::Spacing();
-    if (ImGui::Button("Aleatorio", ImVec2(180, 0))) {
+    ImGui::Dummy(ImVec2(0.0f, 8.0f));
+    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+    if (ui::button("Aleatorio", half)) {
         look = CharacterLook::random(static_cast<uint32_t>(m_time * 1000.0));
         changed = true;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Restablecer", ImVec2(180, 0))) {
+    if (ui::button("Restablecer", half)) {
         look = CharacterLook{};
         changed = true;
     }
@@ -599,6 +575,10 @@ int App::run() {
         ++m_frameCount;
         updateAutoPreset();
         if (m_titleScreen && m_options.pressPlayFrame > 0 && m_frameCount == m_options.pressPlayFrame) playFromTitle();
+        if (m_options.menuPage >= 0 && m_frameCount == 5) {
+            m_menuTab = m_options.menuPage;
+            setMenuOpen(true);
+        }
 
         m_input.beginFrame();
         m_window->pollEvents();
@@ -822,7 +802,7 @@ int App::run() {
             } else if (m_mode == Mode::Playing) {
                 const Player& me = m_sim->players()[static_cast<size_t>(m_sim->localPlayerId())];
                 const bool scoped = m_sim->weaponFor(me).scoped && m_adsBlend > 0.9f;
-                m_hud.draw(*m_sim, dt, (m_input.keyDown(GLFW_KEY_TAB) || m_options.showScoreboard) && !m_menuOpen, scoped);
+                if (!m_menuOpen) m_hud.draw(*m_sim, dt, m_input.keyDown(GLFW_KEY_TAB) || m_options.showScoreboard, scoped);
                 if (m_menuOpen) drawMenu();
             } else {
                 m_editor.drawUi();
@@ -1791,188 +1771,250 @@ void App::submitViewModel(float) {
 
 void App::drawMenu() {
     const ImVec2 screen = ImGui::GetIO().DisplaySize;
-    ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), screen, IM_COL32(0, 0, 0, 120));
+    const float k = ui::scale();
+    ImDrawList* bg = ImGui::GetBackgroundDrawList();
     m_characterPreviewShown = m_characterPreview;
     m_characterPreview = false;
-    // With the character preview the menu moves left so the soldier is visible on the right.
-    const float menuX = m_characterPreviewShown && !m_titleScreen ? std::min(screen.x * 0.5f, 40.0f + 290.0f) : screen.x * 0.5f;
-    ImGui::SetNextWindowPos(ImVec2(menuX, screen.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(580, 580), ImGuiCond_Always);
-    ImGui::Begin("Pausa", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+    // Veil: darker on the left (navigation and settings), lighter on the right (the scene, or the
+    // character preview on the Personaje page).
+    bg->AddRectFilledMultiColor(ImVec2(0, 0), screen, IM_COL32(8, 10, 8, 235), IM_COL32(8, 10, 8, m_characterPreviewShown ? 40 : 170),
+                                IM_COL32(8, 10, 8, m_characterPreviewShown ? 40 : 170), IM_COL32(8, 10, 8, 235));
 
-    if (ImGui::Button("Reanudar", ImVec2(130, 0))) setMenuOpen(false);
-    ImGui::SameLine();
-    if (ImGui::Button("Reiniciar", ImVec2(130, 0))) {
+    enum Page { Graphics = 0, Multiplayer = 1, Audio = 2, Controls = 3, Character = 4, Match = 5 };
+    if (m_menuTab >= 0) {
+        m_menuPage = m_menuTab;
+        m_menuTab = -1;
+    }
+    const float left = 80.0f * k;
+    const float top = screen.y * 0.13f;
+    const ImGuiWindowFlags bare = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                  ImGuiWindowFlags_NoBackground;
+
+    // --- Navigation (left). ---
+    ImGui::SetNextWindowPos(ImVec2(left, top));
+    ImGui::SetNextWindowSize(ImVec2(320.0f * k, screen.y - top - 60.0f * k));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2.0f * k));
+    ImGui::Begin("##menu_nav", nullptr, bare);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 head = ImGui::GetCursorScreenPos();
+    dl->AddRectFilled(head, ImVec2(head.x + 40.0f * k, head.y + 3.0f * k), ui::color::kBrass);
+    ui::label(dl, ImVec2(head.x, head.y + 14.0f * k), ui::color::kMuted, m_titleScreen ? "Origon" : "Pausa", 14.0f);
+    ImGui::Dummy(ImVec2(0, 48.0f * k));
+    if (!m_titleScreen) {
+        if (ui::menuItem("resume", "Reanudar", 40.0f)) setMenuOpen(false);
+    } else if (ui::menuItem("back", "Volver", 40.0f)) {
+        setMenuOpen(false);
+    }
+    ImGui::Dummy(ImVec2(0, 18.0f * k));
+    const std::pair<int, const char*> pages[] = {{Match, "Partida"},   {Character, "Personaje"}, {Graphics, "Gráficos"},
+                                                 {Audio, "Audio"},      {Controls, "Controles"},  {Multiplayer, "Multijugador"}};
+    for (const auto& [page, name] : pages) {
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        if (ui::menuItem(name, name, 28.0f)) m_menuPage = page;
+        if (m_menuPage == page) {
+            // Current page: a brass tick on the left edge.
+            dl->AddRectFilled(ImVec2(at.x - 18.0f * k, at.y + 10.0f * k), ImVec2(at.x - 15.0f * k, at.y + 34.0f * k), ui::color::kBrass);
+        }
+    }
+    ImGui::Dummy(ImVec2(0, 26.0f * k));
+    if (!m_titleScreen && ui::menuItem("restart", "Reiniciar partida", 20.0f)) {
         restartMatch();
         setMenuOpen(false);
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Editor (F1)", ImVec2(130, 0))) enterEditor();
-    ImGui::SameLine();
-    if (ImGui::Button("Salir", ImVec2(-1, 0))) m_window->requestClose();
-    ImGui::Separator();
-
-    if (m_titleScreen && ImGui::Button("Volver al título", ImVec2(-1, 0))) setMenuOpen(false);
-    if (ImGui::BeginTabBar("menu_tabs")) {
-        const int forcedTab = m_menuTab;
-        m_menuTab = -1;
-        if (ImGui::BeginTabItem("Gráficos", nullptr, forcedTab == 0 ? ImGuiTabItemFlags_SetSelected : 0)) {
-            RenderSettings& r = m_settings.render;
-            ImGui::TextDisabled("Preajustes:");
-            ImGui::SameLine();
-            const char* presets[] = {"Batata", "Media", "Alta", "Ultra"};
-            for (int i = 0; i < 4; ++i) {
-                if (i > 0) ImGui::SameLine();
-                if (ImGui::SmallButton(presets[i])) applyGraphicsPreset(i);
-            }
-            ImGui::Separator();
-            const char* shadowLabels[] = {"Desactivadas", "Bajas", "Medias", "Altas", "Ultra"};
-            ImGui::Combo("Calidad de sombras", &r.shadowQuality, shadowLabels, 5);
-            const char* msaaLabels[] = {"Desactivado", "MSAA 2x", "MSAA 4x", "MSAA 8x"};
-            int msaaIndex = r.msaaSamples >= 8 ? 3 : r.msaaSamples >= 4 ? 2 : r.msaaSamples >= 2 ? 1 : 0;
-            if (ImGui::Combo("Antialiasing", &msaaIndex, msaaLabels, 4)) {
-                const int values[] = {0, 2, 4, 8};
-                r.msaaSamples = values[msaaIndex];
-            }
-            int scale = static_cast<int>(std::round(r.renderScale * 100.0f));
-            if (ImGui::SliderInt("Escala de resolución", &scale, 50, 100, "%d%%")) r.renderScale = static_cast<float>(scale) / 100.0f;
-            ImGui::Checkbox("Oclusión ambiental (SSAO)", &r.ssao);
-            ImGui::Checkbox("Bloom", &r.bloom);
-            ImGui::Checkbox("Luces volumétricas (niebla con sombras)", &r.godRays);
-            ImGui::Checkbox("Reflejos en el agua (SSR)", &r.ssr);
-            ImGui::Checkbox("Sombras de contacto", &r.contactShadows);
-            ImGui::Checkbox("Profundidad de campo al apuntar", &m_settings.adsDepthOfField);
-            if (ImGui::Checkbox("Sincronización vertical (VSync)", &m_settings.vsync)) m_window->setVsync(m_settings.vsync);
-            ImGui::BeginDisabled(m_settings.vsync);
-            ImGui::SliderInt("FPS máximos", &m_settings.maxFps, 0, 360, m_settings.maxFps == 0 ? "Sin límite" : "%d");
-            ImGui::EndDisabled();
-            ImGui::SliderFloat("Exposición", &r.exposure, 0.5f, 2.0f, "%.2f");
-            int density = static_cast<int>(std::round(m_settings.vegetationDensity * 100.0f));
-            if (ImGui::SliderInt("Densidad de hierba", &density, 20, 100, "%d%%")) m_settings.vegetationDensity = static_cast<float>(density) / 100.0f;
-            ImGui::SliderFloat("Distancia de hierba", &m_settings.vegetationDistance, 30.0f, 150.0f, "%.0f m");
-            ImGui::TextDisabled("Árboles, rocas, arbustos y helechos se ven igual en todas las calidades.");
-            ImGui::Checkbox("Mostrar rendimiento (F3)", &m_settings.showStats);
-            ImGui::Spacing();
-            ImGui::TextDisabled("Los ajustes nunca cambian colisiones ni visibilidad del mapa.");
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Audio")) {
-            if (ImGui::SliderFloat("Volumen general", &m_settings.masterVolume, 0.0f, 1.0f, "%.2f") && m_audioReady) {
-                m_audio.setVolume(m_settings.masterVolume);
-            }
-            if (ImGui::Checkbox("Sonido ambiente (viento, pájaros)", &m_settings.ambience) && m_audioReady) {
-                m_audio.setAmbienceEnabled(m_settings.ambience);
-            }
-            if (!m_audioReady) ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "No se encontró dispositivo de audio.");
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Controles")) {
-            ImGui::SliderFloat("Campo de visión", &m_settings.fov, 60.0f, 110.0f, "%.0f°");
-            ImGui::SliderFloat("Sensibilidad del ratón", &m_settings.mouseSensitivity, 0.01f, 0.5f, "%.3f");
-            ImGui::SliderFloat("Sensibilidad al apuntar", &m_settings.adsSensitivityScale, 0.2f, 1.5f, "%.2f");
-            ImGui::Checkbox("Invertir eje Y", &m_settings.invertY);
-            ImGui::Separator();
-            ImGui::TextUnformatted("WASD: moverse          Shift: correr        Espacio: saltar");
-            ImGui::TextUnformatted("Ctrl / C: agacharse     Clic izq.: disparar  Clic der.: apuntar");
-            ImGui::TextUnformatted("Q / E: asomarse         Z: cuerpo a tierra");
-            ImGui::TextUnformatted("R: recargar             V: cuchillo          Tab: tabla");
-            ImGui::TextUnformatted("Esc: menú               F1: editor           F3: rendimiento");
-            ImGui::TextUnformatted("F12: captura            K: suicidio (prueba)");
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Personaje")) {
-            drawCharacterTab();
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Multijugador", nullptr, forcedTab == 1 ? ImGuiTabItemFlags_SetSelected : 0)) {
-            ImGui::InputText("Nombre", &m_playerName);
-            ImGui::Separator();
-            ImGui::TextUnformatted("Estado:");
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "%s",
-                               m_net.role() == net::NetSession::Role::None ? "Partida local" : m_net.status().c_str());
-            if (m_net.isClient()) ImGui::Text("Ping: %.0f ms", m_net.pingMs());
-            ImGui::Separator();
-            ImGui::SeparatorText("Crear partida (servidor)");
-            ImGui::InputInt("Puerto", &m_hostPort);
-            ImGui::TextDisabled("Usa el mapa actual. Los jugadores ocupan el lugar de los bots.");
-            if (ImGui::Button("Crear partida", ImVec2(-1, 0))) {
-                startHosting(std::clamp(m_hostPort, 1024, 65535));
-                setMenuOpen(false);
-            }
-            if (ImGui::Button("Crear partida y publicarla por internet", ImVec2(-1, 0))) {
-                startHosting(std::clamp(m_hostPort, 1024, 65535), true);
-            }
-            ImGui::SeparatorText("Partidas en la red local");
-            m_lan.listen(m_time);
-            if (m_lan.servers().empty()) {
-                ImGui::TextDisabled("Buscando partidas... (los servidores se anuncian cada segundo)");
-            }
-            for (const net::LanDiscovery::Server& server : m_lan.servers()) {
-                ImGui::PushID((server.address + ":" + std::to_string(server.port)).c_str());
-                ImGui::Text("%s  ·  %s  ·  %d/%d  (%s:%d)", server.name.c_str(), server.map.c_str(), server.players, server.maxPlayers,
-                            server.address.c_str(), server.port);
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Unirse")) {
-                    joinServer(server.address, server.port);
-                    setMenuOpen(false);
-                }
-                ImGui::PopID();
-            }
-            ImGui::SeparatorText("Unirse por IP");
-            ImGui::InputText("Dirección IP", &m_joinAddress);
-            ImGui::InputInt("Puerto##join", &m_joinPort);
-            if (ImGui::Button("Unirse", ImVec2(-1, 0))) {
-                joinServer(m_joinAddress, std::clamp(m_joinPort, 1, 65535));
-                setMenuOpen(false);
-            }
-            if (m_net.role() != net::NetSession::Role::None && ImGui::Button("Desconectar", ImVec2(-1, 0))) {
-                leaveNetwork();
-            }
-            ImGui::TextDisabled("Conexión directa por IP (abre el puerto UDP en tu router o usa una VPN LAN).");
-            drawInternetSection();
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Partida")) {
-            ImGui::TextUnformatted("Modo: Gun Game (todos contra todos)");
-            ImGui::SliderInt("Bots", &m_settings.botCount, 0, m_weapons.rules().maxPlayers - 1);
-            ImGui::TextDisabled("Los bots se aplican al reiniciar la partida.");
-            if (ImGui::BeginCombo("Mapa", mapLabel(m_mapFile).c_str())) {
-                for (const std::string& file : m_mapFiles) {
-                    if (ImGui::Selectable(file.c_str(), file == m_mapFile)) {
-                        loadMap(file);
-                        setMenuOpen(false);
-                    }
-                }
-                if (ImGui::Selectable("Procedural (nuevo al azar)")) {
-                    loadMap(randomProceduralMap());
-                    setMenuOpen(false);
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::SetNextItemWidth(160.0f);
-            ImGui::InputInt("Semilla", &m_proceduralSeed);
-            ImGui::SameLine();
-            if (ImGui::Button("Generar mapa procedural")) {
-                loadMap("procedural:" + std::to_string(std::max(0, m_proceduralSeed)));
-                setMenuOpen(false);
-            }
-            ImGui::TextDisabled("Cada semilla genera un mapa distinto: terreno, agua, estructuras y bosque.");
-            if (ImGui::Button("Reiniciar con estos ajustes", ImVec2(-1, 0))) {
-                restartMatch();
-                setMenuOpen(false);
-            }
-            ImGui::Separator();
-            const GunGameRules& rules = m_weapons.rules();
-            ImGui::Text("Niveles: %d   Límite de tiempo: %d min", m_weapons.tierCount(), static_cast<int>(rules.timeLimitSeconds / 60.0f));
-            ImGui::TextWrapped("Cada baja sube un nivel de arma. Morir por cuchillo te baja un nivel (humillación). "
-                               "El suicidio y las caídas también bajan un nivel. Gana quien consiga una baja con el "
-                               "cuchillo en el último nivel.");
-            ImGui::EndTabItem();
-        }
-        ImGui::EndTabBar();
-    }
+    if (ui::menuItem("editor", "Editor de mapas", 20.0f)) enterEditor();
+    if (ui::menuItem("quit", "Salir del juego", 20.0f)) m_window->requestClose();
     ImGui::End();
+    ImGui::PopStyleVar(2);
+
+    // --- Page content (right of the navigation). ---
+    const float contentX = left + 380.0f * k;
+    const float contentWidth = m_menuPage == Character ? 560.0f * k : std::min(860.0f * k, screen.x - contentX - 80.0f * k);
+    ImGui::SetNextWindowPos(ImVec2(contentX, top));
+    ImGui::SetNextWindowSize(ImVec2(contentWidth, screen.y - top - 60.0f * k));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::Begin("##menu_page", nullptr, bare & ~ImGuiWindowFlags_NoScrollbar);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f * k, 8.0f * k));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f * k, 8.0f * k));
+
+    switch (m_menuPage) {
+    case Graphics: {
+        ui::pageHeader("Gráficos", "Los ajustes nunca cambian colisiones ni visibilidad del mapa.");
+        RenderSettings& r = m_settings.render;
+        ui::section("Preajuste");
+        const char* presets[] = {"Batata", "Media", "Alta", "Ultra"};
+        const float presetWidth = (ImGui::GetContentRegionAvail().x - 3.0f * 10.0f * k) / 4.0f;
+        for (int i = 0; i < 4; ++i) {
+            if (i > 0) ImGui::SameLine();
+            if (ui::button(presets[i], presetWidth)) applyGraphicsPreset(i);
+        }
+        ui::section("Imagen");
+        const char* shadowLabels[] = {"Desactivadas", "Bajas", "Medias", "Altas", "Ultra"};
+        if (const int step = ui::stepper("shadows", "Calidad de sombras", shadowLabels[std::clamp(r.shadowQuality, 0, 4)])) {
+            r.shadowQuality = std::clamp(r.shadowQuality + step, 0, 4);
+        }
+        const int msaaValues[] = {0, 2, 4, 8};
+        const char* msaaLabels[] = {"Desactivado", "MSAA 2x", "MSAA 4x", "MSAA 8x"};
+        int msaaIndex = r.msaaSamples >= 8 ? 3 : r.msaaSamples >= 4 ? 2 : r.msaaSamples >= 2 ? 1 : 0;
+        if (const int step = ui::stepper("msaa", "Antialiasing", msaaLabels[msaaIndex])) {
+            msaaIndex = std::clamp(msaaIndex + step, 0, 3);
+            r.msaaSamples = msaaValues[msaaIndex];
+        }
+        int scale = static_cast<int>(std::round(r.renderScale * 100.0f));
+        ui::rowCaption("Escala de resolución");
+        if (ImGui::SliderInt("##scale", &scale, 50, 100, "%d%%")) r.renderScale = static_cast<float>(scale) / 100.0f;
+        ui::rowCaption("Exposición");
+        ImGui::SliderFloat("##exposure", &r.exposure, 0.5f, 2.0f, "%.2f");
+        ui::section("Efectos");
+        ui::toggle("Oclusión ambiental (SSAO)", &r.ssao);
+        ui::toggle("Bloom", &r.bloom);
+        ui::toggle("Luces volumétricas (niebla con sombras)", &r.godRays);
+        ui::toggle("Reflejos en el agua (SSR)", &r.ssr);
+        ui::toggle("Sombras de contacto", &r.contactShadows);
+        ui::toggle("Profundidad de campo al apuntar", &m_settings.adsDepthOfField);
+        ui::section("Vegetación");
+        int density = static_cast<int>(std::round(m_settings.vegetationDensity * 100.0f));
+        ui::rowCaption("Densidad de hierba");
+        if (ImGui::SliderInt("##density", &density, 20, 100, "%d%%")) m_settings.vegetationDensity = static_cast<float>(density) / 100.0f;
+        ui::rowCaption("Distancia de hierba");
+        ImGui::SliderFloat("##grassdist", &m_settings.vegetationDistance, 30.0f, 150.0f, "%.0f m");
+        ImGui::TextDisabled("Árboles, rocas, arbustos y helechos se ven igual en todas las calidades.");
+        ui::section("Rendimiento");
+        if (ui::toggle("Sincronización vertical (VSync)", &m_settings.vsync)) m_window->setVsync(m_settings.vsync);
+        ImGui::BeginDisabled(m_settings.vsync);
+        ui::rowCaption("FPS máximos");
+        ImGui::SliderInt("##maxfps", &m_settings.maxFps, 0, 360, m_settings.maxFps == 0 ? "Sin límite" : "%d");
+        ImGui::EndDisabled();
+        ui::toggle("Mostrar rendimiento (F3)", &m_settings.showStats);
+        break;
+    }
+    case Audio: {
+        ui::pageHeader("Audio", "Sonidos grabados con propagación: distancia, oclusión y dirección.");
+        ui::section("Volumen");
+        ui::rowCaption("Volumen general");
+        if (ImGui::SliderFloat("##master", &m_settings.masterVolume, 0.0f, 1.0f, "%.2f") && m_audioReady) {
+            m_audio.setVolume(m_settings.masterVolume);
+        }
+        if (ui::toggle("Sonido ambiente (viento, pájaros, agua)", &m_settings.ambience) && m_audioReady) {
+            m_audio.setAmbienceEnabled(m_settings.ambience);
+        }
+        if (!m_audioReady) ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::color::kDanger), "No se encontró dispositivo de audio.");
+        break;
+    }
+    case Controls: {
+        ui::pageHeader("Controles", "");
+        ui::section("Mira");
+        ui::rowCaption("Campo de visión");
+        ImGui::SliderFloat("##fov", &m_settings.fov, 60.0f, 110.0f, "%.0f°");
+        ui::rowCaption("Sensibilidad del ratón");
+        ImGui::SliderFloat("##sens", &m_settings.mouseSensitivity, 0.01f, 0.5f, "%.3f");
+        ui::rowCaption("Sensibilidad al apuntar");
+        ImGui::SliderFloat("##adssens", &m_settings.adsSensitivityScale, 0.2f, 1.5f, "%.2f");
+        ui::toggle("Invertir eje Y", &m_settings.invertY);
+        ui::section("Teclas");
+        const std::pair<const char*, const char*> keys[] = {
+            {"W A S D", "Moverse"},       {"Shift", "Correr"},          {"Espacio", "Saltar"},
+            {"Ctrl / C", "Agacharse"},    {"Z", "Cuerpo a tierra"},     {"Q / E", "Asomarse"},
+            {"Clic izq.", "Disparar"},    {"Clic der.", "Apuntar"},     {"R", "Recargar"},
+            {"V", "Cuchillo"},            {"Tab", "Tabla de jugadores"}, {"Esc", "Menú"},
+            {"F3", "Rendimiento"},        {"F12", "Captura"},           {"F1", "Editor de mapas"}};
+        const float column = ImGui::GetContentRegionAvail().x * 0.5f;
+        int index = 0;
+        for (const auto& [key, action] : keys) {
+            if (index % 2 == 1) ImGui::SameLine(column);
+            ui::keyHint(key, action, 130.0f * k);
+            ++index;
+        }
+        break;
+    }
+    case Character: {
+        ui::pageHeader("Personaje", "Solo cambia el aspecto: mismo tamaño y mismas zonas de impacto para todos.");
+        drawCharacterTab();
+        break;
+    }
+    case Multiplayer: {
+        ui::pageHeader("Multijugador", m_net.role() == net::NetSession::Role::None ? "Partida local" : m_net.status().c_str());
+        ui::rowCaption("Nombre");
+        ImGui::InputText("##name", &m_playerName);
+        if (m_net.isClient()) ImGui::Text("Ping: %.0f ms", m_net.pingMs());
+        ui::section("Crear partida (servidor)");
+        ui::rowCaption("Puerto");
+        ImGui::InputInt("##port", &m_hostPort);
+        ImGui::TextDisabled("Usa el mapa actual. Los jugadores ocupan el lugar de los bots.");
+        const float half = (ImGui::GetContentRegionAvail().x - 10.0f * k) * 0.5f;
+        if (ui::button("Crear partida", half, true)) {
+            startHosting(std::clamp(m_hostPort, 1024, 65535));
+            setMenuOpen(false);
+        }
+        ImGui::SameLine();
+        if (ui::button("Crear y publicar por internet", half)) startHosting(std::clamp(m_hostPort, 1024, 65535), true);
+        ui::section("Partidas en la red local");
+        m_lan.listen(m_time);
+        if (m_lan.servers().empty()) ImGui::TextDisabled("Buscando partidas... (los servidores se anuncian cada segundo)");
+        for (const net::LanDiscovery::Server& server : m_lan.servers()) {
+            ImGui::PushID((server.address + ":" + std::to_string(server.port)).c_str());
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("%s  ·  %s  ·  %d/%d", server.name.c_str(), server.map.c_str(), server.players, server.maxPlayers);
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 140.0f * k);
+            if (ui::button("Unirse", 140.0f * k)) {
+                joinServer(server.address, server.port);
+                setMenuOpen(false);
+            }
+            ImGui::PopID();
+        }
+        ui::section("Unirse por IP");
+        ui::rowCaption("Dirección IP");
+        ImGui::InputText("##ip", &m_joinAddress);
+        ui::rowCaption("Puerto");
+        ImGui::InputInt("##joinport", &m_joinPort);
+        if (ui::button("Unirse", 0.0f, true)) {
+            joinServer(m_joinAddress, std::clamp(m_joinPort, 1, 65535));
+            setMenuOpen(false);
+        }
+        if (m_net.role() != net::NetSession::Role::None && ui::button("Desconectar")) leaveNetwork();
+        ImGui::TextDisabled("Conexión directa por IP (abre el puerto UDP en tu router o usa una VPN LAN).");
+        drawInternetSection();
+        break;
+    }
+    case Match:
+    default: {
+        const GunGameRules& rules = m_weapons.rules();
+        ui::pageHeader("Partida", "Gun Game · todos contra todos");
+        ui::section("Ajustes");
+        if (const int step = ui::stepper("bots", "Bots", std::to_string(m_settings.botCount))) {
+            m_settings.botCount = std::clamp(m_settings.botCount + step, 0, rules.maxPlayers - 1);
+        }
+        std::vector<std::string> choices = m_mapFiles;
+        choices.push_back("procedural");
+        const bool procedural = m_mapFile.starts_with("procedural:");
+        const auto current = std::find(choices.begin(), choices.end(), procedural ? std::string("procedural") : m_mapFile);
+        const int mapIndex = current == choices.end() ? 0 : static_cast<int>(current - choices.begin());
+        if (const int step = ui::stepper("map", "Mapa", mapLabel(m_mapFile)); step != 0 && !choices.empty()) {
+            const int count = static_cast<int>(choices.size());
+            const std::string& next = choices[static_cast<size_t>((mapIndex + step + count) % count)];
+            loadMap(next == "procedural" ? randomProceduralMap() : next);
+        }
+        ui::rowCaption("Semilla procedural");
+        ImGui::InputInt("##seed", &m_proceduralSeed);
+        if (ui::button("Generar mapa con esta semilla")) {
+            loadMap("procedural:" + std::to_string(std::max(0, m_proceduralSeed)));
+            setMenuOpen(false);
+        }
+        if (ui::button("Reiniciar con estos ajustes", 0.0f, true)) {
+            restartMatch();
+            setMenuOpen(false);
+        }
+        ui::section("Reglas");
+        ImGui::TextWrapped("%d niveles de arma, %d minutos. Cada baja sube un nivel. Morir por cuchillo te baja uno "
+                           "(humillación), igual que el suicidio y las caídas. Gana quien consiga una baja con el cuchillo "
+                           "en el último nivel.",
+                           m_weapons.tierCount(), static_cast<int>(rules.timeLimitSeconds / 60.0f));
+        break;
+    }
+    }
+    ImGui::PopStyleVar(2);
+    ImGui::End();
+    ImGui::PopStyleVar();
 }
 
 void App::applyGraphicsPreset(int level) {
@@ -2035,46 +2077,70 @@ void App::playFromTitle() {
 
 void App::drawTitleScreen() {
     const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    const float k = ui::scale();
+    const ui::Fonts& f = ui::fonts();
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(screen.x * 0.45f, screen.y), IM_COL32(0, 0, 0, 200), IM_COL32(0, 0, 0, 0),
-                                IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 200));
-    dl->AddText(m_fontBold, 96.0f, ImVec2(80.0f, screen.y * 0.18f), IM_COL32(235, 225, 200, 255), "ORIGON");
-    dl->AddText(m_fontRegular, 22.0f, ImVec2(86.0f, screen.y * 0.18f + 104.0f), IM_COL32(190, 200, 170, 230),
-                "Gun Game  ·  Bosque  ·  Hasta 10 jugadores");
+    // Left-side shade for legibility, plus a soft floor shade.
+    dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(screen.x * 0.55f, screen.y), IM_COL32(8, 10, 8, 225), IM_COL32(8, 10, 8, 0),
+                                IM_COL32(8, 10, 8, 0), IM_COL32(8, 10, 8, 225));
+    dl->AddRectFilledMultiColor(ImVec2(0, screen.y * 0.7f), screen, IM_COL32(8, 10, 8, 0), IM_COL32(8, 10, 8, 0),
+                                IM_COL32(8, 10, 8, 170), IM_COL32(8, 10, 8, 170));
+
+    const float left = 96.0f * k;
+    const float top = screen.y * 0.17f;
+    dl->AddRectFilled(ImVec2(left, top), ImVec2(left + 48.0f * k, top + 3.0f * k), ui::color::kBrass);
+    ui::label(dl, ImVec2(left, top + 16.0f * k), ui::color::kMuted, "Gun Game", 15.0f);
+    ui::text(dl, f.heavy, 128.0f * k, ImVec2(left - 6.0f * k, top + 30.0f * k), ui::color::kPaper, "ORIGON", 10.0f * k);
+    ui::label(dl, ImVec2(left, top + 176.0f * k), ui::color::kMuted,
+              std::format("{}  ·  Hasta 10 jugadores  ·  Escalera de 20 armas", mapLabel(m_mapFile)), 14.5f);
+    ui::label(dl, ImVec2(left, screen.y - 48.0f * k), ui::color::kDim, "Enter  jugar     ·     Esc  configuración", 13.5f);
     if (m_menuOpen) return;
-    ImGui::SetNextWindowPos(ImVec2(80.0f, screen.y * 0.42f));
-    ImGui::SetNextWindowSize(ImVec2(320.0f, 0.0f));
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)) {
+        playFromTitle();
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImVec2(left - 4.0f * k, top + 250.0f * k));
+    ImGui::SetNextWindowSize(ImVec2(420.0f * k, 0.0f));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
-    ImGui::Begin("##title", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-    ImGui::PushFont(m_fontBold, 22.0f);
-    const ImVec2 size(-1, 46);
-    if (ImGui::Button("Jugar contra bots", size)) playFromTitle();
-    if (ImGui::Button("Multijugador", size)) {
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f * k, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f * k));
+    ImGui::Begin("##title", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                         ImGuiWindowFlags_AlwaysAutoResize);
+    if (ui::menuItem("play", "Jugar contra bots", 44.0f)) playFromTitle();
+    if (ui::menuItem("multi", "Multijugador", 34.0f)) {
         m_menuTab = 1;
         setMenuOpen(true);
     }
-    if (ImGui::Button("Editor de mapas", size)) {
+    if (ui::menuItem("settings", "Configuración", 34.0f)) {
+        m_menuTab = 0;
+        setMenuOpen(true);
+    }
+    if (ui::menuItem("editor", "Editor de mapas", 24.0f)) {
         m_titleScreen = false;
         m_sim->players()[0].isBot = false;
         enterEditor();
     }
-    if (ImGui::Button("Configuración", size)) {
-        m_menuTab = 0;
-        setMenuOpen(true);
-    }
-    if (ImGui::Button("Salir", size)) m_window->requestClose();
-    ImGui::PopFont();
-    ImGui::Spacing();
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::BeginCombo("##map", ("Mapa: " + mapLabel(m_mapFile)).c_str())) {
-        for (const std::string& file : m_mapFiles) {
-            if (ImGui::Selectable(file.c_str(), file == m_mapFile)) loadMap(file);
-        }
-        if (ImGui::Selectable("Procedural (nuevo al azar)")) loadMap(randomProceduralMap());
-        ImGui::EndCombo();
+    if (ui::menuItem("quit", "Salir", 24.0f)) m_window->requestClose();
+
+    // Map: cycle through the map files plus a fresh procedural one.
+    ImGui::Dummy(ImVec2(0.0f, 40.0f * k));
+    std::vector<std::string> choices = m_mapFiles;
+    choices.push_back("procedural");
+    const bool procedural = m_mapFile.starts_with("procedural:");
+    const auto current = std::find(choices.begin(), choices.end(), procedural ? std::string("procedural") : m_mapFile);
+    const int index = current == choices.end() ? 0 : static_cast<int>(current - choices.begin());
+    const int step = ui::selector("map", "Mapa", procedural ? std::string("Procedural · ") + m_mapFile.substr(11) : mapLabel(m_mapFile),
+                                  340.0f * k);
+    if (step != 0 && !choices.empty()) {
+        const int count = static_cast<int>(choices.size());
+        const std::string& next = choices[static_cast<size_t>((index + step + count) % count)];
+        loadMap(next == "procedural" ? randomProceduralMap() : next);
     }
     ImGui::End();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
 }
 
 void App::drawStats(float) {

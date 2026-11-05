@@ -50,4 +50,24 @@ void label(ImDrawList* dl, ImVec2 pos, ImU32 color, const std::string& s, float 
 void panel(ImDrawList* dl, ImVec2 min, ImVec2 max, float opacity = 0.72f, bool border = true);
 std::string upper(const std::string& s); // UTF-8 aware for Spanish letters (á, é, í, ó, ú, ñ, ü).
 
+// Menu widgets (inside an ImGui window, keyboard/gamepad navigable).
+// A large typographic menu entry: no box; on hover/focus it turns brass, slides right and shows a bar.
+bool menuItem(const char* id, const std::string& text, float size, bool enabled = true);
+// "LABEL   ‹ value ›": returns -1 / +1 when an arrow is clicked (or left/right pressed while focused), else 0.
+int selector(const char* id, const std::string& caption, const std::string& value, float width);
+// One settings row: caption on the left, "‹ value ›" on the right (optional color swatch). Same return as selector.
+int stepper(const char* id, const std::string& caption, const std::string& value, const ImVec4* swatch = nullptr);
+// Settings row layout: draws the caption, then positions the cursor for a full-width control on the right.
+void rowCaption(const char* caption, const char* hint = nullptr);
+// Section heading inside a page: tracked uppercase label and a hairline.
+void section(const char* title);
+// Page header: big title and a one-line description.
+void pageHeader(const char* title, const char* description);
+// Keycap chip followed by an action description (controls page).
+void keyHint(const char* key, const char* action, float keyWidth);
+// On/off switch row: caption on the left, a pill switch on the right. Returns true when toggled.
+bool toggle(const char* caption, bool* value);
+// Primary / secondary rectangular buttons in the theme (full width when width is 0).
+bool button(const char* text, float width = 0.0f, bool primary = false);
+
 } // namespace origon::ui

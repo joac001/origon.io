@@ -39,6 +39,7 @@ int main(int argc, char** argv) {
         else if (arg == "--press-play") options.pressPlayFrame = std::atoi(next().c_str());
         else if (arg == "--ads") options.forceAds = true;
         else if (arg == "--scoreboard") options.showScoreboard = true;
+        else if (arg == "--menu") options.menuPage = std::atoi(next().c_str());
         else if (arg == "--tier") options.forceTier = std::atoi(next().c_str());
         else if (arg == "--hold") {
             const std::string list = next();

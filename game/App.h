@@ -48,6 +48,7 @@ struct LaunchOptions {
     bool forceAds = false;     // Debug: the local player aims down sights (view model captures).
     int forceTier = -1;        // Debug: the local player holds this ladder weapon (view model captures).
     bool showScoreboard = false; // Debug: keep the scoreboard open (HUD captures).
+    int menuPage = -1;           // Debug: open the menu on this page (captures).
     uint32_t holdButtons = 0;  // Debug: buttons held by the local player (--hold lean-left,lean-right,prone,crouch).
     int pressPlayFrame = 0;    // Test: press "Jugar contra bots" on the title screen at this frame.
     int forceLod = -1;         // Debug: draw characters at this LOD regardless of distance.
@@ -156,7 +157,8 @@ private:
     Mode m_mode = Mode::Playing;
     bool m_menuOpen = false;
     bool m_titleScreen = false;
-    int m_menuTab = -1; // Tab to open when the pause menu appears (-1: keep).
+    int m_menuTab = -1; // Page to open when the pause menu appears (-1: keep).
+    int m_menuPage = 5; // Current menu page (see drawMenu).
     std::string m_mapFile = "bosque";
     std::vector<std::string> m_mapFiles;
 
