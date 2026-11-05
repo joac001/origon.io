@@ -1144,10 +1144,16 @@ glm::mat4 weaponAttachment(const SkinnedModel& sk, const std::vector<glm::mat4>&
         if (hand < 0) return glm::mat4(1.0f);
         return glm::translate(glm::mat4(1.0f), glm::vec3(globals[static_cast<size_t>(hand)][3]) + glm::vec3(-0.02f, -0.02f, 0.03f));
     }
-    std::vector<glm::mat4> rest, skin;
-    sk.evaluate(sk.restPose(), rest, skin);
-    const glm::mat4& restJoint = rest[static_cast<size_t>(joint)];
-    return globals[static_cast<size_t>(joint)] * glm::inverse(restJoint) * glm::translate(glm::mat4(1.0f), glm::vec3(restJoint[3]));
+    // Rest transform of the joint, per model (both soldier models live as long as the app).
+    static std::map<const SkinnedModel*, glm::mat4> restOffsets;
+    auto it = restOffsets.find(&sk);
+    if (it == restOffsets.end()) {
+        std::vector<glm::mat4> rest, skin;
+        sk.evaluate(sk.restPose(), rest, skin);
+        const glm::mat4& restJoint = rest[static_cast<size_t>(joint)];
+        it = restOffsets.emplace(&sk, glm::inverse(restJoint) * glm::translate(glm::mat4(1.0f), glm::vec3(restJoint[3]))).first;
+    }
+    return globals[static_cast<size_t>(joint)] * it->second;
 }
 
 // Weight envelope for one-shot upper-body clips: fades in and out over `edge` of the progress.
@@ -1320,7 +1326,8 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
     };
     static const Entry entries[] = {{"walk", 0.0f},  {"walk", 0.125f}, {"walk", 0.25f},  {"walk", 0.375f},
                                     {"walk", 0.5f},  {"run", 0.0f},    {"run", 0.125f},  {"run", 0.25f},
-                                    {"run", 0.375f}, {"crouch_walk", 0.0f}, {"crouch_walk", 0.25f}, {"jump", 0.0f}};
+                                    {"run", 0.375f}, {"crouch_walk", 0.0f}, {"crouch_walk", 0.25f}, {"jump", 0.0f},
+                                    {"idle", 0.0f},  {"reload", 0.3f}, {"reload", 0.6f}, {"knife", 0.4f}};
     const glm::vec3 forward = viewDirection(yaw, 0.0f);
     const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
     const int count = static_cast<int>(std::size(entries));
@@ -1336,7 +1343,8 @@ void App::submitPoseGallery(const glm::vec3& eye, float yaw) {
         // Profile view (facing right on screen) so gait poses read.
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), feet) *
                                 glm::rotate(glm::mat4(1.0f), yaw - glm::half_pi<float>(), glm::vec3(0, 1, 0));
-        drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
+        const std::vector<glm::mat4>& globals = drawSoldierPose(pose, model, look, glm::vec3(0.6f, 0.1f, 0.08f), false);
+        if (const Model* gun = m_models.getWeapon("garand")) submitModel(*gun, model * weaponAttachment(sk, globals));
     }
 }
 
